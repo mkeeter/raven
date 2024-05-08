@@ -16,12 +16,12 @@ struct Mode {
     ret: bool,
 }
 
-impl Mode {
-    fn offset(&self, v: u8) -> u8 {
-        if self.short {
-            v.wrapping_mul(2)
-        } else {
-            v
+impl From<LitMode> for Mode {
+    fn from(mode: LitMode) -> Mode {
+        Mode {
+            short: mode.short,
+            keep: false,
+            ret: mode.ret,
         }
     }
 }
@@ -637,6 +637,7 @@ impl<'a> TryFrom<&'a str> for Op {
     }
 }
 
+#[derive(Debug)]
 struct Stack {
     data: [u8; 256],
 
@@ -644,6 +645,74 @@ struct Stack {
     ///
     /// If the buffer is empty or full, it points to `u8::MAX`.
     index: u8,
+}
+
+/// Virtual stack, which is aware of `keep` and `short` modes
+///
+/// This type expects the user to perform all of their `pop()` calls first,
+/// followed by any `push(..)` calls.  `pop()` will either adjust the true index
+/// or a virtual index, depending on whether `keep` is set.
+struct StackView<'a> {
+    stack: &'a mut Stack,
+    keep: bool,
+    short: bool,
+
+    /// Virtual index, used in `keep` mode
+    offset: u8,
+}
+
+impl<'a> StackView<'a> {
+    fn new(stack: &'a mut Stack, mode: Mode) -> Self {
+        Self {
+            stack,
+            keep: mode.keep,
+            short: mode.short,
+            offset: 0,
+        }
+    }
+
+    /// Pops a single value from the stack based
+    ///
+    /// Returns a [`Value::Short`] if `self.short` is set, and a [`Value::Byte`]
+    /// otherwise.
+    ///
+    /// If `self.keep` is set, then only the view offset ([`StackView::offset`])
+    /// is changed; otherwise, the stack index ([`Stack::index`]) is changed.
+    fn pop(&mut self) -> Value {
+        self.pop_type(self.short)
+    }
+
+    fn pop_type(&mut self, short: bool) -> Value {
+        if self.keep {
+            let v = self.stack.peek_at(self.offset, short);
+            self.offset = self.offset.wrapping_add(if short { 2 } else { 1 });
+            v
+        } else {
+            self.stack.pop(short)
+        }
+    }
+
+    fn pop_byte(&mut self) -> u8 {
+        let Value::Byte(out) = self.pop_type(false) else {
+            unreachable!();
+        };
+        out
+    }
+
+    fn pop_short(&mut self) -> u16 {
+        let Value::Short(out) = self.pop_type(true) else {
+            unreachable!();
+        };
+        out
+    }
+
+    fn push(&mut self, v: Value) {
+        self.stack.push(v);
+    }
+
+    fn push_byte(&mut self, v: u8) {
+        self.stack.push_byte(v);
+    }
 }
 
 impl Default for Stack {
@@ -682,18 +751,20 @@ impl Value {
     }
 }
 
-impl Stack {
-    /// Drops `n` bytes from the stack
-    fn drop(&mut self, n: u8) {
-        self.index = self.index.wrapping_sub(n);
+impl From<Value> for u16 {
+    fn from(v: Value) -> u16 {
+        match v {
+            Value::Short(v) => v,
+            Value::Byte(v) => u16::from(v),
+        }
     }
+}
+
+impl Stack {
     fn pop_byte(&mut self) -> u8 {
         let out = self.data[usize::from(self.index)];
         self.index = self.index.wrapping_sub(1);
         out
-    }
-    fn peek_short(&mut self) -> u16 {
-        self.peek_short_at(0)
     }
     fn pop_short(&mut self) -> u16 {
         let lo = self.pop_byte();
@@ -722,26 +793,6 @@ impl Stack {
             Value::Byte(self.pop_byte())
         }
     }
-    fn peek(&self, short: bool) -> Value {
-        self.peek_at(0, short)
-    }
-    fn peek_byte(&self) -> u8 {
-        self.peek_byte_at(0)
-    }
-    fn peekpop_byte(&mut self, keep: bool) -> u8 {
-        if keep {
-            self.peek_byte()
-        } else {
-            self.pop_byte()
-        }
-    }
-    fn peekpop_byte_at(&mut self, offset: u8, keep: bool) -> u8 {
-        if keep {
-            self.peek_byte_at(offset)
-        } else {
-            self.pop_byte()
-        }
-    }
     fn peek_byte_at(&self, offset: u8) -> u8 {
         self.data[usize::from(self.index.wrapping_sub(offset))]
     }
@@ -755,13 +806,6 @@ impl Stack {
             Value::Short(self.peek_short_at(offset))
         } else {
             Value::Byte(self.peek_byte_at(offset))
-        }
-    }
-    fn peekpop(&mut self, mode: Mode) -> Value {
-        if mode.keep {
-            self.peek(mode.short)
-        } else {
-            self.pop(mode.short)
         }
     }
 }
@@ -825,90 +869,72 @@ impl Vm {
                 self.pc = self.pc.wrapping_add(dt);
             }
             Op::Lit(mode) => {
-                if mode.short {
-                    let v = self.next2();
-                    self.stack_mut(mode.ret).push(Value::Short(v));
+                let v = if mode.short {
+                    Value::Short(self.next2())
                 } else {
-                    let v = self.next();
-                    self.stack_mut(mode.ret).push(Value::Byte(v));
-                }
+                    Value::Byte(self.next())
+                };
+                self.stack_view(Mode::from(mode)).push(v);
             }
             Op::Inc(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let v = s.peekpop(mode);
+                let mut s = self.stack_view(mode);
+                let v = s.pop();
                 s.push(v.wrapping_add(1));
             }
             Op::Pop(mode) => {
-                let s = self.stack_mut(mode.ret);
-                s.peekpop(mode);
+                self.stack_view(mode).pop();
             }
             Op::Nip(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let v = s.peek(mode.short);
-                if !mode.keep {
-                    s.drop(mode.offset(2));
-                }
+                let mut s = self.stack_view(mode);
+                let v = s.pop();
+                let _ = s.pop();
                 s.push(v);
             }
             Op::Swp(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let a = s.peek_at(0, mode.short);
-                let b = s.peek_at(mode.offset(1), mode.short);
-                if !mode.keep {
-                    s.drop(mode.offset(2));
-                }
-                s.push(a);
+                let mut s = self.stack_view(mode);
+                let b = s.pop();
+                let a = s.pop();
                 s.push(b);
+                s.push(a);
             }
             Op::Rot(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let c = s.peek_at(0, mode.short);
-                let b = s.peek_at(mode.offset(1), mode.short);
-                let a = s.peek_at(mode.offset(2), mode.short);
-                if !mode.keep {
-                    s.drop(mode.offset(3));
-                }
+                let mut s = self.stack_view(mode);
+                let c = s.pop();
+                let b = s.pop();
+                let a = s.pop();
                 s.push(b);
                 s.push(c);
                 s.push(a);
             }
             Op::Dup(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let v = s.peek(mode.short);
+                let mut s = self.stack_view(mode);
+                let v = s.pop();
                 s.push(v);
-                if mode.keep {
-                    s.push(v);
-                }
+                s.push(v);
             }
             Op::Ovr(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let b = s.peek_at(0, mode.short);
-                let a = s.peek_at(mode.offset(1), mode.short);
+                let mut s = self.stack_view(mode);
+                let b = s.pop();
+                let a = s.pop();
                 s.push(a);
-                if mode.keep {
-                    s.push(b);
-                    s.push(a);
-                }
+                s.push(b);
+                s.push(a);
             }
             Op::Equ(mode) => self.op_cmp(mode, |a, b| a == b),
             Op::Neq(mode) => self.op_cmp(mode, |a, b| a != b),
             Op::Gth(mode) => self.op_cmp(mode, |a, b| b > a),
             Op::Lth(mode) => self.op_cmp(mode, |a, b| b < a),
             Op::Jmp(mode) => {
-                let s = self.stack_mut(mode.ret);
-                self.pc = match s.peekpop(mode) {
+                let mut s = self.stack_view(mode);
+                self.pc = match s.pop() {
                     Value::Short(v) => v,
                     Value::Byte(v) => self.pc.wrapping_add(u16::from(v)),
                 }
             }
             Op::Jcn(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let dst = s.peekpop(mode);
-                let cond = if mode.keep {
-                    s.peek_byte_at(mode.offset(1))
-                } else {
-                    s.pop_byte()
-                };
+                let mut s = self.stack_view(mode);
+                let dst = s.pop();
+                let cond = s.pop_byte();
                 if cond != 0 {
                     self.pc = match dst {
                         Value::Short(dst) => dst,
@@ -920,21 +946,23 @@ impl Vm {
             }
             Op::Jsr(mode) => {
                 self.ret.push(Value::Short(self.pc));
-                let s = self.stack_mut(mode.ret);
-                self.pc = match s.peekpop(mode) {
+                let mut s = self.stack_view(mode);
+                self.pc = match s.pop() {
                     Value::Short(v) => v,
                     Value::Byte(v) => self.pc.wrapping_add(u16::from(v)),
                 }
             }
             Op::Sth(mode) => {
-                let src = self.stack_mut(!mode.ret);
-                let v = src.peekpop(mode);
-                let dst = self.stack_mut(mode.ret);
-                dst.push(v);
+                let v = self
+                    .stack_view(Mode {
+                        ret: !mode.ret,
+                        ..mode
+                    })
+                    .pop();
+                self.stack_view(mode).push(v)
             }
             Op::Ldz(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let addr = s.peekpop_byte(mode.keep);
+                let addr = self.stack_view(mode).pop_byte();
                 let v = if mode.short {
                     let hi = self.ram[usize::from(addr)];
                     let lo = self.ram[usize::from(addr.wrapping_add(1))];
@@ -943,33 +971,24 @@ impl Vm {
                     let v = self.ram[usize::from(addr)];
                     Value::Byte(v)
                 };
-                let s = self.stack_mut(mode.ret);
-                s.push(v);
+                self.stack_view(mode).push(v)
             }
             Op::Stz(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let addr = s.peekpop_byte(mode.keep);
-                if mode.short {
-                    let v = if mode.keep {
-                        s.peek_short_at(1)
-                    } else {
-                        s.pop_short()
-                    };
-                    let [hi, lo] = v.to_be_bytes();
-                    self.ram[usize::from(addr)] = hi;
-                    self.ram[usize::from(addr.wrapping_add(1))] = lo;
-                } else {
-                    let v = if mode.keep {
-                        s.peek_byte_at(1)
-                    } else {
-                        s.pop_byte()
-                    };
-                    self.ram[usize::from(addr)] = v;
+                let mut s = self.stack_view(mode);
+                let addr = s.pop_byte();
+                match s.pop() {
+                    Value::Short(v) => {
+                        let [hi, lo] = v.to_be_bytes();
+                        self.ram[usize::from(addr)] = hi;
+                        self.ram[usize::from(addr.wrapping_add(1))] = lo;
+                    }
+                    Value::Byte(v) => {
+                        self.ram[usize::from(addr)] = v;
+                    }
                 }
             }
             Op::Ldr(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let offset = s.peekpop_byte(mode.keep) as i8;
+                let offset = self.stack_view(mode).pop_byte() as i8;
 
                 // TODO: make this more obviously infallible
                 let addr = if offset < 0 {
@@ -979,6 +998,7 @@ impl Vm {
                 } else {
                     self.pc.wrapping_add(u16::try_from(offset).unwrap())
                 };
+
                 let v = if mode.short {
                     let hi = self.ram[usize::from(addr)];
                     let lo = self.ram[usize::from(addr.wrapping_add(1))];
@@ -987,25 +1007,18 @@ impl Vm {
                     let v = self.ram[usize::from(addr)];
                     Value::Byte(v)
                 };
-                let s = self.stack_mut(mode.ret);
-                s.push(v);
+                self.stack_view(mode).push(v);
             }
             Op::Str(mode) => {
                 let pc = self.pc;
-                let s = self.stack_mut(mode.ret);
-                let offset = s.peekpop_byte(mode.keep) as i8;
+                let mut s = self.stack_view(mode);
+                let offset = s.pop_byte() as i8;
                 let addr = if offset < 0 {
                     pc.wrapping_sub(i16::from(offset).abs().try_into().unwrap())
                 } else {
                     pc.wrapping_add(u16::try_from(offset).unwrap())
                 };
-
-                let v = if mode.keep {
-                    s.peek_at(1, mode.short)
-                } else {
-                    s.pop(mode.short)
-                };
-                match v {
+                match s.pop() {
                     Value::Short(v) => {
                         let [hi, lo] = v.to_be_bytes();
                         self.ram[usize::from(addr)] = hi;
@@ -1017,13 +1030,7 @@ impl Vm {
                 }
             }
             Op::Lda(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let addr = if mode.keep {
-                    s.peek_short()
-                } else {
-                    s.pop_short()
-                };
-
+                let addr = self.stack_view(mode).pop_short();
                 let v = if mode.short {
                     let hi = self.ram[usize::from(addr)];
                     let lo = self.ram[usize::from(addr.wrapping_add(1))];
@@ -1032,23 +1039,12 @@ impl Vm {
                     let v = self.ram[usize::from(addr)];
                     Value::Byte(v)
                 };
-                let s = self.stack_mut(mode.ret);
-                s.push(v);
+                self.stack_view(mode).push(v);
             }
             Op::Sta(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let addr = if mode.keep {
-                    s.peek_short()
-                } else {
-                    s.pop_short()
-                };
-
-                let v = if mode.keep {
-                    s.peek_at(1, mode.short)
-                } else {
-                    s.pop(mode.short)
-                };
-                match v {
+                let mut s = self.stack_view(mode);
+                let addr = s.pop_short();
+                match s.pop() {
                     Value::Short(v) => {
                         let [hi, lo] = v.to_be_bytes();
                         self.ram[usize::from(addr)] = hi;
@@ -1060,32 +1056,31 @@ impl Vm {
                 }
             }
             Op::Dei(mode) => {
-                // TODO pass in devs, instead of stealing them here?
-                let s = self.stack_mut(mode.ret);
-                let i = s.peekpop_byte(mode.keep);
-                // Short mode is weird here, but I think this matches the C
-                // reference implementation.
-                let a = dev.dei(self, i);
-                self.stack_mut(mode.ret).push_byte(a);
-                if mode.short {
-                    let i = i.wrapping_add(1);
-                    let a = dev.dei(self, i);
-                    self.stack_mut(mode.ret).push_byte(a);
-                }
+                let i = self.stack_view(mode).pop_byte();
+                let v = if mode.short {
+                    // ORDER??
+                    let lo = dev.dei(self, i);
+                    let hi = dev.dei(self, i.wrapping_add(1));
+                    Value::Short(u16::from_be_bytes([hi, lo]))
+                } else {
+                    let lo = dev.dei(self, i);
+                    Value::Byte(lo)
+                };
+                self.stack_view(mode).push(v);
             }
             Op::Deo(mode) => {
-                // TODO pass in devs, instead of stealing them here?
-                let s = self.stack_mut(mode.ret);
-                let i = s.peekpop_byte(mode.keep);
-                let v = s.peekpop_byte_at(1, mode.keep);
-                // Short mode is weird here, but I think this matches the C
-                // reference implementation.
-                dev.deo(self, i, v);
-                if mode.short {
-                    let i = i.wrapping_add(1);
-                    let s = self.stack_mut(mode.ret);
-                    let v = s.peekpop_byte_at(2, mode.keep);
-                    dev.deo(self, i, v);
+                let mut s = self.stack_view(mode);
+                let i = s.pop_byte();
+                match s.pop() {
+                    Value::Short(v) => {
+                        let [hi, lo] = v.to_be_bytes();
+                        // ORDER??
+                        dev.deo(self, i, lo);
+                        dev.deo(self, i.wrapping_add(1), hi);
+                    }
+                    Value::Byte(v) => {
+                        dev.deo(self, i, v);
+                    }
                 }
             }
             Op::Add(mode) => {
@@ -1110,15 +1105,11 @@ impl Vm {
                 self.op_bin(mode, |a, b| a ^ b);
             }
             Op::Sft(mode) => {
-                let s = self.stack_mut(mode.ret);
-                let shift = s.peekpop_byte(mode.keep);
+                let mut s = self.stack_view(mode);
+                let shift = s.pop_byte();
                 let shr = u32::from(shift & 0xF);
                 let shl = u32::from(shift >> 4);
-                let v = if mode.keep {
-                    s.peek_at(1, mode.short)
-                } else {
-                    s.pop(mode.short)
-                };
+                let v = s.pop();
                 s.push(v.wrapping_shr(shr).wrapping_shl(shl));
             }
         }
@@ -1127,46 +1118,32 @@ impl Vm {
     }
 
     fn op_cmp<F: Fn(u16, u16) -> bool>(&mut self, mode: Mode, f: F) {
-        let s = self.stack_mut(mode.ret);
-        let v = if mode.short {
-            let (a, b) = (s.peek_short_at(0), s.peek_short_at(2));
-            if !mode.keep {
-                s.drop(4);
-            }
-            f(a, b)
-        } else {
-            let (a, b) = (s.peek_byte_at(0), s.peek_byte_at(1));
-            if !mode.keep {
-                s.drop(2);
-            }
-            f(u16::from(a), u16::from(b))
-        };
-        s.push_byte(v as u8);
+        let mut s = self.stack_view(mode);
+        let a = s.pop();
+        let b = s.pop();
+        let v = f(u16::from(a), u16::from(b));
+        s.push_byte(v as u8)
     }
 
     fn op_bin<F: Fn(u16, u16) -> u16>(&mut self, mode: Mode, f: F) {
-        let s = self.stack_mut(mode.ret);
-        if mode.short {
-            let (a, b) = (s.peek_short_at(2), s.peek_short_at(0));
-            if !mode.keep {
-                s.drop(4);
-            }
-            s.push_short(f(a, b));
+        let mut s = self.stack_view(mode);
+        let b = s.pop();
+        let a = s.pop();
+        let v = f(u16::from(a), u16::from(b));
+        s.push(if mode.short {
+            Value::Short(v)
         } else {
-            let (a, b) = (s.peek_byte_at(1), s.peek_byte_at(0));
-            if !mode.keep {
-                s.drop(2);
-            }
-            s.push_byte(f(u16::from(a), u16::from(b)) as u8);
-        }
+            Value::Byte(v as u8)
+        })
     }
 
-    fn stack_mut(&mut self, ret: bool) -> &mut Stack {
-        if ret {
+    fn stack_view(&mut self, mode: Mode) -> StackView {
+        let stack = if mode.ret {
             &mut self.ret
         } else {
             &mut self.stack
-        }
+        };
+        StackView::new(stack, mode)
     }
 }
 
@@ -1190,6 +1167,7 @@ mod test {
     }
 
     fn parse_and_test(s: &str) {
+        println!("\n{s}");
         let mut vm = Vm::default();
         let mut iter = s.split_whitespace();
         let mut op = None;
