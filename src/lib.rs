@@ -1,3 +1,4 @@
+/// Opcode mode flags
 #[derive(Copy, Clone, Debug)]
 struct Mode {
     /// `2` mode
@@ -26,6 +27,7 @@ impl From<LitMode> for Mode {
     }
 }
 
+/// Opcode mode flags for literal opcodes (where `keep` is always true)
 #[derive(Copy, Clone, Debug)]
 struct LitMode {
     /// `2` mode
@@ -39,6 +41,7 @@ struct LitMode {
     ret: bool,
 }
 
+/// Uxn opcode
 #[derive(Copy, Clone, Debug)]
 enum Op {
     /// Break
@@ -533,6 +536,7 @@ enum Op {
     Sft(Mode),
 }
 
+/// Every `u8` is a valid opcode
 impl From<u8> for Op {
     fn from(i: u8) -> Op {
         let short = (i & (1 << 5)) != 0;
@@ -583,60 +587,6 @@ impl From<u8> for Op {
     }
 }
 
-impl<'a> TryFrom<&'a str> for Op {
-    type Error = &'a str;
-    fn try_from(s: &str) -> Result<Op, &str> {
-        let (s, ret) =
-            s.strip_suffix('r').map(|s| (s, true)).unwrap_or((s, false));
-        let (s, keep) =
-            s.strip_suffix('k').map(|s| (s, true)).unwrap_or((s, false));
-        let (s, short) =
-            s.strip_suffix('2').map(|s| (s, true)).unwrap_or((s, false));
-        let mode = Mode { ret, keep, short };
-        let out = match s {
-            "BRK" => Op::Brk,
-            "JCI" => Op::Jci,
-            "JMI" => Op::Jmi,
-            "JSI" => Op::Jsi,
-            "LIT" => Op::Lit(LitMode { ret, short }),
-
-            "INC" => Op::Inc(mode),
-            "POP" => Op::Pop(mode),
-            "NIP" => Op::Nip(mode),
-            "SWP" => Op::Swp(mode),
-            "ROT" => Op::Rot(mode),
-            "DUP" => Op::Dup(mode),
-            "OVR" => Op::Ovr(mode),
-            "EQU" => Op::Equ(mode),
-            "NEQ" => Op::Neq(mode),
-            "GTH" => Op::Gth(mode),
-            "LTH" => Op::Lth(mode),
-            "JMP" => Op::Jmp(mode),
-            "JCN" => Op::Jcn(mode),
-            "JSR" => Op::Jsr(mode),
-            "STH" => Op::Sth(mode),
-            "LDZ" => Op::Ldz(mode),
-            "STZ" => Op::Stz(mode),
-            "LDR" => Op::Ldr(mode),
-            "STR" => Op::Str(mode),
-            "LDA" => Op::Lda(mode),
-            "STA" => Op::Sta(mode),
-            "DEI" => Op::Dei(mode),
-            "DEO" => Op::Deo(mode),
-            "ADD" => Op::Add(mode),
-            "SUB" => Op::Sub(mode),
-            "MUL" => Op::Mul(mode),
-            "DIV" => Op::Div(mode),
-            "AND" => Op::And(mode),
-            "ORA" => Op::Ora(mode),
-            "EOR" => Op::Eor(mode),
-            "SFT" => Op::Sft(mode),
-            _ => return Err(s),
-        };
-        Ok(out)
-    }
-}
-
 #[derive(Debug)]
 struct Stack {
     data: [u8; 256],
@@ -671,7 +621,7 @@ impl<'a> StackView<'a> {
         }
     }
 
-    /// Pops a single value from the stack based
+    /// Pops a single value from the stack
     ///
     /// Returns a [`Value::Short`] if `self.short` is set, and a [`Value::Byte`]
     /// otherwise.
@@ -712,6 +662,10 @@ impl<'a> StackView<'a> {
 
     fn push_byte(&mut self, v: u8) {
         self.stack.push_byte(v);
+    }
+
+    fn push_short(&mut self, v: u16) {
+        self.stack.push_short(v);
     }
 }
 
@@ -828,6 +782,41 @@ impl Default for Vm {
     }
 }
 
+macro_rules! op_cmp {
+    ($self:ident, $mode:ident, $f:expr) => {{
+        let mut s = $self.stack_view($mode);
+        #[allow(clippy::redundant_closure_call)]
+        let v = if $mode.short {
+            let b = s.pop_short();
+            let a = s.pop_short();
+            ($f)(a, b)
+        } else {
+            let b = s.pop_byte();
+            let a = s.pop_byte();
+            ($f)(a, b)
+        };
+        s.push_byte(v as u8);
+    }};
+}
+
+macro_rules! op_bin {
+    ($self:ident, $mode:ident, $f:expr) => {{
+        let mut s = $self.stack_view($mode);
+        #[allow(clippy::redundant_closure_call)]
+        if $mode.short {
+            let b = s.pop_short();
+            let a = s.pop_short();
+            let f: fn(u16, u16) -> u16 = $f;
+            s.push_short(f(a, b));
+        } else {
+            let b = s.pop_byte();
+            let a = s.pop_byte();
+            let f: fn(u8, u8) -> u8 = $f;
+            s.push_byte(f(a, b));
+        };
+    }};
+}
+
 impl Vm {
     /// Reads a byte from RAM at the program counter
     fn next(&mut self) -> u8 {
@@ -920,10 +909,10 @@ impl Vm {
                 s.push(b);
                 s.push(a);
             }
-            Op::Equ(mode) => self.op_cmp(mode, |a, b| a == b),
-            Op::Neq(mode) => self.op_cmp(mode, |a, b| a != b),
-            Op::Gth(mode) => self.op_cmp(mode, |a, b| b > a),
-            Op::Lth(mode) => self.op_cmp(mode, |a, b| b < a),
+            Op::Equ(mode) => op_cmp!(self, mode, |a, b| a == b),
+            Op::Neq(mode) => op_cmp!(self, mode, |a, b| a != b),
+            Op::Gth(mode) => op_cmp!(self, mode, |a, b| a > b),
+            Op::Lth(mode) => op_cmp!(self, mode, |a, b| a < b),
             Op::Jmp(mode) => {
                 let mut s = self.stack_view(mode);
                 self.pc = match s.pop() {
@@ -1084,25 +1073,25 @@ impl Vm {
                 }
             }
             Op::Add(mode) => {
-                self.op_bin(mode, |a, b| a.wrapping_add(b));
+                op_bin!(self, mode, |a, b| a.wrapping_add(b));
             }
             Op::Sub(mode) => {
-                self.op_bin(mode, |a, b| a.wrapping_sub(b));
+                op_bin!(self, mode, |a, b| a.wrapping_sub(b));
             }
             Op::Mul(mode) => {
-                self.op_bin(mode, |a, b| a.wrapping_mul(b));
+                op_bin!(self, mode, |a, b| a.wrapping_mul(b));
             }
             Op::Div(mode) => {
-                self.op_bin(mode, |a, b| if b != 0 { a / b } else { 0 });
+                op_bin!(self, mode, |a, b| if b != 0 { a / b } else { 0 });
             }
             Op::And(mode) => {
-                self.op_bin(mode, |a, b| a & b);
+                op_bin!(self, mode, |a, b| a & b);
             }
             Op::Ora(mode) => {
-                self.op_bin(mode, |a, b| a | b);
+                op_bin!(self, mode, |a, b| a | b);
             }
             Op::Eor(mode) => {
-                self.op_bin(mode, |a, b| a ^ b);
+                op_bin!(self, mode, |a, b| a ^ b);
             }
             Op::Sft(mode) => {
                 let mut s = self.stack_view(mode);
@@ -1115,26 +1104,6 @@ impl Vm {
         }
 
         false
-    }
-
-    fn op_cmp<F: Fn(u16, u16) -> bool>(&mut self, mode: Mode, f: F) {
-        let mut s = self.stack_view(mode);
-        let a = s.pop();
-        let b = s.pop();
-        let v = f(u16::from(a), u16::from(b));
-        s.push_byte(v as u8)
-    }
-
-    fn op_bin<F: Fn(u16, u16) -> u16>(&mut self, mode: Mode, f: F) {
-        let mut s = self.stack_view(mode);
-        let b = s.pop();
-        let a = s.pop();
-        let v = f(u16::from(a), u16::from(b));
-        s.push(if mode.short {
-            Value::Short(v)
-        } else {
-            Value::Byte(v as u8)
-        })
     }
 
     fn stack_view(&mut self, mode: Mode) -> StackView {
@@ -1155,6 +1124,61 @@ pub trait Device {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    /// Simple parser for textual opcodes
+    impl<'a> TryFrom<&'a str> for Op {
+        type Error = &'a str;
+        fn try_from(s: &str) -> Result<Op, &str> {
+            let (s, ret) =
+                s.strip_suffix('r').map(|s| (s, true)).unwrap_or((s, false));
+            let (s, keep) =
+                s.strip_suffix('k').map(|s| (s, true)).unwrap_or((s, false));
+            let (s, short) =
+                s.strip_suffix('2').map(|s| (s, true)).unwrap_or((s, false));
+            let mode = Mode { ret, keep, short };
+            let out = match s {
+                "BRK" => Op::Brk,
+                "JCI" => Op::Jci,
+                "JMI" => Op::Jmi,
+                "JSI" => Op::Jsi,
+                "LIT" => Op::Lit(LitMode { ret, short }),
+
+                "INC" => Op::Inc(mode),
+                "POP" => Op::Pop(mode),
+                "NIP" => Op::Nip(mode),
+                "SWP" => Op::Swp(mode),
+                "ROT" => Op::Rot(mode),
+                "DUP" => Op::Dup(mode),
+                "OVR" => Op::Ovr(mode),
+                "EQU" => Op::Equ(mode),
+                "NEQ" => Op::Neq(mode),
+                "GTH" => Op::Gth(mode),
+                "LTH" => Op::Lth(mode),
+                "JMP" => Op::Jmp(mode),
+                "JCN" => Op::Jcn(mode),
+                "JSR" => Op::Jsr(mode),
+                "STH" => Op::Sth(mode),
+                "LDZ" => Op::Ldz(mode),
+                "STZ" => Op::Stz(mode),
+                "LDR" => Op::Ldr(mode),
+                "STR" => Op::Str(mode),
+                "LDA" => Op::Lda(mode),
+                "STA" => Op::Sta(mode),
+                "DEI" => Op::Dei(mode),
+                "DEO" => Op::Deo(mode),
+                "ADD" => Op::Add(mode),
+                "SUB" => Op::Sub(mode),
+                "MUL" => Op::Mul(mode),
+                "DIV" => Op::Div(mode),
+                "AND" => Op::And(mode),
+                "ORA" => Op::Ora(mode),
+                "EOR" => Op::Eor(mode),
+                "SFT" => Op::Sft(mode),
+                _ => return Err(s),
+            };
+            Ok(out)
+        }
+    }
 
     struct EmptyDevice;
     impl Device for EmptyDevice {
