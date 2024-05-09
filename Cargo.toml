@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.83"
 clap = { version = "4.5.4", features = ["derive"] }
-zerocopy = "0.7.34"
 
 [[bin]]
 name = "muxn"

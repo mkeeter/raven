@@ -768,7 +768,7 @@ impl Stack {
 }
 
 /// The virtual machine itself
-pub struct Vm {
+pub struct Uxn {
     /// Device memory
     dev: [u8; 256],
     /// 64 KiB of VM memory
@@ -781,7 +781,7 @@ pub struct Vm {
     pc: u16,
 }
 
-impl Default for Vm {
+impl Default for Uxn {
     fn default() -> Self {
         Self {
             dev: [0u8; 256],
@@ -828,8 +828,8 @@ macro_rules! op_bin {
     }};
 }
 
-impl Vm {
-    /// Build a new `Vm`, loading the given ROM at the start address
+impl Uxn {
+    /// Build a new `Uxn`, loading the given ROM at the start address
     ///
     /// # Panics
     /// If `rom` cannot fit in memory
@@ -1165,13 +1165,13 @@ pub trait Device {
     ///
     /// The output byte (if any) must be written to `vm.dev[target]`, and can be
     /// read after this function returns.
-    fn dei(&mut self, vm: &mut Vm, target: u8);
+    fn dei(&mut self, vm: &mut Uxn, target: u8);
 
     /// Performs the `DEO` operation on the given target
     ///
     /// The input byte (if any) will be read from `vm.dev[target]`, and must be
     /// stored before this function is called.
-    fn deo(&mut self, vm: &mut Vm, target: u8);
+    fn deo(&mut self, vm: &mut Uxn, target: u8);
 }
 
 #[cfg(test)]
@@ -1235,17 +1235,17 @@ mod test {
 
     struct EmptyDevice;
     impl Device for EmptyDevice {
-        fn dei(&mut self, _vm: &mut Vm, _target: u8) {
+        fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
             // nothing to do here
         }
-        fn deo(&mut self, _vm: &mut Vm, _target: u8) {
+        fn deo(&mut self, _vm: &mut Uxn, _target: u8) {
             // nothing to do here
         }
     }
 
     fn parse_and_test(s: &str) {
         println!("\n{s}");
-        let mut vm = Vm::default();
+        let mut vm = Uxn::default();
         let mut iter = s.split_whitespace();
         let mut op = None;
         let mut dev = EmptyDevice;

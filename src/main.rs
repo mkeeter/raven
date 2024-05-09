@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use muxn::{uxn::Vm, varvara::Varvara};
+use muxn::{uxn::Uxn, varvara::Varvara};
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -21,7 +21,7 @@ fn main() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
-    let mut vm = Vm::new(&rom);
+    let mut vm = Uxn::new(&rom);
     let mut dev = Varvara::default();
     while !vm.step(&mut dev) {
         // nothing to do here
