@@ -1,8 +1,8 @@
 use crate::uxn::{Device, Uxn};
-use zerocopy::{BigEndian, FromBytes, FromZeroes, U16};
+use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct System {
-    banks: [Box<[u8]>; 15],
+    banks: [Box<[u8; 65536]>; 15],
 }
 
 impl Default for System {
@@ -11,7 +11,8 @@ impl Default for System {
     }
 }
 
-#[derive(FromZeroes, FromBytes)]
+#[derive(FromZeroes, FromBytes, AsBytes)]
+#[repr(C)]
 struct Fill {
     length: U16<BigEndian>,
     bank: U16<BigEndian>,
@@ -19,7 +20,8 @@ struct Fill {
     value: u8,
 }
 
-#[derive(FromZeroes, FromBytes)]
+#[derive(FromZeroes, FromBytes, AsBytes)]
+#[repr(C)]
 struct Cpy {
     length: U16<BigEndian>,
     src_bank: U16<BigEndian>,
@@ -64,11 +66,13 @@ impl Device for System {
                 let op = vm.ram[addr as usize];
                 match op {
                     expansion::FILL => {
-                        let f = Fill::read_from(
-                            &vm.ram[addr.wrapping_add(1) as usize..]
-                                [..std::mem::size_of::<Fill>()],
-                        )
-                        .unwrap();
+                        let mut f = Fill::new_zeroed();
+                        for (i, b) in f.as_bytes_mut().iter_mut().enumerate() {
+                            *b = vm.ram[addr
+                                .wrapping_add(1)
+                                .wrapping_add(i as u16)
+                                as usize]
+                        }
                         let bank = f.bank.get();
                         let addr = f.addr.get();
                         for i in 0..f.length.get() {
@@ -80,11 +84,13 @@ impl Device for System {
                         }
                     }
                     expansion::CPYL | expansion::CPYR => {
-                        let c = Cpy::read_from(
-                            &vm.ram[addr.wrapping_add(1) as usize..]
-                                [..std::mem::size_of::<Cpy>()],
-                        )
-                        .unwrap();
+                        let mut c = Cpy::new_zeroed();
+                        for (i, b) in c.as_bytes_mut().iter_mut().enumerate() {
+                            *b = vm.ram[addr
+                                .wrapping_add(1)
+                                .wrapping_add(i as u16)
+                                as usize]
+                        }
                         let offset = |i, addr: zerocopy::U16<zerocopy::BE>| {
                             if op == expansion::CPYL {
                                 addr.get().wrapping_add(i)
@@ -155,8 +161,7 @@ impl Device for System {
 
 impl System {
     fn new() -> Self {
-        let banks = [(); 15]
-            .map(|_| vec![0u8; usize::from(u16::MAX)].into_boxed_slice());
+        let banks = [(); 15].map(|_| Box::new([0u8; 65536]));
         Self { banks }
     }
 }

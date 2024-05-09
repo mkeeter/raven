@@ -802,7 +802,7 @@ pub struct Uxn {
     /// Device memory
     dev: [u8; 256],
     /// 64 KiB of VM memory
-    pub(crate) ram: Box<[u8]>,
+    pub(crate) ram: Box<[u8; 65536]>,
     /// 256-byte data stack
     pub(crate) stack: Stack,
     /// 256-byte return stack
@@ -813,7 +813,7 @@ impl Default for Uxn {
     fn default() -> Self {
         Self {
             dev: [0u8; 256],
-            ram: vec![0u8; usize::from(u16::MAX)].into_boxed_slice(),
+            ram: Box::new([0u8; 65536]),
             stack: Stack::default(),
             ret: Stack::default(),
         }
@@ -863,7 +863,7 @@ impl Uxn {
     pub fn new(rom: &[u8]) -> Self {
         let mut out = Self {
             dev: [0u8; 256],
-            ram: vec![0u8; usize::from(u16::MAX)].into_boxed_slice(),
+            ram: Box::new([0u8; 65536]),
             stack: Stack::default(),
             ret: Stack::default(),
         };
