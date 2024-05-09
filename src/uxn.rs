@@ -591,7 +591,7 @@ impl From<u8> for Op {
 
 /// Simple circular stack, with room for 256 items
 #[derive(Debug)]
-struct Stack {
+pub(crate) struct Stack {
     data: [u8; 256],
 
     /// The index points to the last occupied slot, and increases on `push`
@@ -660,6 +660,23 @@ impl<'a> StackView<'a> {
     }
 
     fn push(&mut self, v: Value) {
+        self.stack.push(v);
+    }
+
+    fn reserve(&mut self, n: u8) {
+        self.stack.reserve(n);
+    }
+
+    /// Replaces the top item on the stack with the given value
+    fn emplace(&mut self, v: Value) {
+        match v {
+            Value::Short(..) => {
+                self.pop_short();
+            }
+            Value::Byte(..) => {
+                self.pop_byte();
+            }
+        }
         self.stack.push(v);
     }
 
@@ -732,6 +749,9 @@ impl Stack {
         self.index = self.index.wrapping_add(1);
         self.data[usize::from(self.index)] = v;
     }
+    fn reserve(&mut self, n: u8) {
+        self.index = self.index.wrapping_add(n);
+    }
     fn push_short(&mut self, v: u16) {
         let [hi, lo] = v.to_be_bytes();
         self.push_byte(hi);
@@ -750,7 +770,7 @@ impl Stack {
             Value::Byte(self.pop_byte())
         }
     }
-    fn peek_byte_at(&self, offset: u8) -> u8 {
+    pub fn peek_byte_at(&self, offset: u8) -> u8 {
         self.data[usize::from(self.index.wrapping_sub(offset))]
     }
     fn peek_short_at(&self, offset: u8) -> u16 {
@@ -765,6 +785,16 @@ impl Stack {
             Value::Byte(self.peek_byte_at(offset))
         }
     }
+
+    /// Returns the number of items in the stack
+    pub fn len(&self) -> u8 {
+        self.index.wrapping_add(1)
+    }
+
+    /// Sets the number of items in the stack
+    pub fn set_len(&mut self, n: u8) {
+        self.index = n.wrapping_sub(1);
+    }
 }
 
 /// The virtual machine itself
@@ -772,11 +802,11 @@ pub struct Uxn {
     /// Device memory
     dev: [u8; 256],
     /// 64 KiB of VM memory
-    ram: Box<[u8]>,
+    pub(crate) ram: Box<[u8]>,
     /// 256-byte data stack
-    stack: Stack,
+    pub(crate) stack: Stack,
     /// 256-byte return stack
-    ret: Stack,
+    pub(crate) ret: Stack,
 }
 
 impl Default for Uxn {
@@ -973,13 +1003,12 @@ impl Uxn {
                 }
             }
             Op::Sth(mode) => {
-                let v = self
-                    .stack_view(Mode {
-                        ret: !mode.ret,
-                        ..mode
-                    })
-                    .pop();
-                self.stack_view(mode).push(v)
+                let v = self.stack_view(mode).pop();
+                self.stack_view(Mode {
+                    ret: !mode.ret,
+                    ..mode
+                })
+                .push(v)
             }
             Op::Ldz(mode) => {
                 let addr = self.stack_view(mode).pop_byte();
@@ -1073,9 +1102,16 @@ impl Uxn {
                 }
             }
             Op::Dei(mode) => {
-                let i = self.stack_view(mode).pop_byte();
+                let mut s = self.stack_view(mode);
+                let i = s.pop_byte();
+
+                // For compatibility with the C implementation, we'll
+                // pre-emtively push a dummy value here, then use `emplace` to
+                // replace it afterwards.  This is because the C implementation
+                // `uxn.c` reserves stack space before calling `emu_deo/dei`,
+                // which affects the behavior of `System.rst/wst`
                 let v = if mode.short {
-                    // ORDER??
+                    s.reserve(2);
                     dev.dei(self, i);
                     let hi = self.dev[i as usize];
                     let j = i.wrapping_add(1);
@@ -1083,10 +1119,11 @@ impl Uxn {
                     let lo = self.dev[j as usize];
                     Value::Short(u16::from_be_bytes([hi, lo]))
                 } else {
+                    s.reserve(1);
                     dev.dei(self, i);
                     Value::Byte(self.dev[i as usize])
                 };
-                self.stack_view(mode).push(v);
+                self.stack_view(mode).emplace(v);
             }
             Op::Deo(mode) => {
                 let mut s = self.stack_view(mode);
