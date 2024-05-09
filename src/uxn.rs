@@ -1,65 +1,13 @@
 //! Uxn virtual machine
 
-/// Opcode mode flags
-#[derive(Copy, Clone, Debug)]
-struct Mode {
-    /// `2` mode
-    ///
-    /// Operate on shorts (`u16`), instead of bytes
-    short: bool,
-
-    /// `k` mode
-    ///
-    /// Operate without consuming items
-    keep: bool,
-
-    /// `r` mode
-    ///
-    /// Operate on the return stack
-    ret: bool,
+fn keep(flags: u8) -> bool {
+    (flags & (1 << 2)) != 0
 }
-
-impl Mode {
-    const fn new(i: u8) -> Mode {
-        let short = (i & (1 << 0)) != 0;
-        let ret = (i & (1 << 1)) != 0;
-        let keep = (i & (1 << 2)) != 0;
-        Self { short, keep, ret }
-    }
+fn short(flags: u8) -> bool {
+    (flags & (1 << 0)) != 0
 }
-
-impl From<LitMode> for Mode {
-    fn from(mode: LitMode) -> Mode {
-        Mode {
-            short: mode.short,
-            keep: true,
-            ret: mode.ret,
-        }
-    }
-}
-
-/// Opcode mode flags for literal opcodes (where `keep` is always true)
-#[derive(Copy, Clone, Debug)]
-struct LitMode {
-    /// `2` mode
-    ///
-    /// Operate on shorts (`u16`), instead of bytes
-    short: bool,
-
-    /// `r` mode
-    ///
-    /// Operate on the return stack
-    ret: bool,
-}
-
-impl LitMode {
-    const fn new(i: u8) -> LitMode {
-        let short = (i & (1 << 0)) != 0;
-        let ret = (i & (1 << 1)) != 0;
-        let keep = (i & (1 << 2)) != 0;
-        assert!(keep);
-        Self { short, ret }
-    }
+fn ret(flags: u8) -> bool {
+    (flags & (1 << 1)) != 0
 }
 
 /// Simple circular stack, with room for 256 items
@@ -78,23 +26,16 @@ pub(crate) struct Stack {
 /// This type expects the user to perform all of their `pop()` calls first,
 /// followed by any `push(..)` calls.  `pop()` will either adjust the true index
 /// or a virtual index, depending on whether `keep` is set.
-struct StackView<'a> {
+struct StackView<'a, const FLAGS: u8> {
     stack: &'a mut Stack,
-    keep: bool,
-    short: bool,
 
     /// Virtual index, used in `keep` mode
     offset: u8,
 }
 
-impl<'a> StackView<'a> {
-    fn new(stack: &'a mut Stack, mode: Mode) -> Self {
-        Self {
-            stack,
-            keep: mode.keep,
-            short: mode.short,
-            offset: 0,
-        }
+impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
+    fn new(stack: &'a mut Stack) -> Self {
+        Self { stack, offset: 0 }
     }
 
     /// Pops a single value from the stack
@@ -105,11 +46,11 @@ impl<'a> StackView<'a> {
     /// If `self.keep` is set, then only the view offset ([`StackView::offset`])
     /// is changed; otherwise, the stack index ([`Stack::index`]) is changed.
     fn pop(&mut self) -> Value {
-        self.pop_type(self.short)
+        self.pop_type(short(FLAGS))
     }
 
     fn pop_type(&mut self, short: bool) -> Value {
-        if self.keep {
+        if keep(FLAGS) {
             let v = self.stack.peek_at(self.offset, short);
             self.offset = self.offset.wrapping_add(if short { 2 } else { 1 });
             v
@@ -295,10 +236,10 @@ impl Default for Uxn {
 }
 
 macro_rules! op_cmp {
-    ($self:ident, $mode:ident, $f:expr) => {{
-        let mut s = $self.stack_view($mode);
+    ($self:ident, $flags:ident, $f:expr) => {{
+        let mut s = $self.stack_view::<{ $flags }>();
         #[allow(clippy::redundant_closure_call)]
-        let v = if $mode.short {
+        let v = if short($flags) {
             let b = s.pop_short();
             let a = s.pop_short();
             ($f)(a, b)
@@ -312,10 +253,10 @@ macro_rules! op_cmp {
 }
 
 macro_rules! op_bin {
-    ($self:ident, $mode:ident, $f:expr) => {{
-        let mut s = $self.stack_view($mode);
+    ($self:ident, $flags:ident, $f:expr) => {{
+        let mut s = $self.stack_view::<{ $flags }>();
         #[allow(clippy::redundant_closure_call)]
-        if $mode.short {
+        if short($flags) {
             let b = s.pop_short();
             let a = s.pop_short();
             let f: fn(u16, u16) -> u16 = $f;
@@ -359,13 +300,22 @@ impl Uxn {
         u16::from_be_bytes([hi, lo])
     }
 
-    fn stack_view(&mut self, mode: Mode) -> StackView {
-        let stack = if mode.ret {
+    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
+        let stack = if ret(FLAGS) {
             &mut self.ret
         } else {
             &mut self.stack
         };
-        StackView::new(stack, mode)
+        StackView::new(stack)
+    }
+
+    fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
+        let stack = if ret(FLAGS) {
+            &mut self.stack
+        } else {
+            &mut self.ret
+        };
+        StackView::new(stack)
     }
 
     /// Reads a byte from device memory
@@ -720,18 +670,17 @@ mod op {
     /// LIT 12          ( 12 )
     /// LIT2 abcd       ( ab cd )
     /// ```
-    pub fn lit<const I: u8>(
+    pub fn lit<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         mut pc: u16,
     ) -> Option<u16> {
-        let mode = LitMode::new(I);
-        let v = if mode.short {
+        let v = if short(FLAGS) {
             Value::Short(vm.next2(&mut pc))
         } else {
             Value::Byte(vm.next(&mut pc))
         };
-        vm.stack_view(Mode::from(mode)).push(v);
+        vm.stack_view::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -748,13 +697,12 @@ mod op {
     /// #0001 INC2      ( 00 02 )
     /// #0001 INC2k     ( 00 01 00 02 )
     /// ```
-    pub fn inc<const I: u8>(
+    pub fn inc<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let v = s.pop();
         s.push(v.wrapping_add(1));
         Some(pc)
@@ -773,13 +721,12 @@ mod op {
     /// #1234 POP2   ( )
     /// #1234 POP2k  ( 12 34 )
     /// ```
-    pub fn pop<const I: u8>(
+    pub fn pop<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        vm.stack_view(mode).pop();
+        vm.stack_view::<FLAGS>().pop();
         Some(pc)
     }
 
@@ -797,13 +744,12 @@ mod op {
     /// #1234 #5678 NIP2   ( 56 78 )
     /// #1234 #5678 NIP2k  ( 12 34 56 78 56 78 )
     /// ```
-    pub fn nip<const I: u8>(
+    pub fn nip<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let v = s.pop();
         let _ = s.pop();
         s.push(v);
@@ -824,13 +770,12 @@ mod op {
     /// #1234 #5678 SWP2   ( 56 78 12 34 )
     /// #1234 #5678 SWP2k  ( 12 34 56 78 56 78 12 34 )
     /// ```
-    pub fn swp<const I: u8>(
+    pub fn swp<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let b = s.pop();
         let a = s.pop();
         s.push(b);
@@ -853,13 +798,12 @@ mod op {
     /// #1234 #5678 #9abc ROT2   ( 56 78 9a bc 12 34 )
     /// #1234 #5678 #9abc ROT2k  ( 12 34 56 78 9a bc 56 78 9a bc 12 34 )
     /// ```
-    pub fn rot<const I: u8>(
+    pub fn rot<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let c = s.pop();
         let b = s.pop();
         let a = s.pop();
@@ -882,13 +826,12 @@ mod op {
     /// #12 DUPk    ( 12 12 12 )
     /// #1234 DUP2  ( 12 34 12 34 )
     /// ```
-    pub fn dup<const I: u8>(
+    pub fn dup<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let v = s.pop();
         s.push(v);
         s.push(v);
@@ -909,13 +852,12 @@ mod op {
     /// #1234 #5678 OVR2   ( 12 34 56 78 12 34 )
     /// #1234 #5678 OVR2k  ( 12 34 56 78 12 34 56 78 12 34 )
     /// ```
-    pub fn ovr<const I: u8>(
+    pub fn ovr<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let b = s.pop();
         let a = s.pop();
         s.push(a);
@@ -939,13 +881,12 @@ mod op {
     /// #abcd #ef01 EQU2   ( 00 )
     /// #abcd #abcd EQU2k  ( ab cd ab cd 01 )
     /// ```
-    pub fn equ<const I: u8>(
+    pub fn equ<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_cmp!(vm, mode, |a, b| a == b);
+        op_cmp!(vm, FLAGS, |a, b| a == b);
         Some(pc)
     }
 
@@ -964,13 +905,12 @@ mod op {
     /// #abcd #ef01 NEQ2   ( 01 )
     /// #abcd #abcd NEQ2k  ( ab cd ab cd 00 )
     /// ```
-    pub fn neq<const I: u8>(
+    pub fn neq<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_cmp!(vm, mode, |a, b| a != b);
+        op_cmp!(vm, FLAGS, |a, b| a != b);
         Some(pc)
     }
 
@@ -989,13 +929,12 @@ mod op {
     /// #3456 #1234 GTH2   ( 01 )
     /// #1234 #3456 GTH2k  ( 12 34 34 56 00 )
     /// ```
-    pub fn gth<const I: u8>(
+    pub fn gth<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_cmp!(vm, mode, |a, b| a > b);
+        op_cmp!(vm, FLAGS, |a, b| a > b);
         Some(pc)
     }
 
@@ -1014,13 +953,12 @@ mod op {
     /// #0001 #0000 LTH2   ( 00 )
     /// #0001 #0000 LTH2k  ( 00 01 00 00 00 )
     /// ```
-    pub fn lth<const I: u8>(
+    pub fn lth<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_cmp!(vm, mode, |a, b| a < b);
+        op_cmp!(vm, FLAGS, |a, b| a < b);
         Some(pc)
     }
 
@@ -1036,16 +974,16 @@ mod op {
     /// ```text
     /// ,&skip-rel JMP BRK &skip-rel #01  ( 01 )
     /// ```
-    pub fn jmp<const I: u8>(
+    pub fn jmp<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
-        Some(match s.pop() {
-            Value::Short(v) => v,
-            Value::Byte(v) => pc.wrapping_add(u16::from(v)),
+        let mut s = vm.stack_view::<FLAGS>();
+        Some(if short(FLAGS) {
+            s.pop_short()
+        } else {
+            pc.wrapping_add(u16::from(s.pop_byte()))
         })
     }
 
@@ -1063,13 +1001,12 @@ mod op {
     /// #abcd #01 ,&pass JCN SWP &pass POP  ( ab )
     /// #abcd #00 ,&fail JCN SWP &fail POP  ( cd )
     /// ```
-    pub fn jcn<const I: u8>(
+    pub fn jcn<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         mut pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let dst = s.pop();
         let cond = s.pop_byte();
         if cond != 0 {
@@ -1096,14 +1033,13 @@ mod op {
     /// ,&get JSR #01 BRK &get #02 JMP2r  ( 02 01 )
     /// ```
     ///
-    pub fn jsr<const I: u8>(
+    pub fn jsr<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
         vm.ret.push(Value::Short(pc));
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         Some(match s.pop() {
             Value::Short(v) => v,
             Value::Byte(v) => pc.wrapping_add(u16::from(v)),
@@ -1124,18 +1060,13 @@ mod op {
     /// #12 STH       ( | 12 )
     /// LITr 34 STHr  ( 34 )
     /// ```
-    pub fn sth<const I: u8>(
+    pub fn sth<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let v = vm.stack_view(mode).pop();
-        vm.stack_view(Mode {
-            ret: !mode.ret,
-            ..mode
-        })
-        .push(v);
+        let v = vm.stack_view::<FLAGS>().pop();
+        vm.ret_stack_view::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1150,14 +1081,13 @@ mod op {
     /// ```text
     /// |00 @cell $2 |0100 .cell LDZ ( 00 )
     /// ```
-    pub fn ldz<const I: u8>(
+    pub fn ldz<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let addr = vm.stack_view(mode).pop_byte();
-        let v = if mode.short {
+        let addr = vm.stack_view::<FLAGS>().pop_byte();
+        let v = if short(FLAGS) {
             let hi = vm.ram[usize::from(addr)];
             let lo = vm.ram[usize::from(addr.wrapping_add(1))];
             Value::Short(u16::from_be_bytes([hi, lo]))
@@ -1165,7 +1095,7 @@ mod op {
             let v = vm.ram[usize::from(addr)];
             Value::Byte(v)
         };
-        vm.stack_view(mode).push(v);
+        vm.stack_view::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1179,13 +1109,12 @@ mod op {
     /// ```text
     /// |00 @cell $2 |0100 #abcd .cell STZ2  { ab cd }
     /// ```
-    pub fn stz<const I: u8>(
+    pub fn stz<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let addr = s.pop_byte();
         match s.pop() {
             Value::Short(v) => {
@@ -1212,13 +1141,12 @@ mod op {
     /// ```text
     /// ,cell LDR2 BRK @cell abcd  ( ab cd )
     /// ```
-    pub fn ldr<const I: u8>(
+    pub fn ldr<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let offset = vm.stack_view(mode).pop_byte() as i8;
+        let offset = vm.stack_view::<FLAGS>().pop_byte() as i8;
 
         // TODO: make this more obviously infallible
         let addr = if offset < 0 {
@@ -1227,7 +1155,7 @@ mod op {
             pc.wrapping_add(u16::try_from(offset).unwrap())
         };
 
-        let v = if mode.short {
+        let v = if short(FLAGS) {
             let hi = vm.ram[usize::from(addr)];
             let lo = vm.ram[usize::from(addr.wrapping_add(1))];
             Value::Short(u16::from_be_bytes([hi, lo]))
@@ -1235,7 +1163,7 @@ mod op {
             let v = vm.ram[usize::from(addr)];
             Value::Byte(v)
         };
-        vm.stack_view(mode).push(v);
+        vm.stack_view::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1251,13 +1179,12 @@ mod op {
     /// ```text
     /// #1234 ,cell STR2 BRK @cell $2  ( )
     /// ```
-    pub fn str<const I: u8>(
+    pub fn str<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let offset = s.pop_byte() as i8;
         let addr = if offset < 0 {
             pc.wrapping_sub(i16::from(offset).abs().try_into().unwrap())
@@ -1288,14 +1215,13 @@ mod op {
     /// ```text
     /// ;cell LDA BRK @cell abcd ( ab )
     /// ```
-    pub fn lda<const I: u8>(
+    pub fn lda<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let addr = vm.stack_view(mode).pop_short();
-        let v = if mode.short {
+        let addr = vm.stack_view::<FLAGS>().pop_short();
+        let v = if short(FLAGS) {
             let hi = vm.ram[usize::from(addr)];
             let lo = vm.ram[usize::from(addr.wrapping_add(1))];
             Value::Short(u16::from_be_bytes([hi, lo]))
@@ -1303,7 +1229,7 @@ mod op {
             let v = vm.ram[usize::from(addr)];
             Value::Byte(v)
         };
-        vm.stack_view(mode).push(v);
+        vm.stack_view::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1318,13 +1244,12 @@ mod op {
     /// ```text
     /// #abcd ;cell STA BRK @cell $1 ( ab )
     /// ```
-    pub fn sta<const I: u8>(
+    pub fn sta<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let addr = s.pop_short();
         match s.pop() {
             Value::Short(v) => {
@@ -1347,13 +1272,12 @@ mod op {
     ///
     /// Pushes a value from the device page, to the top of the stack. The target
     /// device might capture the reading to trigger an I/O event.
-    pub fn dei<const I: u8>(
+    pub fn dei<const FLAGS: u8>(
         vm: &mut Uxn,
         dev: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let i = s.pop_byte();
 
         // For compatibility with the C implementation, we'll
@@ -1361,7 +1285,7 @@ mod op {
         // replace it afterwards.  This is because the C implementation
         // `uxn.c` reserves stack space before calling `emu_deo/dei`,
         // which affects the behavior of `System.rst/wst`
-        let v = if mode.short {
+        let v = if short(FLAGS) {
             s.reserve(2);
             dev.dei(vm, i);
             let hi = vm.dev[i as usize];
@@ -1374,7 +1298,7 @@ mod op {
             dev.dei(vm, i);
             Value::Byte(vm.dev[i as usize])
         };
-        vm.stack_view(mode).emplace(v);
+        vm.stack_view::<FLAGS>().emplace(v);
         Some(pc)
     }
 
@@ -1386,13 +1310,12 @@ mod op {
     ///
     /// Writes a value to the device page. The target device might capture the
     /// writing to trigger an I/O event.
-    pub fn deo<const I: u8>(
+    pub fn deo<const FLAGS: u8>(
         vm: &mut Uxn,
         dev: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let i = s.pop_byte();
         match s.pop() {
             Value::Short(v) => {
@@ -1423,13 +1346,12 @@ mod op {
     /// #02 #5d ADDk      ( 02 5d 5f )
     /// #0001 #0002 ADD2  ( 00 03 )
     /// ```
-    pub fn add<const I: u8>(
+    pub fn add<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_bin!(vm, mode, |a, b| a.wrapping_add(b));
+        op_bin!(vm, FLAGS, |a, b| a.wrapping_add(b));
         Some(pc)
     }
 
@@ -1441,13 +1363,12 @@ mod op {
     ///
     /// Pushes the difference of the first value minus the second, to the top of
     /// the stack.
-    pub fn sub<const I: u8>(
+    pub fn sub<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_bin!(vm, mode, |a, b| a.wrapping_sub(b));
+        op_bin!(vm, FLAGS, |a, b| a.wrapping_sub(b));
         Some(pc)
     }
 
@@ -1459,13 +1380,12 @@ mod op {
     ///
     /// Pushes the product of the first and second values at the top of the
     /// stack.
-    pub fn mul<const I: u8>(
+    pub fn mul<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_bin!(vm, mode, |a, b| a.wrapping_mul(b));
+        op_bin!(vm, FLAGS, |a, b| a.wrapping_mul(b));
         Some(pc)
     }
 
@@ -1484,13 +1404,12 @@ mod op {
     /// #10 #03 DIVk      ( 10 03 05 )
     /// #0010 #0000 DIV2  ( 00 00 )
     /// ```
-    pub fn div<const I: u8>(
+    pub fn div<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_bin!(vm, mode, |a, b| if b != 0 { a / b } else { 0 });
+        op_bin!(vm, FLAGS, |a, b| if b != 0 { a / b } else { 0 });
         Some(pc)
     }
 
@@ -1502,13 +1421,12 @@ mod op {
     ///
     /// Pushes the result of the bitwise operation `AND`, to the top of the
     /// stack.
-    pub fn and<const I: u8>(
+    pub fn and<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_bin!(vm, mode, |a, b| a & b);
+        op_bin!(vm, FLAGS, |a, b| a & b);
         Some(pc)
     }
 
@@ -1518,13 +1436,12 @@ mod op {
     /// ORA a b -- a|b
     /// ```
     /// Pushes the result of the bitwise operation `OR`, to the top of the stack.
-    pub fn ora<const I: u8>(
+    pub fn ora<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_bin!(vm, mode, |a, b| a | b);
+        op_bin!(vm, FLAGS, |a, b| a | b);
         Some(pc)
     }
 
@@ -1536,13 +1453,12 @@ mod op {
     ///
     /// Pushes the result of the bitwise operation `XOR`, to the top of the
     /// stack.
-    pub fn eor<const I: u8>(
+    pub fn eor<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        op_bin!(vm, mode, |a, b| a ^ b);
+        op_bin!(vm, FLAGS, |a, b| a ^ b);
         Some(pc)
     }
 
@@ -1563,13 +1479,12 @@ mod op {
     /// #34 #33 SFTk       ( 34 33 30 )
     /// #1248 #34 SFT2k    ( 12 48 34 09 20 )
     /// ```
-    pub fn sft<const I: u8>(
+    pub fn sft<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
-        let mode = Mode::new(I);
-        let mut s = vm.stack_view(mode);
+        let mut s = vm.stack_view::<FLAGS>();
         let shift = s.pop_byte();
         let shr = u32::from(shift & 0xF);
         let shl = u32::from(shift >> 4);
