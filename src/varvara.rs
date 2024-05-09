@@ -1,11 +1,13 @@
 //! The Varvara computer system
 use crate::uxn::Device;
+use std::io::Write;
 use zerocopy::AsBytes;
 
 /// Handle to the Varvara system
 #[derive(Default)]
 pub struct Varvara {
     system: System,
+    console: Console,
 }
 
 #[derive(Default)]
@@ -42,16 +44,45 @@ impl System {
     }
 }
 
+#[derive(Default)]
+struct Console {
+    vector: u16,
+}
+impl Console {
+    fn deo(&mut self, target: u8, value: u8) {
+        match target & 0x0F {
+            0x00 => self.vector.as_bytes_mut()[1] = value,
+            0x01 => self.vector.as_bytes_mut()[0] = value,
+
+            0x08 => {
+                let mut out = std::io::stdout();
+                out.write_all(&[value]).unwrap();
+                out.flush().unwrap();
+            }
+
+            _ => panic!("unimplemented console call: {target:#2x}"),
+        }
+    }
+    fn dei(&mut self, target: u8) -> u8 {
+        match target & 0x0F {
+            0x07 => 0, // TODO
+            _ => panic!("unimplemented console call: {target:#2x}"),
+        }
+    }
+}
+
 impl Device for Varvara {
     fn deo(&mut self, target: u8, value: u8) {
         match target & 0xF0 {
             0x00 => self.system.deo(target, value),
+            0x10 => self.console.deo(target, value),
             _ => panic!("unimplemented device {target:#2x}"),
         }
     }
     fn dei(&mut self, target: u8) -> u8 {
         match target & 0xF0 {
             0x00 => self.system.dei(target),
+            0x10 => self.console.dei(target),
             _ => panic!("unimplemented device {target:#2x}"),
         }
     }

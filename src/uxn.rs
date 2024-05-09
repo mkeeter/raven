@@ -846,9 +846,9 @@ impl Vm {
 
     /// Reads a word from RAM at the program counter
     fn next2(&mut self) -> u16 {
-        let lo = self.next();
         let hi = self.next();
-        u16::from_le_bytes([lo, hi])
+        let lo = self.next();
+        u16::from_be_bytes([hi, lo])
     }
 
     /// Executes the opcode at the program counter
