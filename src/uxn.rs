@@ -1095,9 +1095,9 @@ impl Uxn {
                     Value::Short(v) => {
                         let [hi, lo] = v.to_be_bytes();
                         let j = i.wrapping_add(1);
-                        self.dev[i as usize] = lo;
+                        self.dev[i as usize] = hi;
                         dev.deo(self, i);
-                        self.dev[j as usize] = hi;
+                        self.dev[j as usize] = lo;
                         dev.deo(self, j);
                     }
                     Value::Byte(v) => {
@@ -1246,7 +1246,6 @@ mod test {
     }
 
     fn parse_and_test(s: &str) {
-        println!("\n{s}");
         let mut vm = Uxn::default();
         let mut iter = s.split_whitespace();
         let mut op = None;

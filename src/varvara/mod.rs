@@ -27,3 +27,14 @@ impl Device for Varvara {
         }
     }
 }
+
+impl Varvara {
+    /// Runs in a busy-loop
+    pub fn run(&mut self, vm: &mut Uxn) {
+        loop {
+            if let Some(vector) = self.console.ready(vm) {
+                vm.run(self, vector)
+            }
+        }
+    }
+}
