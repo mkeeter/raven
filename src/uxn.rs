@@ -777,8 +777,6 @@ pub struct Uxn {
     stack: Stack,
     /// 256-byte return stack
     ret: Stack,
-    /// Current program counter (as an index into `ram`)
-    pc: u16,
 }
 
 impl Default for Uxn {
@@ -788,7 +786,6 @@ impl Default for Uxn {
             ram: vec![0u8; usize::from(u16::MAX)].into_boxed_slice(),
             stack: Stack::default(),
             ret: Stack::default(),
-            pc: 0x0,
         }
     }
 }
@@ -839,56 +836,63 @@ impl Uxn {
             ram: vec![0u8; usize::from(u16::MAX)].into_boxed_slice(),
             stack: Stack::default(),
             ret: Stack::default(),
-            pc: 0x100,
         };
         out.ram[0x100..][..rom.len()].copy_from_slice(rom);
         out
     }
 
     /// Reads a byte from RAM at the program counter
-    fn next(&mut self) -> u8 {
-        let out = self.ram[usize::from(self.pc)];
-        self.pc = self.pc.wrapping_add(1);
+    fn next(&mut self, pc: &mut u16) -> u8 {
+        let out = self.ram[usize::from(*pc)];
+        *pc = pc.wrapping_add(1);
         out
     }
 
     /// Reads a word from RAM at the program counter
-    fn next2(&mut self) -> u16 {
-        let hi = self.next();
-        let lo = self.next();
+    fn next2(&mut self, pc: &mut u16) -> u16 {
+        let hi = self.next(pc);
+        let lo = self.next(pc);
         u16::from_be_bytes([hi, lo])
     }
 
-    /// Executes the opcode at the program counter
-    pub fn step<D: Device>(&mut self, dev: &mut D) -> bool {
-        let i = self.next();
-        let op = Op::from(i);
-        self.run_op(op, dev)
+    /// Executes code starting at the given address
+    pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) {
+        while !self.step(dev, &mut pc) {
+            // nothing to do here
+        }
     }
 
-    fn run_op<D: Device>(&mut self, op: Op, dev: &mut D) -> bool {
+    /// Executes the opcode at the program counter
+    pub fn step<D: Device>(&mut self, dev: &mut D, pc: &mut u16) -> bool {
+        let i = self.next(pc);
+        let op = Op::from(i);
+        self.op(op, dev, pc)
+    }
+
+    /// Executes a single operation
+    fn op<D: Device>(&mut self, op: Op, dev: &mut D, pc: &mut u16) -> bool {
         match op {
             Op::Brk => return true,
             Op::Jci => {
-                let dt = self.next2();
+                let dt = self.next2(pc);
                 if self.stack.pop_byte() != 0 {
-                    self.pc = self.pc.wrapping_add(dt);
+                    *pc = pc.wrapping_add(dt);
                 }
             }
             Op::Jmi => {
-                let dt = self.next2();
-                self.pc = self.pc.wrapping_add(dt);
+                let dt = self.next2(pc);
+                *pc = pc.wrapping_add(dt);
             }
             Op::Jsi => {
-                let dt = self.next2();
-                self.ret.push(Value::Short(self.pc));
-                self.pc = self.pc.wrapping_add(dt);
+                let dt = self.next2(pc);
+                self.ret.push(Value::Short(*pc));
+                *pc = pc.wrapping_add(dt);
             }
             Op::Lit(mode) => {
                 let v = if mode.short {
-                    Value::Short(self.next2())
+                    Value::Short(self.next2(pc))
                 } else {
-                    Value::Byte(self.next())
+                    Value::Byte(self.next(pc))
                 };
                 self.stack_view(Mode::from(mode)).push(v);
             }
@@ -942,9 +946,9 @@ impl Uxn {
             Op::Lth(mode) => op_cmp!(self, mode, |a, b| a < b),
             Op::Jmp(mode) => {
                 let mut s = self.stack_view(mode);
-                self.pc = match s.pop() {
+                *pc = match s.pop() {
                     Value::Short(v) => v,
-                    Value::Byte(v) => self.pc.wrapping_add(u16::from(v)),
+                    Value::Byte(v) => pc.wrapping_add(u16::from(v)),
                 }
             }
             Op::Jcn(mode) => {
@@ -952,20 +956,20 @@ impl Uxn {
                 let dst = s.pop();
                 let cond = s.pop_byte();
                 if cond != 0 {
-                    self.pc = match dst {
+                    *pc = match dst {
                         Value::Short(dst) => dst,
                         Value::Byte(offset) => {
-                            self.pc.wrapping_add(u16::from(offset))
+                            pc.wrapping_add(u16::from(offset))
                         }
                     };
                 }
             }
             Op::Jsr(mode) => {
-                self.ret.push(Value::Short(self.pc));
+                self.ret.push(Value::Short(*pc));
                 let mut s = self.stack_view(mode);
-                self.pc = match s.pop() {
+                *pc = match s.pop() {
                     Value::Short(v) => v,
-                    Value::Byte(v) => self.pc.wrapping_add(u16::from(v)),
+                    Value::Byte(v) => pc.wrapping_add(u16::from(v)),
                 }
             }
             Op::Sth(mode) => {
@@ -1008,11 +1012,9 @@ impl Uxn {
 
                 // TODO: make this more obviously infallible
                 let addr = if offset < 0 {
-                    self.pc.wrapping_sub(
-                        i16::from(offset).abs().try_into().unwrap(),
-                    )
+                    pc.wrapping_sub(i16::from(offset).abs().try_into().unwrap())
                 } else {
-                    self.pc.wrapping_add(u16::try_from(offset).unwrap())
+                    pc.wrapping_add(u16::try_from(offset).unwrap())
                 };
 
                 let v = if mode.short {
@@ -1026,7 +1028,6 @@ impl Uxn {
                 self.stack_view(mode).push(v);
             }
             Op::Str(mode) => {
-                let pc = self.pc;
                 let mut s = self.stack_view(mode);
                 let offset = s.pop_byte() as i8;
                 let addr = if offset < 0 {
@@ -1174,6 +1175,17 @@ pub trait Device {
     fn deo(&mut self, vm: &mut Uxn, target: u8);
 }
 
+/// Device which does nothing
+pub struct EmptyDevice;
+impl Device for EmptyDevice {
+    fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
+        // nothing to do here
+    }
+    fn deo(&mut self, _vm: &mut Uxn, _target: u8) {
+        // nothing to do here
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1233,16 +1245,6 @@ mod test {
         }
     }
 
-    struct EmptyDevice;
-    impl Device for EmptyDevice {
-        fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
-            // nothing to do here
-        }
-        fn deo(&mut self, _vm: &mut Uxn, _target: u8) {
-            // nothing to do here
-        }
-    }
-
     fn parse_and_test(s: &str) {
         println!("\n{s}");
         let mut vm = Uxn::default();
@@ -1272,7 +1274,7 @@ mod test {
                         expected.push(u8::from_str_radix(s, 16).unwrap());
                     }
                 }
-                vm.run_op(op.unwrap(), &mut dev);
+                vm.op(op.unwrap(), &mut dev, &mut 0);
                 let mut actual = vec![];
                 while vm.stack.index != u8::MAX {
                     actual.push(vm.stack.pop_byte());

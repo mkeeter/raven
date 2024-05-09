@@ -23,9 +23,7 @@ fn main() -> Result<()> {
 
     let mut vm = Uxn::new(&rom);
     let mut dev = Varvara::default();
-    while !vm.step(&mut dev) {
-        // nothing to do here
-    }
+    vm.run(&mut dev, 0x100);
 
     Ok(())
 }
