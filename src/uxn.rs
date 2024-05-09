@@ -769,15 +769,22 @@ impl Stack {
 
 /// The virtual machine itself
 pub struct Vm {
+    /// Device memory
+    dev: [u8; 256],
+    /// 64 KiB of VM memory
     ram: Box<[u8]>,
+    /// 256-byte data stack
     stack: Stack,
+    /// 256-byte return stack
     ret: Stack,
+    /// Current program counter (as an index into `ram`)
     pc: u16,
 }
 
 impl Default for Vm {
     fn default() -> Self {
         Self {
+            dev: [0u8; 256],
             ram: vec![0u8; usize::from(u16::MAX)].into_boxed_slice(),
             stack: Stack::default(),
             ret: Stack::default(),
@@ -828,6 +835,7 @@ impl Vm {
     /// If `rom` cannot fit in memory
     pub fn new(rom: &[u8]) -> Self {
         let mut out = Self {
+            dev: [0u8; 256],
             ram: vec![0u8; usize::from(u16::MAX)].into_boxed_slice(),
             stack: Stack::default(),
             ret: Stack::default(),
@@ -1067,12 +1075,15 @@ impl Vm {
                 let i = self.stack_view(mode).pop_byte();
                 let v = if mode.short {
                     // ORDER??
-                    let lo = dev.dei(i);
-                    let hi = dev.dei(i.wrapping_add(1));
+                    dev.dei(self, i);
+                    let hi = self.dev[i as usize];
+                    let j = i.wrapping_add(1);
+                    dev.dei(self, i.wrapping_add(1));
+                    let lo = self.dev[j as usize];
                     Value::Short(u16::from_be_bytes([hi, lo]))
                 } else {
-                    let lo = dev.dei(i);
-                    Value::Byte(lo)
+                    dev.dei(self, i);
+                    Value::Byte(self.dev[i as usize])
                 };
                 self.stack_view(mode).push(v);
             }
@@ -1082,12 +1093,15 @@ impl Vm {
                 match s.pop() {
                     Value::Short(v) => {
                         let [hi, lo] = v.to_be_bytes();
-                        // ORDER??
-                        dev.deo(i, lo);
-                        dev.deo(i.wrapping_add(1), hi);
+                        let j = i.wrapping_add(1);
+                        self.dev[i as usize] = lo;
+                        dev.deo(self, i);
+                        self.dev[j as usize] = hi;
+                        dev.deo(self, j);
                     }
                     Value::Byte(v) => {
-                        dev.deo(i, v);
+                        self.dev[i as usize] = v;
+                        dev.deo(self, i);
                     }
                 }
             }
@@ -1133,14 +1147,31 @@ impl Vm {
         };
         StackView::new(stack, mode)
     }
+
+    /// Reads a byte from device memory
+    pub fn dev_read(&self, addr: u8) -> u8 {
+        self.dev[addr as usize]
+    }
+
+    /// Writes a byte to device memory
+    pub fn dev_write(&mut self, addr: u8, v: u8) {
+        self.dev[addr as usize] = v;
+    }
 }
 
 /// Trait for a Uxn-compatible device
 pub trait Device {
-    /// Performs the `DEI` operation, reading a byte from the device
-    fn dei(&mut self, target: u8) -> u8;
-    /// Performs the `DEO` operation, writing a byte to the device
-    fn deo(&mut self, target: u8, value: u8);
+    /// Performs the `DEI` operation for the given target
+    ///
+    /// The output byte (if any) must be written to `vm.dev[target]`, and can be
+    /// read after this function returns.
+    fn dei(&mut self, vm: &mut Vm, target: u8);
+
+    /// Performs the `DEO` operation on the given target
+    ///
+    /// The input byte (if any) will be read from `vm.dev[target]`, and must be
+    /// stored before this function is called.
+    fn deo(&mut self, vm: &mut Vm, target: u8);
 }
 
 #[cfg(test)]
@@ -1204,10 +1235,10 @@ mod test {
 
     struct EmptyDevice;
     impl Device for EmptyDevice {
-        fn dei(&mut self, _target: u8) -> u8 {
-            0
+        fn dei(&mut self, _vm: &mut Vm, _target: u8) {
+            // nothing to do here
         }
-        fn deo(&mut self, _target: u8, _value: u8) {
+        fn deo(&mut self, _vm: &mut Vm, _target: u8) {
             // nothing to do here
         }
     }

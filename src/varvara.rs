@@ -1,5 +1,5 @@
 //! The Varvara computer system
-use crate::uxn::Device;
+use crate::uxn::{Device, Vm};
 use std::io::Write;
 use zerocopy::AsBytes;
 
@@ -11,78 +11,67 @@ pub struct Varvara {
 }
 
 #[derive(Default)]
-struct System {
-    red: u16,
-    green: u16,
-    blue: u16,
-}
+struct System {}
 
 impl System {
-    fn deo(&mut self, target: u8, value: u8) {
+    fn deo(&mut self, vm: &mut Vm, target: u8) {
         match target & 0x0F {
-            0x08 => self.red.as_bytes_mut()[1] = value,
-            0x09 => self.red.as_bytes_mut()[0] = value,
-            0x0a => self.green.as_bytes_mut()[0] = value,
-            0x0b => self.green.as_bytes_mut()[1] = value,
-            0x0c => self.blue.as_bytes_mut()[0] = value,
-            0x0d => self.blue.as_bytes_mut()[1] = value,
+            0x08..=0x0d => (),
 
             _ => panic!("unimplemented system call: {target}"),
         }
     }
-    fn dei(&mut self, target: u8) -> u8 {
+    fn dei(&mut self, vm: &mut Vm, target: u8) {
         match target & 0x0F {
-            0x08 => self.red.to_be_bytes()[0],
-            0x09 => self.red.to_be_bytes()[1],
-            0x0a => self.green.to_be_bytes()[0],
-            0x0b => self.green.to_be_bytes()[1],
-            0x0c => self.blue.to_be_bytes()[0],
-            0x0d => self.blue.to_be_bytes()[1],
-
+            0x08..=0x0d => (),
             _ => panic!("unimplemented system call: {target}"),
         }
     }
 }
 
 #[derive(Default)]
-struct Console {
-    vector: u16,
-}
-impl Console {
-    fn deo(&mut self, target: u8, value: u8) {
-        match target & 0x0F {
-            0x00 => self.vector.as_bytes_mut()[1] = value,
-            0x01 => self.vector.as_bytes_mut()[0] = value,
+struct Console {}
 
+impl Console {
+    fn deo(&mut self, vm: &mut Vm, target: u8) {
+        match target & 0x0F {
+            0x00..=0x01 => (), // vector
             0x08 => {
-                let mut out = std::io::stdout();
-                out.write_all(&[value]).unwrap();
+                let v = vm.dev_read(target);
+                let mut out = std::io::stdout().lock();
+                out.write_all(&[v]).unwrap();
+                out.flush().unwrap();
+            }
+            0x09 => {
+                let v = vm.dev_read(target);
+                let mut out = std::io::stderr().lock();
+                out.write_all(&[v]).unwrap();
                 out.flush().unwrap();
             }
 
-            _ => panic!("unimplemented console call: {target:#2x}"),
+            _ => panic!("unimplemented console DEO call: {target:#2x}"),
         }
     }
-    fn dei(&mut self, target: u8) -> u8 {
+    fn dei(&mut self, vm: &mut Vm, target: u8) {
         match target & 0x0F {
-            0x07 => 0, // TODO
-            _ => panic!("unimplemented console call: {target:#2x}"),
+            0x07 => (), // TODO
+            _ => panic!("unimplemented console DEI call: {target:#2x}"),
         }
     }
 }
 
 impl Device for Varvara {
-    fn deo(&mut self, target: u8, value: u8) {
+    fn deo(&mut self, vm: &mut Vm, target: u8) {
         match target & 0xF0 {
-            0x00 => self.system.deo(target, value),
-            0x10 => self.console.deo(target, value),
+            0x00 => self.system.deo(vm, target),
+            0x10 => self.console.deo(vm, target),
             _ => panic!("unimplemented device {target:#2x}"),
         }
     }
-    fn dei(&mut self, target: u8) -> u8 {
+    fn dei(&mut self, vm: &mut Vm, target: u8) {
         match target & 0xF0 {
-            0x00 => self.system.dei(target),
-            0x10 => self.console.dei(target),
+            0x00 => self.system.dei(vm, target),
+            0x10 => self.console.dei(vm, target),
             _ => panic!("unimplemented device {target:#2x}"),
         }
     }
