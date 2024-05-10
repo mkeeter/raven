@@ -66,7 +66,7 @@ impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
     fn pop_short(&mut self) -> u16 {
         if keep(FLAGS) {
             let v = self.stack.peek_short_at(self.offset);
-            self.offset = self.offset.wrapping_add(1);
+            self.offset = self.offset.wrapping_add(2);
             v
         } else {
             self.stack.pop_short()
@@ -84,14 +84,13 @@ impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
     /// Replaces the top item on the stack with the given value
     fn emplace(&mut self, v: Value) {
         match v {
-            Value::Short(..) => {
-                self.pop_short();
+            Value::Short(v) => {
+                self.stack.emplace_short(v);
             }
-            Value::Byte(..) => {
-                self.pop_byte();
+            Value::Byte(v) => {
+                self.stack.emplace_byte(v);
             }
         }
-        self.stack.push(v);
     }
 
     fn push_byte(&mut self, v: u8) {
@@ -163,6 +162,14 @@ impl Stack {
         self.index = self.index.wrapping_add(1);
         self.data[usize::from(self.index)] = v;
     }
+    fn emplace_byte(&mut self, v: u8) {
+        self.data[usize::from(self.index)] = v;
+    }
+    fn emplace_short(&mut self, v: u16) {
+        let [hi, lo] = v.to_be_bytes();
+        self.data[usize::from(self.index.wrapping_sub(1))] = hi;
+        self.data[usize::from(self.index)] = lo;
+    }
     fn reserve(&mut self, n: u8) {
         self.index = self.index.wrapping_add(n);
     }
@@ -177,13 +184,6 @@ impl Stack {
             Value::Byte(v) => self.push_byte(v),
         }
     }
-    fn pop(&mut self, short: bool) -> Value {
-        if short {
-            Value::Short(self.pop_short())
-        } else {
-            Value::Byte(self.pop_byte())
-        }
-    }
 
     pub fn peek_byte_at(&self, offset: u8) -> u8 {
         self.data[usize::from(self.index.wrapping_sub(offset))]
@@ -192,13 +192,6 @@ impl Stack {
         let lo = self.peek_byte_at(offset);
         let hi = self.peek_byte_at(offset.wrapping_add(1));
         u16::from_be_bytes([hi, lo])
-    }
-    fn peek_at(&self, offset: u8, short: bool) -> Value {
-        if short {
-            Value::Short(self.peek_short_at(offset))
-        } else {
-            Value::Byte(self.peek_byte_at(offset))
-        }
     }
 
     /// Returns the number of items in the stack
