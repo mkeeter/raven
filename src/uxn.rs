@@ -148,36 +148,51 @@ impl From<Value> for u16 {
 }
 
 impl Stack {
+    #[inline]
     fn pop_byte(&mut self) -> u8 {
         let out = self.data[usize::from(self.index)];
         self.index = self.index.wrapping_sub(1);
         out
     }
+
+    #[inline]
     fn pop_short(&mut self) -> u16 {
         let lo = self.pop_byte();
         let hi = self.pop_byte();
         u16::from_be_bytes([hi, lo])
     }
+
+    #[inline]
     fn push_byte(&mut self, v: u8) {
         self.index = self.index.wrapping_add(1);
         self.data[usize::from(self.index)] = v;
     }
+
+    #[inline]
     fn emplace_byte(&mut self, v: u8) {
         self.data[usize::from(self.index)] = v;
     }
+
+    #[inline]
     fn emplace_short(&mut self, v: u16) {
         let [hi, lo] = v.to_be_bytes();
         self.data[usize::from(self.index.wrapping_sub(1))] = hi;
         self.data[usize::from(self.index)] = lo;
     }
+
+    #[inline]
     fn reserve(&mut self, n: u8) {
         self.index = self.index.wrapping_add(n);
     }
+
+    #[inline]
     fn push_short(&mut self, v: u16) {
         let [hi, lo] = v.to_be_bytes();
         self.push_byte(hi);
         self.push_byte(lo);
     }
+
+    #[inline]
     fn push(&mut self, v: Value) {
         match v {
             Value::Short(v) => self.push_short(v),
@@ -185,9 +200,12 @@ impl Stack {
         }
     }
 
+    #[inline]
     pub fn peek_byte_at(&self, offset: u8) -> u8 {
         self.data[usize::from(self.index.wrapping_sub(offset))]
     }
+
+    #[inline]
     fn peek_short_at(&self, offset: u8) -> u16 {
         let lo = self.peek_byte_at(offset);
         let hi = self.peek_byte_at(offset.wrapping_add(1));
@@ -195,11 +213,13 @@ impl Stack {
     }
 
     /// Returns the number of items in the stack
+    #[inline]
     pub fn len(&self) -> u8 {
         self.index.wrapping_add(1)
     }
 
     /// Sets the number of items in the stack
+    #[inline]
     pub fn set_len(&mut self, n: u8) {
         self.index = n.wrapping_sub(1);
     }
