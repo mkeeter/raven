@@ -46,31 +46,31 @@ impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
     /// If `self.keep` is set, then only the view offset ([`StackView::offset`])
     /// is changed; otherwise, the stack index ([`Stack::index`]) is changed.
     fn pop(&mut self) -> Value {
-        self.pop_type(short(FLAGS))
-    }
-
-    fn pop_type(&mut self, short: bool) -> Value {
-        if keep(FLAGS) {
-            let v = self.stack.peek_at(self.offset, short);
-            self.offset = self.offset.wrapping_add(if short { 2 } else { 1 });
-            v
+        if short(FLAGS) {
+            Value::Short(self.pop_short())
         } else {
-            self.stack.pop(short)
+            Value::Byte(self.pop_byte())
         }
     }
 
     fn pop_byte(&mut self) -> u8 {
-        let Value::Byte(out) = self.pop_type(false) else {
-            unreachable!();
-        };
-        out
+        if keep(FLAGS) {
+            let v = self.stack.peek_byte_at(self.offset);
+            self.offset = self.offset.wrapping_add(1);
+            v
+        } else {
+            self.stack.pop_byte()
+        }
     }
 
     fn pop_short(&mut self) -> u16 {
-        let Value::Short(out) = self.pop_type(true) else {
-            unreachable!();
-        };
-        out
+        if keep(FLAGS) {
+            let v = self.stack.peek_short_at(self.offset);
+            self.offset = self.offset.wrapping_add(1);
+            v
+        } else {
+            self.stack.pop_short()
+        }
     }
 
     fn push(&mut self, v: Value) {
