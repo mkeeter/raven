@@ -11,6 +11,12 @@ pub struct Varvara {
     rx: std::sync::mpsc::Receiver<Event>,
 }
 
+impl Default for Varvara {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 enum Event {
     Console(u8),
 }
