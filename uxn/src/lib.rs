@@ -12,7 +12,7 @@ fn ret(flags: u8) -> bool {
 
 /// Simple circular stack, with room for 256 items
 #[derive(Debug)]
-pub(crate) struct Stack {
+pub struct Stack {
     data: [u8; 256],
 
     /// The index points to the last occupied slot, and increases on `push`
@@ -334,6 +334,41 @@ impl Uxn {
     /// Reads a byte from device memory
     pub fn dev_read(&self, addr: u8) -> u8 {
         self.dev[addr as usize]
+    }
+
+    /// Mutably borrows the entire RAM array
+    pub fn ram_mut(&mut self) -> &mut [u8; 65536] {
+        &mut self.ram
+    }
+
+    /// Shared borrow of the entire RAM array
+    pub fn ram(&mut self) -> &[u8; 65536] {
+        &self.ram
+    }
+
+    /// Reads a byte from RAM
+    pub fn ram_read(&self, addr: u16) -> u8 {
+        self.ram[addr as usize]
+    }
+
+    /// Shared borrow of the working stack
+    pub fn stack(&self) -> &Stack {
+        &self.stack
+    }
+
+    /// Mutable borrow of the working stack
+    pub fn stack_mut(&mut self) -> &mut Stack {
+        &mut self.stack
+    }
+
+    /// Shared borrow of the return stack
+    pub fn ret(&self) -> &Stack {
+        &self.ret
+    }
+
+    /// Mutable borrow of the return stack
+    pub fn ret_mut(&mut self) -> &mut Stack {
+        &mut self.ret
     }
 
     /// Writes a byte to device memory

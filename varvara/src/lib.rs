@@ -2,7 +2,7 @@
 mod console;
 mod system;
 
-use crate::uxn::{Device, Uxn};
+use uxn::{Device, Uxn};
 
 /// Handle to the Varvara system
 pub struct Varvara {

@@ -1,7 +1,8 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use muxn::{uxn::Uxn, varvara::Varvara};
+use uxn::Uxn;
+use varvara::Varvara;
 
 use anyhow::{Context, Result};
 use clap::Parser;

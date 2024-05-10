@@ -1,4 +1,4 @@
-use crate::uxn::{Device, Uxn};
+use uxn::{Device, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct System {
@@ -63,21 +63,20 @@ impl Device for System {
             port::EXPANSION_1 => {
                 let hi = vm.dev_read(0x2);
                 let addr = u16::from_be_bytes([hi, v]);
-                let op = vm.ram[addr as usize];
+                let op = vm.ram_read(addr);
                 match op {
                     expansion::FILL => {
                         let mut f = Fill::new_zeroed();
                         for (i, b) in f.as_bytes_mut().iter_mut().enumerate() {
-                            *b = vm.ram[addr
-                                .wrapping_add(1)
-                                .wrapping_add(i as u16)
-                                as usize]
+                            *b = vm.ram_read(
+                                addr.wrapping_add(1).wrapping_add(i as u16),
+                            );
                         }
                         let bank = f.bank.get();
                         let addr = f.addr.get();
                         for i in 0..f.length.get() {
                             let ram = match bank {
-                                0 => &mut vm.ram,
+                                0 => vm.ram_mut(),
                                 b => &mut self.banks[b as usize - 1],
                             };
                             ram[addr.wrapping_add(i) as usize] = f.value;
@@ -86,10 +85,9 @@ impl Device for System {
                     expansion::CPYL | expansion::CPYR => {
                         let mut c = Cpy::new_zeroed();
                         for (i, b) in c.as_bytes_mut().iter_mut().enumerate() {
-                            *b = vm.ram[addr
-                                .wrapping_add(1)
-                                .wrapping_add(i as u16)
-                                as usize]
+                            *b = vm.ram_read(
+                                addr.wrapping_add(1).wrapping_add(i as u16),
+                            );
                         }
                         let offset = |i, addr: zerocopy::U16<zerocopy::BE>| {
                             if op == expansion::CPYL {
@@ -105,14 +103,14 @@ impl Device for System {
                         for i in 0..c.length.get() {
                             let src_addr = offset(i, c.src_addr);
                             let src = match c.src_bank.get() {
-                                0 => &vm.ram,
+                                0 => vm.ram(),
                                 b => &self.banks[b as usize - 1],
                             };
                             let v = src[src_addr as usize];
 
                             let dst_addr = offset(i, c.dst_addr);
                             let dst = match c.dst_bank.get() {
-                                0 => &mut vm.ram,
+                                0 => vm.ram_mut(),
                                 b => &mut self.banks[b as usize - 1],
                             };
                             dst[dst_addr as usize] = v;
@@ -121,14 +119,14 @@ impl Device for System {
                     _ => panic!("invalid expansion opcode {op}"),
                 }
             }
-            port::WST => vm.stack.set_len(v),
-            port::RST => vm.ret.set_len(v),
+            port::WST => vm.stack_mut().set_len(v),
+            port::RST => vm.ret_mut().set_len(v),
             port::METADATA_0 | port::METADATA_1 => (),
             port::RED_0 | port::RED_1 => (), // red
             port::GREEN_0 | port::GREEN_1 => (), // green
             port::BLUE_0 | port::BLUE_1 => (), // blue
             port::DEBUG => {
-                for (name, st) in [("WST", &vm.stack), ("RST", &vm.ret)] {
+                for (name, st) in [("WST", vm.stack()), ("RST", vm.ret())] {
                     print!("{name} ");
                     let n = st.len();
                     for i in (0..8).rev() {
@@ -152,8 +150,8 @@ impl Device for System {
     }
     fn dei(&mut self, vm: &mut Uxn, target: u8) {
         match target & 0x0F {
-            port::WST => vm.dev_write(target, vm.stack.len()),
-            port::RST => vm.dev_write(target, vm.ret.len()),
+            port::WST => vm.dev_write(target, vm.stack().len()),
+            port::RST => vm.dev_write(target, vm.ret().len()),
             _ => (),
         }
     }

@@ -1,13 +1,6 @@
-[package]
-name = "muxn"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-anyhow = "1.0.83"
-clap = { version = "4.5.4", features = ["derive"] }
-zerocopy = { version = "0.7.34", features = ["derive"] }
-
-[[bin]]
-name = "muxn"
-path = "src/main.rs"
+[workspace]
+resolver = "2"
+members = [
+    "uxn",
+    "varvara",
+]

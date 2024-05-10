@@ -1,11 +1,9 @@
-use crate::{
-    uxn::{Device, Uxn},
-    varvara::Event,
-};
+use crate::Event;
 use std::{
     io::{Read, Write},
     sync::mpsc,
 };
+use uxn::{Device, Uxn};
 
 pub struct Console;
 
