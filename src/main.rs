@@ -22,7 +22,7 @@ fn main() -> Result<()> {
     f.read_to_end(&mut rom).context("failed to read file")?;
 
     let mut vm = Uxn::new(&rom);
-    let mut dev = Varvara::default();
+    let mut dev = Varvara::new();
     vm.run(&mut dev, 0x100);
     dev.run(&mut vm);
 

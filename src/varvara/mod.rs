@@ -5,10 +5,14 @@ mod system;
 use crate::uxn::{Device, Uxn};
 
 /// Handle to the Varvara system
-#[derive(Default)]
 pub struct Varvara {
     system: system::System,
     console: console::Console,
+    rx: std::sync::mpsc::Receiver<Event>,
+}
+
+enum Event {
+    Console(u8),
 }
 
 impl Device for Varvara {
@@ -29,11 +33,24 @@ impl Device for Varvara {
 }
 
 impl Varvara {
+    pub fn new() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let console = console::Console::new(tx.clone());
+        Self {
+            console,
+            system: system::System::default(),
+            rx,
+        }
+    }
+
     /// Runs in a busy-loop
     pub fn run(&mut self, vm: &mut Uxn) {
-        loop {
-            if let Some(vector) = self.console.ready(vm) {
-                vm.run(self, vector)
+        while let Ok(e) = self.rx.recv() {
+            match e {
+                Event::Console(c) => {
+                    let vector = self.console.event(vm, c);
+                    vm.run(self, vector);
+                }
             }
         }
     }

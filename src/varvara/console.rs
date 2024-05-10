@@ -1,15 +1,13 @@
-use crate::uxn::{Device, Uxn};
-use std::io::{Read, Write};
+use crate::{
+    uxn::{Device, Uxn},
+    varvara::Event,
+};
+use std::{
+    io::{Read, Write},
+    sync::mpsc,
+};
 
-pub struct Console {
-    rx: std::sync::mpsc::Receiver<u8>,
-}
-
-impl Default for Console {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub struct Console;
 
 mod port {
     pub const VECTOR_0: u8 = 0x10;
@@ -48,21 +46,20 @@ impl Device for Console {
 }
 
 impl Console {
-    fn new() -> Self {
-        let (tx, rx) = std::sync::mpsc::channel();
+    pub fn new(tx: mpsc::Sender<Event>) -> Self {
         std::thread::spawn(move || {
             let mut i = std::io::stdin().lock();
             let mut buf = [0u8; 32];
             loop {
                 let n = i.read(&mut buf).unwrap();
                 for &c in &buf[..n] {
-                    if tx.send(c).is_err() {
+                    if tx.send(Event::Console(c)).is_err() {
                         return;
                     }
                 }
             }
         });
-        Self { rx }
+        Self
     }
 
     /// Reads the `vector` value from VM device memory
@@ -73,14 +70,9 @@ impl Console {
     }
 
     /// Checks whether a callback is ready
-    pub fn ready(&mut self, vm: &mut Uxn) -> Option<u16> {
-        // TODO error handling?
-        if let Ok(c) = self.rx.try_recv() {
-            vm.dev_write(port::READ, c);
-            vm.dev_write(port::TYPE, 1);
-            Some(self.vector(vm))
-        } else {
-            None
-        }
+    pub fn event(&mut self, vm: &mut Uxn, c: u8) -> u16 {
+        vm.dev_write(port::READ, c);
+        vm.dev_write(port::TYPE, 1);
+        self.vector(vm)
     }
 }
