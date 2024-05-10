@@ -43,7 +43,7 @@ impl Varvara {
         }
     }
 
-    /// Runs in a busy-loop
+    /// Runs in a wait-loop
     pub fn run(&mut self, vm: &mut Uxn) {
         while let Ok(e) = self.rx.recv() {
             match e {
