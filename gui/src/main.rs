@@ -15,6 +15,11 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    let env = env_logger::Env::default()
+        .filter_or("UXN_LOG", "info")
+        .write_style_or("UXN_LOG", "always");
+    env_logger::init_from_env(env);
+
     let args = Args::parse();
     let mut f = std::fs::File::open(&args.rom)
         .with_context(|| format!("failed to open {:?}", args.rom))?;

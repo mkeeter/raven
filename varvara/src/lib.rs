@@ -1,4 +1,6 @@
 //! The Varvara computer system
+use log::warn;
+
 mod console;
 mod system;
 
@@ -20,6 +22,8 @@ pub struct Varvara {
     #[cfg(feature = "screen")]
     window: window::Window,
     rx: std::sync::mpsc::Receiver<Event>,
+
+    already_warned: [bool; 16],
 }
 
 impl Default for Varvara {
@@ -41,7 +45,8 @@ impl Device for Varvara {
             console::ConsolePorts::BASE => self.console.deo(vm, target),
             #[cfg(feature = "screen")]
             screen::ScreenPorts::BASE => self.window.screen.deo(vm, target),
-            _ => panic!("unimplemented device {target:#2x}"),
+
+            t => self.warn_missing(t),
         }
     }
     fn dei(&mut self, vm: &mut Uxn, target: u8) {
@@ -50,7 +55,8 @@ impl Device for Varvara {
             console::ConsolePorts::BASE => self.console.dei(vm, target),
             #[cfg(feature = "screen")]
             screen::ScreenPorts::BASE => self.window.screen.dei(vm, target),
-            _ => panic!("unimplemented device {target:#2x}"),
+
+            t => self.warn_missing(t),
         }
     }
 }
@@ -64,6 +70,14 @@ impl Varvara {
             #[cfg(feature = "screen")]
             window: window::Window::new(tx.clone()),
             rx,
+            already_warned: [false; 16],
+        }
+    }
+
+    fn warn_missing(&mut self, t: u8) {
+        if !self.already_warned[(t >> 4) as usize] {
+            warn!("unimplemented device {t:#02x}");
+            self.already_warned[(t >> 4) as usize] = true;
         }
     }
 
