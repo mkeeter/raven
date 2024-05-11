@@ -1,6 +1,5 @@
-use crate::{mouse::Mouse, screen::Screen, Event};
+use crate::{mouse::Mouse, screen::Screen};
 use minifb::{MouseMode, Scale, Window as FbWindow, WindowOptions};
-use std::sync::mpsc;
 use uxn::Uxn;
 
 pub struct Window {
@@ -9,33 +8,33 @@ pub struct Window {
 
     has_mouse: bool,
     window: FbWindow,
+    frame: u64,
 }
 
 const APP_NAME: &str = "Varvara";
 impl Window {
-    pub fn new(tx: mpsc::Sender<Event>) -> Self {
-        const WIDTH: u16 = 640;
-        const HEIGHT: u16 = 360;
+    pub fn new() -> Self {
+        const WIDTH: u16 = 512;
+        const HEIGHT: u16 = 320;
         let screen = Screen::new(WIDTH, HEIGHT);
         let mouse = Mouse::new();
 
-        let window = FbWindow::new(
+        let mut window = FbWindow::new(
             APP_NAME,
             WIDTH as usize,
             HEIGHT as usize,
-            WindowOptions::default(),
+            WindowOptions {
+                scale: Scale::X2,
+                ..WindowOptions::default()
+            },
         )
         .unwrap();
+        window.set_target_fps(120);
 
-        std::thread::spawn(move || loop {
-            if tx.send(Event::Window).is_err() {
-                return;
-            }
-            std::thread::sleep(std::time::Duration::from_micros(16600));
-        });
         Self {
             screen,
             mouse,
+            frame: 0,
 
             has_mouse: false,
             window,
@@ -50,8 +49,14 @@ impl Window {
     }
 
     pub fn event(&mut self, vm: &mut Uxn) -> impl Iterator<Item = u16> {
-        // The screen vector should always be called
-        let v = self.screen.event(vm);
+        // The screen vector should be called every other frame, since we do
+        // updates at ~120 FPS
+        let v = if self.frame & 1 == 1 {
+            Some(self.screen.event(vm))
+        } else {
+            None
+        };
+        self.frame = self.frame.wrapping_add(1);
 
         // The mouse vector should be called if it changed
         let m = if self.has_mouse {
@@ -62,7 +67,7 @@ impl Window {
         } else {
             None
         };
-        [Some(v), m].into_iter().flatten()
+        [v, m].into_iter().flatten()
     }
 
     /// Redraws the window and handles miscellaneous polling
@@ -92,6 +97,7 @@ impl Window {
             },
         )
         .unwrap();
+        self.window.set_target_fps(120);
         if self.has_mouse {
             self.window.set_cursor_visibility(false);
         }

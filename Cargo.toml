@@ -13,6 +13,6 @@ chrono = "0.4.38"
 clap = { version = "4.5.4", features = ["derive"] }
 env_logger = "0.11.3"
 log = "0.4.21"
-minifb = "0.25"
+minifb = "0.26"
 static_assertions = "1.1.0"
 zerocopy = { version = "0.7.34", features = ["derive"] }

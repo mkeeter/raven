@@ -39,8 +39,6 @@ impl Default for Varvara {
 
 enum Event {
     Console(u8),
-    #[cfg(feature = "gui")]
-    Window,
 }
 
 impl Device for Varvara {
@@ -50,8 +48,9 @@ impl Device for Varvara {
             console::ConsolePorts::BASE => self.console.deo(vm, target),
             #[cfg(feature = "gui")]
             screen::ScreenPorts::BASE => self.window.screen.deo(vm, target),
-            datetime::DatetimePorts::BASE => self.datetime.deo(vm, target),
+            #[cfg(feature = "gui")]
             mouse::MousePorts::BASE => self.window.set_mouse(),
+            datetime::DatetimePorts::BASE => self.datetime.deo(vm, target),
 
             t => self.warn_missing(t),
         }
@@ -62,8 +61,9 @@ impl Device for Varvara {
             console::ConsolePorts::BASE => self.console.dei(vm, target),
             #[cfg(feature = "gui")]
             screen::ScreenPorts::BASE => self.window.screen.dei(vm, target),
-            datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
+            #[cfg(feature = "gui")]
             mouse::MousePorts::BASE => self.window.set_mouse(),
+            datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
 
             t => self.warn_missing(t),
         }
@@ -77,7 +77,7 @@ impl Varvara {
             console: console::Console::new(tx.clone()),
             system: system::System::default(),
             #[cfg(feature = "gui")]
-            window: window::Window::new(tx.clone()),
+            window: window::Window::new(),
             datetime: datetime::Datetime,
             rx,
             already_warned: [false; 16],
@@ -92,6 +92,24 @@ impl Varvara {
     }
 
     /// Runs in a wait-loop
+    #[cfg(feature = "gui")]
+    pub fn run(&mut self, vm: &mut Uxn) {
+        while self.window.update(vm) {
+            if let Ok(e) = self.rx.try_recv() {
+                match e {
+                    Event::Console(c) => {
+                        let vector = self.console.event(vm, c);
+                        vm.run(self, vector);
+                    }
+                }
+            }
+            for v in self.window.event(vm) {
+                vm.run(self, v);
+            }
+        }
+    }
+
+    #[cfg(not(feature = "gui"))]
     pub fn run(&mut self, vm: &mut Uxn) {
         while let Ok(e) = self.rx.recv() {
             match e {
@@ -99,17 +117,6 @@ impl Varvara {
                     let vector = self.console.event(vm, c);
                     vm.run(self, vector);
                 }
-                #[cfg(feature = "gui")]
-                Event::Window => {
-                    for v in self.window.event(vm) {
-                        vm.run(self, v);
-                    }
-                }
-            }
-
-            #[cfg(feature = "gui")]
-            if !self.window.update(vm) {
-                break;
             }
         }
     }
