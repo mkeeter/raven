@@ -43,8 +43,13 @@ pub struct Screen {
     foreground: Vec<u8>,
     background: Vec<u8>,
     window: Window,
-    width: usize,
-    height: usize,
+    width: u16,
+    height: u16,
+}
+
+enum Layer {
+    Foreground,
+    Background,
 }
 
 /// Decoder for the `pixel` port
@@ -59,8 +64,12 @@ impl Pixel {
     fn fill(&self) -> bool {
         (self.0 & (1 << 7)) != 0
     }
-    fn layer(&self) -> bool {
-        (self.0 & (1 << 6)) != 0
+    fn layer(&self) -> Layer {
+        if (self.0 & (1 << 6)) != 0 {
+            Layer::Foreground
+        } else {
+            Layer::Background
+        }
     }
     fn flip_y(&self) -> bool {
         (self.0 & (1 << 5)) != 0
@@ -81,8 +90,12 @@ impl Sprite {
     fn two_bpp(&self) -> bool {
         (self.0 & (1 << 7)) != 0
     }
-    fn layer(&self) -> bool {
-        (self.0 & (1 << 6)) != 0
+    fn layer(&self) -> Layer {
+        if (self.0 & (1 << 6)) != 0 {
+            Layer::Foreground
+        } else {
+            Layer::Background
+        }
     }
     fn flip_y(&self) -> bool {
         (self.0 & (1 << 5)) != 0
@@ -115,15 +128,20 @@ const APP_NAME: &str = "Varvara";
 
 impl Screen {
     pub fn new(tx: mpsc::Sender<Event>) -> Self {
-        const WIDTH: usize = 640;
-        const HEIGHT: usize = 360;
-        let buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
-        let foreground: Vec<u8> = vec![0; WIDTH * HEIGHT];
-        let background: Vec<u8> = vec![0; WIDTH * HEIGHT];
+        const WIDTH: u16 = 640;
+        const HEIGHT: u16 = 360;
+        const SIZE: usize = WIDTH as usize * HEIGHT as usize;
+        let buffer: Vec<u32> = vec![0; SIZE];
+        let foreground: Vec<u8> = vec![0; SIZE];
+        let background: Vec<u8> = vec![0; SIZE];
 
-        let mut window =
-            Window::new(APP_NAME, WIDTH, HEIGHT, WindowOptions::default())
-                .unwrap();
+        let mut window = Window::new(
+            APP_NAME,
+            WIDTH as usize,
+            HEIGHT as usize,
+            WindowOptions::default(),
+        )
+        .unwrap();
         window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
         std::thread::spawn(move || loop {
@@ -164,7 +182,11 @@ impl Screen {
             *o = colors[i as usize];
         }
         self.window
-            .update_with_buffer(&self.buffer, self.width, self.height)
+            .update_with_buffer(
+                &self.buffer,
+                self.width as usize,
+                self.height as usize,
+            )
             .unwrap();
         self.window.is_open()
     }
@@ -172,17 +194,30 @@ impl Screen {
     fn reopen(&mut self) {
         self.window = Window::new(
             APP_NAME,
-            self.width,
-            self.height,
+            self.width as usize,
+            self.height as usize,
             WindowOptions {
                 scale: Scale::X2,
                 ..WindowOptions::default()
             },
         )
         .unwrap();
-        self.foreground = vec![0u8; self.width * self.height];
-        self.background = vec![0u8; self.width * self.height];
-        self.buffer = vec![0; self.width * self.height];
+        let size = self.width as usize * self.height as usize;
+        self.foreground.resize(size, 0u8);
+        self.background.resize(size, 0u8);
+        self.buffer.resize(size, 0u32);
+    }
+
+    fn set_pixel(&mut self, layer: Layer, x: u16, y: u16, color: u8) {
+        if x >= self.width || y >= self.height {
+            return;
+        }
+        let i = x as usize + y as usize * self.width as usize;
+        let pixels = match layer {
+            Layer::Foreground => &mut self.foreground,
+            Layer::Background => &mut self.background,
+        };
+        pixels[i] = color;
     }
 
     /// Executes the `pixel` operation
@@ -191,27 +226,19 @@ impl Screen {
         let p = v.pixel;
         let auto = v.auto;
 
-        let x = v.x.get() as usize;
-        let y = v.y.get() as usize;
-        let pixels = if p.layer() {
-            &mut self.foreground
-        } else {
-            &mut self.background
-        };
+        let x = v.x.get();
+        let y = v.y.get();
 
         if p.fill() {
             let xr = if p.flip_x() { 0..x } else { x..self.width };
             let yr = if p.flip_y() { 0..y } else { y..self.height };
             for x in xr {
                 for y in yr.clone() {
-                    let i = x + y * self.width;
-                    if let Some(o) = pixels.get_mut(i) {
-                        *o = p.color();
-                    }
+                    self.set_pixel(p.layer(), x, y, p.color());
                 }
             }
-        } else if let Some(o) = pixels.get_mut(x + y * self.width) {
-            *o = p.color();
+        } else {
+            self.set_pixel(p.layer(), x, y, p.color());
             let v = vm.dev_mut::<ScreenPorts>();
             if auto.x() {
                 v.x.set(v.x.get().wrapping_add(1));
@@ -225,12 +252,6 @@ impl Screen {
     fn sprite(&mut self, vm: &mut Uxn) {
         let v = vm.dev::<ScreenPorts>();
         let s = v.sprite;
-
-        let pixels = if s.layer() {
-            &mut self.foreground
-        } else {
-            &mut self.background
-        };
 
         const BLENDING: [[u8; 16]; 4] = [
             [0, 0, 0, 0, 1, 0, 1, 1, 2, 2, 0, 2, 3, 3, 3, 0],
@@ -250,8 +271,8 @@ impl Screen {
         // The exact behavior of the `sprite` port is emergent from the C code,
         // so this is written to match it when testing against the
         // `screen.blending.tal` example.
-        let mut x = v.x.get() as usize;
-        let mut y = v.y.get() as usize;
+        let mut x = v.x.get();
+        let mut y = v.y.get();
         for _n in 0..=auto.len() {
             let v = vm.dev::<ScreenPorts>();
             let mut addr = v.addr.get();
@@ -289,11 +310,9 @@ impl Screen {
 
                     let data = ((lo >> (7 - dx)) & 0b1)
                         | (((hi >> (7 - dx)) & 0b1) << 1);
-                    let i = (x + y * self.width) % pixels.len();
-                    if let Some(p) = pixels.get_mut(i) {
-                        if data != 0 || OPAQUE[s.color() as usize] {
-                            *p = BLENDING[data as usize][s.color() as usize];
-                        }
+                    if data != 0 || OPAQUE[s.color() as usize] {
+                        let c = BLENDING[data as usize][s.color() as usize];
+                        self.set_pixel(s.layer(), x, y, c);
                     }
                 }
                 addr = addr.wrapping_add(1);
@@ -346,14 +365,14 @@ impl Device for Screen {
         let v = vm.dev::<ScreenPorts>();
         match target {
             ScreenPorts::WIDTH_W => {
-                let new_width = usize::from(v.width.get());
+                let new_width = v.width.get();
                 if new_width != self.width {
                     self.width = new_width;
                     self.reopen();
                 }
             }
             ScreenPorts::HEIGHT_W => {
-                let new_height = usize::from(v.height.get());
+                let new_height = v.height.get();
                 if new_height != self.height {
                     self.height = new_height;
                     self.reopen();
@@ -373,10 +392,10 @@ impl Device for Screen {
         let v = vm.dev_mut::<ScreenPorts>();
         match target {
             ScreenPorts::WIDTH_R => {
-                v.width.set(self.width as u16);
+                v.width.set(self.width);
             }
             ScreenPorts::HEIGHT_R => {
-                v.height.set(self.height as u16);
+                v.height.set(self.height);
             }
             _ => (),
         }
