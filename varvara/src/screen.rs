@@ -130,7 +130,7 @@ impl Screen {
             if tx.send(Event::Screen).is_err() {
                 return;
             }
-            std::thread::sleep(std::time::Duration::from_micros(16666));
+            std::thread::sleep(std::time::Duration::from_micros(16600));
         });
         Self {
             buffer,
