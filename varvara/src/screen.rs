@@ -10,13 +10,13 @@ pub struct ScreenPorts {
     vector: U16<BigEndian>,
     width: U16<BigEndian>,
     height: U16<BigEndian>,
-    auto: u8,
+    auto: Auto,
     _padding: u8,
     x: U16<BigEndian>,
     y: U16<BigEndian>,
     addr: U16<BigEndian>,
-    pixel: u8,
-    sprite: u8,
+    pixel: Pixel,
+    sprite: Sprite,
 }
 
 impl Ports for ScreenPorts {
@@ -45,6 +45,70 @@ pub struct Screen {
     window: Window,
     width: usize,
     height: usize,
+}
+
+/// Decoder for the `pixel` port
+#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[repr(C)]
+struct Pixel(u8);
+
+impl Pixel {
+    fn color(&self) -> u8 {
+        self.0 & 0b11
+    }
+    fn fill(&self) -> bool {
+        (self.0 & (1 << 7)) != 0
+    }
+    fn layer(&self) -> bool {
+        (self.0 & (1 << 6)) != 0
+    }
+    fn flip_y(&self) -> bool {
+        (self.0 & (1 << 5)) != 0
+    }
+    fn flip_x(&self) -> bool {
+        (self.0 & (1 << 4)) != 0
+    }
+}
+
+/// Decoder for the `sprite` port
+#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[repr(C)]
+struct Sprite(u8);
+impl Sprite {
+    fn color(&self) -> u8 {
+        self.0 & 0b1111
+    }
+    fn two_bpp(&self) -> bool {
+        (self.0 & (1 << 7)) != 0
+    }
+    fn layer(&self) -> bool {
+        (self.0 & (1 << 6)) != 0
+    }
+    fn flip_y(&self) -> bool {
+        (self.0 & (1 << 5)) != 0
+    }
+    fn flip_x(&self) -> bool {
+        (self.0 & (1 << 4)) != 0
+    }
+}
+
+/// Decoder for the `auto` port
+#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[repr(C)]
+struct Auto(u8);
+impl Auto {
+    fn len(&self) -> u8 {
+        self.0 >> 4
+    }
+    fn addr(&self) -> bool {
+        (self.0 & (1 << 2)) != 0
+    }
+    fn y(&self) -> bool {
+        (self.0 & (1 << 1)) != 0
+    }
+    fn x(&self) -> bool {
+        (self.0 & (1 << 0)) != 0
+    }
 }
 
 const APP_NAME: &str = "Varvara";
@@ -125,41 +189,34 @@ impl Screen {
     fn pixel(&mut self, vm: &mut Uxn) {
         let v = vm.dev::<ScreenPorts>();
         let p = v.pixel;
-        let color = p & 0b11;
-        let fill = (p & (1 << 7)) != 0;
-        let layer = (p & (1 << 6)) != 0;
-        let flip_y = (p & (1 << 5)) != 0;
-        let flip_x = (p & (1 << 4)) != 0;
         let auto = v.auto;
 
         let x = v.x.get() as usize;
         let y = v.y.get() as usize;
-        let pixels = if layer {
+        let pixels = if p.layer() {
             &mut self.foreground
         } else {
             &mut self.background
         };
 
-        if fill {
-            let xr = if flip_x { 0..x } else { x..self.width };
-            let yr = if flip_y { 0..y } else { y..self.height };
+        if p.fill() {
+            let xr = if p.flip_x() { 0..x } else { x..self.width };
+            let yr = if p.flip_y() { 0..y } else { y..self.height };
             for x in xr {
                 for y in yr.clone() {
                     let i = x + y * self.width;
-                    if let Some(p) = pixels.get_mut(i) {
-                        *p = color;
+                    if let Some(o) = pixels.get_mut(i) {
+                        *o = p.color();
                     }
                 }
             }
-        } else if let Some(p) = pixels.get_mut(x + y * self.width) {
-            *p = color;
-            let auto_y = (auto & (1 << 1)) != 0;
-            let auto_x = (auto & (1 << 0)) != 0;
+        } else if let Some(o) = pixels.get_mut(x + y * self.width) {
+            *o = p.color();
             let v = vm.dev_mut::<ScreenPorts>();
-            if auto_x {
+            if auto.x() {
                 v.x.set(v.x.get().wrapping_add(1));
             }
-            if auto_y {
+            if auto.y() {
                 v.y.set(v.y.get().wrapping_add(1));
             }
         }
@@ -167,15 +224,9 @@ impl Screen {
 
     fn sprite(&mut self, vm: &mut Uxn) {
         let v = vm.dev::<ScreenPorts>();
-        let p = v.sprite;
+        let s = v.sprite;
 
-        let color = p & 0b1111;
-        let two_bpp = (p & (1 << 7)) != 0;
-        let layer = (p & (1 << 6)) != 0;
-        let flip_y = (p & (1 << 5)) != 0;
-        let flip_x = (p & (1 << 4)) != 0;
-
-        let pixels = if layer {
+        let pixels = if s.layer() {
             &mut self.foreground
         } else {
             &mut self.background
@@ -193,10 +244,6 @@ impl Screen {
         ];
 
         let auto = v.auto;
-        let auto_len = auto >> 4;
-        let auto_addr = (auto & (1 << 2)) != 0;
-        let auto_y = (auto & (1 << 1)) != 0;
-        let auto_x = (auto & (1 << 0)) != 0;
 
         // XXX THIS IS NOT A PLACE OF HONOR
         //
@@ -205,12 +252,12 @@ impl Screen {
         // `screen.blending.tal` example.
         let mut x = v.x.get() as usize;
         let mut y = v.y.get() as usize;
-        for _n in 0..=auto_len {
+        for _n in 0..=auto.len() {
             let v = vm.dev::<ScreenPorts>();
             let mut addr = v.addr.get();
 
             for dy in 0..8 {
-                let y = if flip_y {
+                let y = if s.flip_y() {
                     y.checked_add(7).and_then(|y| y.checked_sub(dy))
                 } else {
                     y.checked_add(dy)
@@ -222,13 +269,13 @@ impl Screen {
                     continue;
                 }
                 let lo = vm.ram_read(addr);
-                let hi = if two_bpp {
+                let hi = if s.two_bpp() {
                     vm.ram_read(addr.wrapping_add(8))
                 } else {
                     0
                 };
                 for dx in 0..8 {
-                    let x = if flip_x {
+                    let x = if s.flip_x() {
                         x.checked_add(7).and_then(|x| x.checked_sub(dx))
                     } else {
                         x.checked_add(dx)
@@ -244,48 +291,48 @@ impl Screen {
                         | (((hi >> (7 - dx)) & 0b1) << 1);
                     let i = (x + y * self.width) % pixels.len();
                     if let Some(p) = pixels.get_mut(i) {
-                        if data != 0 || OPAQUE[color as usize] {
-                            *p = BLENDING[data as usize][color as usize];
+                        if data != 0 || OPAQUE[s.color() as usize] {
+                            *p = BLENDING[data as usize][s.color() as usize];
                         }
                     }
                 }
                 addr = addr.wrapping_add(1);
             }
             // Skip the second byte if this is a 2bpp sprite
-            if two_bpp {
+            if s.two_bpp() {
                 addr = addr.wrapping_add(8);
             }
             // Update position within the loop
-            if auto_y {
-                x = if flip_x {
+            if auto.y() {
+                x = if s.flip_x() {
                     x.wrapping_sub(8)
                 } else {
                     x.wrapping_add(8)
                 };
             }
-            if auto_x {
-                y = if flip_y {
+            if auto.x() {
+                y = if s.flip_y() {
                     y.wrapping_sub(8)
                 } else {
                     y.wrapping_add(8)
                 };
             }
             // Update address globally
-            if auto_addr {
+            if auto.addr() {
                 let v = vm.dev_mut::<ScreenPorts>();
                 v.addr.set(addr);
             }
         }
         let v = vm.dev_mut::<ScreenPorts>();
-        if auto_x {
-            v.x.set(if flip_x {
+        if auto.x() {
+            v.x.set(if s.flip_x() {
                 v.x.get().wrapping_sub(8)
             } else {
                 v.x.get().wrapping_add(8)
             })
         }
-        if auto_y {
-            v.y.set(if flip_y {
+        if auto.y() {
+            v.y.set(if s.flip_y() {
                 v.y.get().wrapping_sub(8)
             } else {
                 v.y.get().wrapping_add(8)
