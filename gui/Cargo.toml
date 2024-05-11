@@ -1,5 +1,5 @@
 [package]
-name = "cli"
+name = "gui"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,4 @@ edition = "2021"
 anyhow = "1.0.83"
 clap = { version = "4.5.4", features = ["derive"] }
 uxn.path = "../uxn"
-varvara = { path = "../varvara", default-features = false }
+varvara = { path = "../varvara" }

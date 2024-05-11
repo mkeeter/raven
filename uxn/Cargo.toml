@@ -2,3 +2,6 @@
 name = "uxn"
 version = "0.1.0"
 edition = "2021"
+
+[dependencies]
+zerocopy = { version = "0.7.34", features = ["derive"] }

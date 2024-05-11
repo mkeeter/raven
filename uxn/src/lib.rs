@@ -218,6 +218,12 @@ impl Stack {
         self.index.wrapping_add(1)
     }
 
+    /// Checks whether the stack is empty
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Sets the number of items in the stack
     #[inline]
     pub fn set_len(&mut self, n: u8) {
@@ -331,9 +337,16 @@ impl Uxn {
         StackView::new(stack)
     }
 
-    /// Reads a byte from device memory
-    pub fn dev_read(&self, addr: u8) -> u8 {
-        self.dev[addr as usize]
+    pub fn dev<D: Ports>(&self) -> &D {
+        D::ref_from(&self.dev[D::BASE as usize..][..std::mem::size_of::<D>()])
+            .unwrap()
+    }
+
+    pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
+        D::mut_from(
+            &mut self.dev[D::BASE as usize..][..std::mem::size_of::<D>()],
+        )
+        .unwrap()
     }
 
     /// Mutably borrows the entire RAM array
@@ -369,11 +382,6 @@ impl Uxn {
     /// Mutable borrow of the return stack
     pub fn ret_mut(&mut self) -> &mut Stack {
         &mut self.ret
-    }
-
-    /// Writes a byte to device memory
-    pub fn dev_write(&mut self, addr: u8, v: u8) {
-        self.dev[addr as usize] = v;
     }
 
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) {
@@ -1555,6 +1563,22 @@ pub trait Device {
     /// The input byte (if any) will be read from `vm.dev[target]`, and must be
     /// stored before this function is called.
     fn deo(&mut self, vm: &mut Uxn, target: u8);
+}
+
+/// Trait for a type which can be cast to a device ports `struct`
+pub trait Ports:
+    zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::FromZeroes
+{
+    /// Base address of the port, of the form `0xA0`
+    const BASE: u8;
+
+    /// This function should be a static assertion that the port is 16 bytes
+    ///
+    /// Here's the canonical example:
+    /// ```text
+    /// static_assertions::assert_eq_size!(Self, [u8; 16]);
+    /// ```
+    fn assert_size();
 }
 
 /// Device which does nothing

@@ -1,4 +1,4 @@
-use uxn::{Device, Uxn};
+use uxn::{Device, Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct System {
@@ -30,23 +30,45 @@ struct Cpy {
     dst_addr: U16<BigEndian>,
 }
 
-mod port {
-    pub const _UNUSED_0: u8 = 0x00;
-    pub const _UNUSED_1: u8 = 0x01;
-    pub const EXPANSION_0: u8 = 0x02;
-    pub const EXPANSION_1: u8 = 0x03;
-    pub const WST: u8 = 0x04;
-    pub const RST: u8 = 0x05;
-    pub const METADATA_0: u8 = 0x06;
-    pub const METADATA_1: u8 = 0x07;
-    pub const RED_0: u8 = 0x08;
-    pub const RED_1: u8 = 0x09;
-    pub const GREEN_0: u8 = 0x0a;
-    pub const GREEN_1: u8 = 0x0b;
-    pub const BLUE_0: u8 = 0x0c;
-    pub const BLUE_1: u8 = 0x0d;
-    pub const DEBUG: u8 = 0x0e;
-    pub const STATE: u8 = 0x0f;
+#[derive(AsBytes, FromZeroes, FromBytes)]
+#[repr(C)]
+pub struct SystemPorts {
+    _unused_0: u8,
+    _unused_1: u8,
+    expansion: U16<BigEndian>,
+    wst: u8,
+    rst: u8,
+    metadata: U16<BigEndian>,
+    red: U16<BigEndian>,
+    green: U16<BigEndian>,
+    blue: U16<BigEndian>,
+    debug: u8,
+    state: u8,
+}
+
+impl Ports for SystemPorts {
+    const BASE: u8 = 0x00;
+    fn assert_size() {
+        static_assertions::assert_eq_size!(SystemPorts, [u8; 16]);
+    }
+}
+
+impl SystemPorts {
+    const EXPANSION: u8 = (std::mem::offset_of!(Self, expansion) + 1) as u8;
+    const WST: u8 = std::mem::offset_of!(Self, wst) as u8;
+    const RST: u8 = std::mem::offset_of!(Self, rst) as u8;
+    const DEBUG: u8 = std::mem::offset_of!(Self, debug) as u8;
+    const STATE: u8 = std::mem::offset_of!(Self, state) as u8;
+
+    /// Looks up the color for the given index
+    pub fn color(&self, i: u8) -> u32 {
+        let i = 3 - i;
+        let r = (self.red.get() >> (i * 4)) as u32 & 0xF;
+        let g = (self.green.get() >> (i * 4)) as u32 & 0xF;
+        let b = (self.blue.get() >> (i * 4)) as u32 & 0xF;
+        let color = 0x0F000000 | (r << 16) | (g << 8) | b;
+        color | (color << 4)
+    }
 }
 
 mod expansion {
@@ -57,12 +79,10 @@ mod expansion {
 
 impl Device for System {
     fn deo(&mut self, vm: &mut Uxn, target: u8) {
-        let v = vm.dev_read(target);
+        let v = vm.dev::<SystemPorts>();
         match target {
-            port::EXPANSION_0 => (), // triggers on subsequent byte
-            port::EXPANSION_1 => {
-                let hi = vm.dev_read(0x2);
-                let addr = u16::from_be_bytes([hi, v]);
+            SystemPorts::EXPANSION => {
+                let addr = v.expansion.get();
                 let op = vm.ram_read(addr);
                 match op {
                     expansion::FILL => {
@@ -119,13 +139,15 @@ impl Device for System {
                     _ => panic!("invalid expansion opcode {op}"),
                 }
             }
-            port::WST => vm.stack_mut().set_len(v),
-            port::RST => vm.ret_mut().set_len(v),
-            port::METADATA_0 | port::METADATA_1 => (),
-            port::RED_0 | port::RED_1 => (), // red
-            port::GREEN_0 | port::GREEN_1 => (), // green
-            port::BLUE_0 | port::BLUE_1 => (), // blue
-            port::DEBUG => {
+            SystemPorts::WST => {
+                let wst = v.wst;
+                vm.stack_mut().set_len(wst)
+            }
+            SystemPorts::RST => {
+                let rst = v.rst;
+                vm.ret_mut().set_len(rst)
+            }
+            SystemPorts::DEBUG => {
                 for (name, st) in [("WST", vm.stack()), ("RST", vm.ret())] {
                     print!("{name} ");
                     let n = st.len();
@@ -140,18 +162,24 @@ impl Device for System {
                     println!("<");
                 }
             }
-            port::STATE => {
-                if v & 0x80 != 0 {
-                    std::process::exit((v & !0x80) as i32);
+            SystemPorts::STATE => {
+                if v.state & 0x80 != 0 {
+                    std::process::exit((v.state & !0x80) as i32);
                 }
             }
-            _ => unreachable!(),
+            _ => (),
         }
     }
     fn dei(&mut self, vm: &mut Uxn, target: u8) {
         match target & 0x0F {
-            port::WST => vm.dev_write(target, vm.stack().len()),
-            port::RST => vm.dev_write(target, vm.ret().len()),
+            SystemPorts::WST => {
+                let wst = vm.stack().len();
+                vm.dev_mut::<SystemPorts>().wst = wst;
+            }
+            SystemPorts::RST => {
+                let rst = vm.stack().len();
+                vm.dev_mut::<SystemPorts>().rst = rst;
+            }
             _ => (),
         }
     }

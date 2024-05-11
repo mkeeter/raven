@@ -3,36 +3,50 @@ use std::{
     io::{Read, Write},
     sync::mpsc,
 };
-use uxn::{Device, Uxn};
+use uxn::{Device, Ports, Uxn};
+use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct Console;
 
-mod port {
-    pub const VECTOR_0: u8 = 0x10;
-    pub const VECTOR_1: u8 = 0x11;
-    pub const READ: u8 = 0x12;
-    pub const _EXEC: u8 = 0x13;
-    pub const _MODE: u8 = 0x14;
-    pub const _DEAD: u8 = 0x15;
-    pub const _EXIT: u8 = 0x16;
-    pub const TYPE: u8 = 0x17;
-    pub const WRITE: u8 = 0x18;
-    pub const ERROR: u8 = 0x19;
+#[derive(AsBytes, FromZeroes, FromBytes)]
+#[repr(C)]
+pub struct ConsolePorts {
+    vector: U16<BigEndian>,
+    read: u8,
+    _exec: u8,
+    _mode: u8,
+    _dead: u8,
+    _exit: u8,
+    type_: u8,
+    write: u8,
+    error: u8,
+    _pad: [u8; 6],
+}
+
+impl Ports for ConsolePorts {
+    const BASE: u8 = 0x10;
+    fn assert_size() {
+        static_assertions::assert_eq_size!(ConsolePorts, [u8; 16]);
+    }
+}
+
+impl ConsolePorts {
+    const WRITE: u8 = Self::BASE | std::mem::offset_of!(Self, write) as u8;
+    const ERROR: u8 = Self::BASE | std::mem::offset_of!(Self, error) as u8;
 }
 
 impl Device for Console {
     fn deo(&mut self, vm: &mut Uxn, target: u8) {
+        let v = vm.dev::<ConsolePorts>();
         match target {
-            port::WRITE => {
-                let v = vm.dev_read(target);
+            ConsolePorts::WRITE => {
                 let mut out = std::io::stdout().lock();
-                out.write_all(&[v]).unwrap();
+                out.write_all(&[v.write]).unwrap();
                 out.flush().unwrap();
             }
-            port::ERROR => {
-                let v = vm.dev_read(target);
+            ConsolePorts::ERROR => {
                 let mut out = std::io::stderr().lock();
-                out.write_all(&[v]).unwrap();
+                out.write_all(&[v.write]).unwrap();
                 out.flush().unwrap();
             }
             _ => (),
@@ -60,17 +74,11 @@ impl Console {
         Self
     }
 
-    /// Reads the `vector` value from VM device memory
-    fn vector(&self, vm: &Uxn) -> u16 {
-        let hi = vm.dev_read(port::VECTOR_0);
-        let lo = vm.dev_read(port::VECTOR_1);
-        u16::from_be_bytes([hi, lo])
-    }
-
     /// Checks whether a callback is ready
     pub fn event(&mut self, vm: &mut Uxn, c: u8) -> u16 {
-        vm.dev_write(port::READ, c);
-        vm.dev_write(port::TYPE, 1);
-        self.vector(vm)
+        let p = vm.dev_mut::<ConsolePorts>();
+        p.read = c;
+        p.type_ = 1;
+        p.vector.get()
     }
 }
