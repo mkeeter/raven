@@ -176,7 +176,7 @@ impl Screen {
             .zip(self.buffer.iter_mut())
         {
             let i = if f != 0 { f } else { b };
-            *o = colors[i as usize];
+            *o = colors[(i & 0b11) as usize];
         }
         self.window
             .update_with_buffer(
@@ -214,7 +214,10 @@ impl Screen {
             Layer::Foreground => &mut self.foreground,
             Layer::Background => &mut self.background,
         };
-        pixels[i] = color;
+        // This should always be true, but we check to avoid a panic site
+        if let Some(o) = pixels.get_mut(i) {
+            *o = color;
+        }
     }
 
     /// Executes the `pixel` operation
@@ -305,10 +308,12 @@ impl Screen {
                         continue;
                     }
 
-                    let data = ((lo >> (7 - dx)) & 0b1)
-                        | (((hi >> (7 - dx)) & 0b1) << 1);
-                    if data != 0 || OPAQUE[s.color() as usize] {
-                        let c = BLENDING[data as usize][s.color() as usize];
+                    let lo_bit = (lo >> (7 - dx)) & 0b1;
+                    let hi_bit = (hi >> (7 - dx)) & 0b1; // 0 if !two_bpp
+                    let data = (lo_bit | (hi_bit << 1)) as usize;
+                    let color = s.color() as usize;
+                    if data != 0 || OPAQUE[color] {
+                        let c = BLENDING[data][color];
                         self.set_pixel(s.layer(), x, y, c);
                     }
                 }
