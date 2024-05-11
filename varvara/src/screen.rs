@@ -1,6 +1,3 @@
-use crate::Event;
-use minifb::{Scale, Window, WindowOptions};
-use std::sync::mpsc;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -49,14 +46,6 @@ impl ScreenPixel {
             self.bg
         }
     }
-}
-
-pub struct Screen {
-    buffer: Vec<u32>,
-    pixels: Vec<ScreenPixel>,
-    window: Window,
-    width: u16,
-    height: u16,
 }
 
 enum Layer {
@@ -136,79 +125,57 @@ impl Auto {
     }
 }
 
-const APP_NAME: &str = "Varvara";
+pub struct Screen {
+    buffer: Vec<u32>,
+    pixels: Vec<ScreenPixel>,
+    width: u16,
+    height: u16,
+    resized: bool,
+}
 
 impl Screen {
-    pub fn new(tx: mpsc::Sender<Event>) -> Self {
-        const WIDTH: u16 = 640;
-        const HEIGHT: u16 = 360;
-        const SIZE: usize = WIDTH as usize * HEIGHT as usize;
-        let buffer = vec![0; SIZE];
-        let pixels = vec![ScreenPixel::default(); SIZE];
-
-        let mut window = Window::new(
-            APP_NAME,
-            WIDTH as usize,
-            HEIGHT as usize,
-            WindowOptions::default(),
-        )
-        .unwrap();
-        window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
-
-        std::thread::spawn(move || loop {
-            if tx.send(Event::Screen).is_err() {
-                return;
-            }
-            std::thread::sleep(std::time::Duration::from_micros(16600));
-        });
+    pub fn new(width: u16, height: u16) -> Self {
+        let size = width as usize * height as usize;
+        let buffer = vec![0; size];
+        let pixels = vec![ScreenPixel::default(); size];
         Self {
             buffer,
             pixels,
-            window,
-            width: WIDTH,
-            height: HEIGHT,
+            width,
+            height,
+            resized: false,
         }
     }
 
-    pub fn event(&mut self, vm: &mut Uxn) -> u16 {
-        // Nothing to do here, but return the screen vector
-        vm.dev::<ScreenPorts>().vector.get()
+    fn resize(&mut self, width: u16, height: u16) {
+        if width == self.width && height == self.height {
+            return;
+        }
+        self.width = width;
+        self.height = height;
+
+        let size = self.width as usize * self.height as usize;
+        self.pixels.resize(size, ScreenPixel::default());
+        self.buffer.resize(size, 0u32);
+
+        self.resized = true;
     }
 
-    /// Redraws the window and handles miscellaneous polling
-    ///
-    /// Returns `true` if the window is still open; `false` otherwise
-    pub fn update(&mut self, vm: &Uxn) -> bool {
-        self.buffer.resize(self.pixels.len(), 0u32);
+    pub fn resized(&mut self) -> bool {
+        std::mem::take(&mut self.resized)
+    }
+
+    pub fn size(&self) -> (u16, u16) {
+        (self.width, self.height)
+    }
+
+    pub fn update(&mut self, vm: &Uxn) -> (&[u32], u16, u16) {
         let sys = vm.dev::<crate::system::SystemPorts>();
         let colors = [0, 1, 2, 3].map(|i| sys.color(i));
         for (p, o) in self.pixels.iter().zip(self.buffer.iter_mut()) {
             *o = colors[(p.get() & 0b11) as usize];
         }
-        self.window
-            .update_with_buffer(
-                &self.buffer,
-                self.width as usize,
-                self.height as usize,
-            )
-            .unwrap();
-        self.window.is_open()
-    }
-
-    fn reopen(&mut self) {
-        self.window = Window::new(
-            APP_NAME,
-            self.width as usize,
-            self.height as usize,
-            WindowOptions {
-                scale: Scale::X2,
-                ..WindowOptions::default()
-            },
-        )
-        .unwrap();
-        let size = self.width as usize * self.height as usize;
-        self.pixels.resize(size, ScreenPixel::default());
-        self.buffer.resize(size, 0u32);
+        (&self.buffer, self.width, self.height)
     }
 
     fn set_pixel(&mut self, layer: Layer, x: u16, y: u16, color: u8) {
@@ -357,22 +324,17 @@ impl Screen {
         }
     }
 
+    /// Executes a DEO command against the screen
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<ScreenPorts>();
         match target {
             ScreenPorts::WIDTH_W => {
                 let new_width = v.width.get();
-                if new_width != self.width {
-                    self.width = new_width;
-                    self.reopen();
-                }
+                self.resize(new_width, self.height);
             }
             ScreenPorts::HEIGHT_W => {
                 let new_height = v.height.get();
-                if new_height != self.height {
-                    self.height = new_height;
-                    self.reopen();
-                }
+                self.resize(self.width, new_height);
             }
             ScreenPorts::PIXEL => {
                 self.pixel(vm);
@@ -382,7 +344,6 @@ impl Screen {
             }
             _ => (),
         }
-        // Nothing to do here (yet)
     }
 
     pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
@@ -396,5 +357,10 @@ impl Screen {
             }
             _ => (),
         }
+    }
+
+    pub fn event(&mut self, vm: &mut Uxn) -> u16 {
+        // Nothing to do here, but return the screen vector
+        vm.dev::<ScreenPorts>().vector.get()
     }
 }
