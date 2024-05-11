@@ -4,12 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-minifb = { version = "0.25", optional = true }
-static_assertions = "1.1.0"
-zerocopy = { version = "0.7.34", features = ["derive"] }
+minifb = {workspace = true, optional = true }
+static_assertions.workspace = true
+zerocopy.workspace = true
+log.workspace = true
 
 uxn.path = "../uxn"
 
 [features]
-default = ["screen"]
+default = ["screen", "file"]
 screen = ["dep:minifb"]
+file = []

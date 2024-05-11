@@ -6,7 +6,10 @@ mod system;
 mod screen;
 
 #[cfg(feature = "screen")]
-mod gui;
+mod window;
+
+#[cfg(feature = "file")]
+mod file;
 
 use uxn::{Device, Ports, Uxn};
 
@@ -15,7 +18,7 @@ pub struct Varvara {
     system: system::System,
     console: console::Console,
     #[cfg(feature = "screen")]
-    gui: gui::Gui,
+    window: window::Window,
     rx: std::sync::mpsc::Receiver<Event>,
 }
 
@@ -37,7 +40,7 @@ impl Device for Varvara {
             system::SystemPorts::BASE => self.system.deo(vm, target),
             console::ConsolePorts::BASE => self.console.deo(vm, target),
             #[cfg(feature = "screen")]
-            screen::ScreenPorts::BASE => self.gui.screen.deo(vm, target),
+            screen::ScreenPorts::BASE => self.window.screen.deo(vm, target),
             _ => panic!("unimplemented device {target:#2x}"),
         }
     }
@@ -46,7 +49,7 @@ impl Device for Varvara {
             system::SystemPorts::BASE => self.system.dei(vm, target),
             console::ConsolePorts::BASE => self.console.dei(vm, target),
             #[cfg(feature = "screen")]
-            screen::ScreenPorts::BASE => self.gui.screen.dei(vm, target),
+            screen::ScreenPorts::BASE => self.window.screen.dei(vm, target),
             _ => panic!("unimplemented device {target:#2x}"),
         }
     }
@@ -59,7 +62,7 @@ impl Varvara {
             console: console::Console::new(tx.clone()),
             system: system::System::default(),
             #[cfg(feature = "screen")]
-            gui: gui::Gui::new(tx.clone()),
+            window: window::Window::new(tx.clone()),
             rx,
         }
     }
@@ -74,13 +77,13 @@ impl Varvara {
                 }
                 #[cfg(feature = "screen")]
                 Event::Screen => {
-                    let vector = self.gui.screen.event(vm);
+                    let vector = self.window.screen.event(vm);
                     vm.run(self, vector);
                 }
             }
 
             #[cfg(feature = "screen")]
-            if !self.gui.update(vm) {
+            if !self.window.update(vm) {
                 break;
             }
         }

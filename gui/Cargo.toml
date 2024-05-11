@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.83"
-clap = { version = "4.5.4", features = ["derive"] }
+anyhow.workspace = true
+clap.workspace = true
+env_logger.workspace = true
+
 uxn.path = "../uxn"
-varvara = { path = "../varvara" }
+varvara.path = "../varvara"

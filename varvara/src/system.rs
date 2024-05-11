@@ -58,6 +58,7 @@ impl SystemPorts {
     const STATE: u8 = std::mem::offset_of!(Self, state) as u8;
 
     /// Looks up the color for the given index
+    #[cfg(feature = "screen")]
     pub fn color(&self, i: u8) -> u32 {
         let i = 3 - i;
         let r = (self.red.get() >> (i * 4)) as u32 & 0xF;

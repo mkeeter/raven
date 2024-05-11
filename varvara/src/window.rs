@@ -1,21 +1,21 @@
 use crate::{screen::Screen, Event};
-use minifb::{Scale, Window, WindowOptions};
+use minifb::{Scale, Window as FbWindow, WindowOptions};
 use std::sync::mpsc;
 use uxn::Uxn;
 
-pub struct Gui {
+pub struct Window {
     pub screen: Screen,
-    window: Window,
+    window: FbWindow,
 }
 
 const APP_NAME: &str = "Varvara";
-impl Gui {
+impl Window {
     pub fn new(tx: mpsc::Sender<Event>) -> Self {
         const WIDTH: u16 = 640;
         const HEIGHT: u16 = 360;
         let screen = Screen::new(WIDTH, HEIGHT);
 
-        let mut window = Window::new(
+        let mut window = FbWindow::new(
             APP_NAME,
             WIDTH as usize,
             HEIGHT as usize,
@@ -50,7 +50,7 @@ impl Gui {
     /// Reopens the window, based on the screen size
     pub fn reopen(&mut self) {
         let (width, height) = self.screen.size();
-        self.window = Window::new(
+        self.window = FbWindow::new(
             APP_NAME,
             width as usize,
             height as usize,
