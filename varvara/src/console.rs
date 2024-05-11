@@ -3,7 +3,7 @@ use std::{
     io::{Read, Write},
     sync::mpsc,
 };
-use uxn::{Device, Ports, Uxn};
+use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct Console;
@@ -32,28 +32,6 @@ impl ConsolePorts {
     const ERROR: u8 = Self::BASE | std::mem::offset_of!(Self, error) as u8;
 }
 
-impl Device for Console {
-    fn deo(&mut self, vm: &mut Uxn, target: u8) {
-        let v = vm.dev::<ConsolePorts>();
-        match target {
-            ConsolePorts::WRITE => {
-                let mut out = std::io::stdout().lock();
-                out.write_all(&[v.write]).unwrap();
-                out.flush().unwrap();
-            }
-            ConsolePorts::ERROR => {
-                let mut out = std::io::stderr().lock();
-                out.write_all(&[v.write]).unwrap();
-                out.flush().unwrap();
-            }
-            _ => (),
-        }
-    }
-    fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
-        // Nothing to do here; data is pre-populated in `vm.dev` memory
-    }
-}
-
 impl Console {
     pub fn new(tx: mpsc::Sender<Event>) -> Self {
         std::thread::spawn(move || {
@@ -77,5 +55,25 @@ impl Console {
         p.read = c;
         p.type_ = 1;
         p.vector.get()
+    }
+
+    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+        let v = vm.dev::<ConsolePorts>();
+        match target {
+            ConsolePorts::WRITE => {
+                let mut out = std::io::stdout().lock();
+                out.write_all(&[v.write]).unwrap();
+                out.flush().unwrap();
+            }
+            ConsolePorts::ERROR => {
+                let mut out = std::io::stderr().lock();
+                out.write_all(&[v.write]).unwrap();
+                out.flush().unwrap();
+            }
+            _ => (),
+        }
+    }
+    pub fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
+        // Nothing to do here; data is pre-populated in `vm.dev` memory
     }
 }

@@ -1,4 +1,4 @@
-use uxn::{Device, Ports, Uxn};
+use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct System {
@@ -74,8 +74,13 @@ mod expansion {
     pub const CPYR: u8 = 0x02;
 }
 
-impl Device for System {
-    fn deo(&mut self, vm: &mut Uxn, target: u8) {
+impl System {
+    fn new() -> Self {
+        let banks = [(); 15].map(|_| Box::new([0u8; 65536]));
+        Self { banks }
+    }
+
+    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<SystemPorts>();
         match target {
             SystemPorts::EXPANSION => {
@@ -167,7 +172,8 @@ impl Device for System {
             _ => (),
         }
     }
-    fn dei(&mut self, vm: &mut Uxn, target: u8) {
+
+    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
         match target & 0x0F {
             SystemPorts::WST => {
                 let wst = vm.stack().len();
@@ -179,12 +185,5 @@ impl Device for System {
             }
             _ => (),
         }
-    }
-}
-
-impl System {
-    fn new() -> Self {
-        let banks = [(); 15].map(|_| Box::new([0u8; 65536]));
-        Self { banks }
     }
 }

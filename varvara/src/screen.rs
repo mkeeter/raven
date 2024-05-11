@@ -1,7 +1,7 @@
 use crate::Event;
 use minifb::{Scale, Window, WindowOptions};
 use std::sync::mpsc;
-use uxn::{Device, Ports, Uxn};
+use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
@@ -356,10 +356,8 @@ impl Screen {
             })
         }
     }
-}
 
-impl Device for Screen {
-    fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<ScreenPorts>();
         match target {
             ScreenPorts::WIDTH_W => {
@@ -386,7 +384,8 @@ impl Device for Screen {
         }
         // Nothing to do here (yet)
     }
-    fn dei(&mut self, vm: &mut Uxn, target: u8) {
+
+    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev_mut::<ScreenPorts>();
         match target {
             ScreenPorts::WIDTH_R => {
