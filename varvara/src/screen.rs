@@ -106,7 +106,6 @@ impl Screen {
     }
 
     fn reopen(&mut self) {
-        println!("reopening with {} {}", self.width, self.height);
         self.window = Window::new(
             APP_NAME,
             self.width,
@@ -135,7 +134,6 @@ impl Screen {
 
         let x = v.x.get() as usize;
         let y = v.y.get() as usize;
-        println!("pixel {x} {y} fill {fill} flip_y {flip_y} flip_x {flip_x} color {color}");
         let pixels = if layer {
             &mut self.foreground
         } else {
@@ -164,8 +162,6 @@ impl Screen {
             if auto_y {
                 v.y.set(v.y.get().wrapping_add(1));
             }
-        } else {
-            println!("INVALID PIXEL?");
         }
     }
 
@@ -178,7 +174,6 @@ impl Screen {
         let layer = (p & (1 << 6)) != 0;
         let flip_y = (p & (1 << 5)) != 0;
         let flip_x = (p & (1 << 4)) != 0;
-        println!("SPRITE {color} {two_bpp} {layer} {flip_y} {flip_x}");
 
         let pixels = if layer {
             &mut self.foreground
@@ -202,9 +197,6 @@ impl Screen {
         let auto_addr = (auto & (1 << 2)) != 0;
         let auto_y = (auto & (1 << 1)) != 0;
         let auto_x = (auto & (1 << 0)) != 0;
-        println!("auto len: {auto_len}");
-        println!("auto addr: {auto_addr}");
-        println!("auto x: {auto_x}, auto_y: {auto_y}");
 
         // XXX THIS IS NOT A PLACE OF HONOR
         //
