@@ -690,8 +690,8 @@ mod op {
 
     /// Jump Instant
     ///
-    /// JMI  -- Moves the PC to a relative address at a distance equal to the next
-    /// short in memory. This opcode has no modes.
+    /// JMI  -- Moves the PC to a relative address at a distance equal to the
+    /// next short in memory. This opcode has no modes.
     pub fn jmi(vm: &mut Uxn, _: &mut dyn Device, mut pc: u16) -> Option<u16> {
         let dt = vm.next2(&mut pc);
         Some(pc.wrapping_add(dt))
@@ -1036,10 +1036,12 @@ mod op {
         pc: u16,
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
-        Some(if short(FLAGS) {
-            s.pop_short()
-        } else {
-            pc.wrapping_add(u16::from(s.pop_byte()))
+        Some(match s.pop() {
+            Value::Short(dst) => dst,
+            Value::Byte(offset) => {
+                let offset = i16::from(offset as i8);
+                pc.wrapping_add_signed(offset)
+            }
         })
     }
 
@@ -1060,18 +1062,22 @@ mod op {
     pub fn jcn<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
-        mut pc: u16,
+        pc: u16,
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
         let dst = s.pop();
         let cond = s.pop_byte();
         if cond != 0 {
-            pc = match dst {
+            Some(match dst {
                 Value::Short(dst) => dst,
-                Value::Byte(offset) => pc.wrapping_add(u16::from(offset)),
-            };
+                Value::Byte(offset) => {
+                    let offset = i16::from(offset as i8);
+                    pc.wrapping_add_signed(offset)
+                }
+            })
+        } else {
+            Some(pc)
         }
-        Some(pc)
     }
 
     /// Jump Stash Return
@@ -1097,8 +1103,11 @@ mod op {
         vm.ret.push(Value::Short(pc));
         let mut s = vm.stack_view::<FLAGS>();
         Some(match s.pop() {
-            Value::Short(v) => v,
-            Value::Byte(v) => pc.wrapping_add(u16::from(v)),
+            Value::Short(dst) => dst,
+            Value::Byte(offset) => {
+                let offset = i16::from(offset as i8);
+                pc.wrapping_add_signed(offset)
+            }
         })
     }
 
@@ -1203,13 +1212,7 @@ mod op {
         pc: u16,
     ) -> Option<u16> {
         let offset = vm.stack_view::<FLAGS>().pop_byte() as i8;
-
-        // TODO: make this more obviously infallible
-        let addr = if offset < 0 {
-            pc.wrapping_sub(i16::from(offset).abs().try_into().unwrap())
-        } else {
-            pc.wrapping_add(u16::try_from(offset).unwrap())
-        };
+        let addr = pc.wrapping_add_signed(i16::from(offset));
 
         let v = if short(FLAGS) {
             let hi = vm.ram[usize::from(addr)];
@@ -1242,11 +1245,8 @@ mod op {
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
         let offset = s.pop_byte() as i8;
-        let addr = if offset < 0 {
-            pc.wrapping_sub(i16::from(offset).abs().try_into().unwrap())
-        } else {
-            pc.wrapping_add(u16::try_from(offset).unwrap())
-        };
+        let addr = pc.wrapping_add_signed(i16::from(offset));
+
         match s.pop() {
             Value::Short(v) => {
                 let [hi, lo] = v.to_be_bytes();
