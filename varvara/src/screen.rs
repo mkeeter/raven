@@ -35,10 +35,25 @@ impl ScreenPorts {
     const SPRITE: u8 = Self::BASE | std::mem::offset_of!(Self, sprite) as u8;
 }
 
+#[derive(Copy, Clone, Default)]
+struct ScreenPixel {
+    fg: u8,
+    bg: u8,
+}
+
+impl ScreenPixel {
+    fn get(&self) -> u8 {
+        if self.fg != 0 {
+            self.fg
+        } else {
+            self.bg
+        }
+    }
+}
+
 pub struct Screen {
     buffer: Vec<u32>,
-    foreground: Vec<u8>,
-    background: Vec<u8>,
+    pixels: Vec<ScreenPixel>,
     window: Window,
     width: u16,
     height: u16,
@@ -128,9 +143,8 @@ impl Screen {
         const WIDTH: u16 = 640;
         const HEIGHT: u16 = 360;
         const SIZE: usize = WIDTH as usize * HEIGHT as usize;
-        let buffer: Vec<u32> = vec![0; SIZE];
-        let foreground: Vec<u8> = vec![0; SIZE];
-        let background: Vec<u8> = vec![0; SIZE];
+        let buffer = vec![0; SIZE];
+        let pixels = vec![ScreenPixel::default(); SIZE];
 
         let mut window = Window::new(
             APP_NAME,
@@ -149,8 +163,7 @@ impl Screen {
         });
         Self {
             buffer,
-            foreground,
-            background,
+            pixels,
             window,
             width: WIDTH,
             height: HEIGHT,
@@ -166,17 +179,11 @@ impl Screen {
     ///
     /// Returns `true` if the window is still open; `false` otherwise
     pub fn update(&mut self, vm: &Uxn) -> bool {
-        self.buffer.resize(self.foreground.len(), 0u32);
+        self.buffer.resize(self.pixels.len(), 0u32);
         let sys = vm.dev::<crate::system::SystemPorts>();
         let colors = [0, 1, 2, 3].map(|i| sys.color(i));
-        for ((&f, &b), o) in self
-            .foreground
-            .iter()
-            .zip(&self.background)
-            .zip(self.buffer.iter_mut())
-        {
-            let i = if f != 0 { f } else { b };
-            *o = colors[(i & 0b11) as usize];
+        for (p, o) in self.pixels.iter().zip(self.buffer.iter_mut()) {
+            *o = colors[(p.get() & 0b11) as usize];
         }
         self.window
             .update_with_buffer(
@@ -200,8 +207,7 @@ impl Screen {
         )
         .unwrap();
         let size = self.width as usize * self.height as usize;
-        self.foreground.resize(size, 0u8);
-        self.background.resize(size, 0u8);
+        self.pixels.resize(size, ScreenPixel::default());
         self.buffer.resize(size, 0u32);
     }
 
@@ -210,13 +216,12 @@ impl Screen {
             return;
         }
         let i = x as usize + y as usize * self.width as usize;
-        let pixels = match layer {
-            Layer::Foreground => &mut self.foreground,
-            Layer::Background => &mut self.background,
-        };
         // This should always be true, but we check to avoid a panic site
-        if let Some(o) = pixels.get_mut(i) {
-            *o = color;
+        if let Some(o) = self.pixels.get_mut(i) {
+            match layer {
+                Layer::Foreground => o.fg = color,
+                Layer::Background => o.bg = color,
+            };
         }
     }
 
@@ -278,26 +283,21 @@ impl Screen {
             let mut addr = v.addr.get();
 
             for dy in 0..8 {
-                let y = if s.flip_y() {
-                    y.wrapping_add(7).wrapping_sub(dy)
-                } else {
-                    y.wrapping_add(dy)
-                };
-                if y >= self.height {
-                    continue;
-                }
                 let lo = vm.ram_read(addr);
                 let hi = if s.two_bpp() {
                     vm.ram_read(addr.wrapping_add(8))
                 } else {
                     0
                 };
+                addr = addr.wrapping_add(1);
+
+                let y = y.wrapping_add(if s.flip_y() { 7 - dy } else { dy });
+                if y >= self.height {
+                    continue;
+                }
                 for dx in 0..8 {
-                    let x = if s.flip_x() {
-                        x.wrapping_add(7).wrapping_sub(dx)
-                    } else {
-                        x.wrapping_add(dx)
-                    };
+                    let x =
+                        x.wrapping_add(if s.flip_x() { 7 - dx } else { dx });
                     if x >= self.width {
                         continue;
                     }
@@ -311,13 +311,9 @@ impl Screen {
                         self.set_pixel(s.layer(), x, y, c);
                     }
                 }
-                addr = addr.wrapping_add(1);
             }
-            // Skip the second byte if this is a 2bpp sprite
-            if s.two_bpp() {
-                addr = addr.wrapping_add(8);
-            }
-            // Update position within the loop
+            // Update position within the loop.  Note that we don't update the
+            // ports here; they're updated outside the loop below.
             if auto.y() {
                 x = if s.flip_x() {
                     x.wrapping_sub(8)
@@ -332,10 +328,16 @@ impl Screen {
                     y.wrapping_add(8)
                 };
             }
-            // Update address globally
+            // Update the address port, skipping the second byte if this is a
+            // 2bpp sprite (if not, addr is already incremented to the new
+            // position, so just assign it)
             if auto.addr() {
                 let v = vm.dev_mut::<ScreenPorts>();
-                v.addr.set(addr);
+                v.addr.set(if s.two_bpp() {
+                    addr.wrapping_add(8)
+                } else {
+                    addr
+                });
             }
         }
         let v = vm.dev_mut::<ScreenPorts>();
