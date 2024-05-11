@@ -1,5 +1,7 @@
 use crate::{mouse::Mouse, screen::Screen};
-use minifb::{MouseMode, Scale, Window as FbWindow, WindowOptions};
+use minifb::{
+    MouseButton, MouseMode, Scale, Window as FbWindow, WindowOptions,
+};
 use uxn::Uxn;
 
 pub struct Window {
@@ -63,7 +65,13 @@ impl Window {
             let mouse_pos =
                 self.window.get_mouse_pos(MouseMode::Clamp).unwrap();
             let mouse_scroll = self.window.get_scroll_wheel();
-            self.mouse.event(vm, mouse_pos, mouse_scroll, 0)
+            let buttons =
+                [MouseButton::Left, MouseButton::Middle, MouseButton::Right]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, b)| (self.window.get_mouse_down(b) as u8) << i)
+                    .fold(0, |a, b| a | b);
+            self.mouse.event(vm, mouse_pos, mouse_scroll, buttons)
         } else {
             None
         };
