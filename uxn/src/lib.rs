@@ -337,12 +337,24 @@ impl Uxn {
         StackView::new(stack)
     }
 
+    fn check_dev_size<D: Ports>() {
+        struct AssertSize16<D>(D);
+        impl<D> AssertSize16<D> {
+            const ASSERT: () = if std::mem::size_of::<D>() != 16 {
+                panic!("dev must be 16 bytes");
+            };
+        }
+        AssertSize16::<D>::ASSERT
+    }
+
     pub fn dev<D: Ports>(&self) -> &D {
+        Self::check_dev_size::<D>();
         D::ref_from(&self.dev[D::BASE as usize..][..std::mem::size_of::<D>()])
             .unwrap()
     }
 
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
+        Self::check_dev_size::<D>();
         D::mut_from(
             &mut self.dev[D::BASE as usize..][..std::mem::size_of::<D>()],
         )
@@ -1561,14 +1573,6 @@ pub trait Ports:
 {
     /// Base address of the port, of the form `0xA0`
     const BASE: u8;
-
-    /// This function should be a static assertion that the port is 16 bytes
-    ///
-    /// Here's the canonical example:
-    /// ```text
-    /// static_assertions::assert_eq_size!(Self, [u8; 16]);
-    /// ```
-    fn assert_size();
 }
 
 /// Device which does nothing

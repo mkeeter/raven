@@ -21,9 +21,6 @@ pub struct ScreenPorts {
 
 impl Ports for ScreenPorts {
     const BASE: u8 = 0x20;
-    fn assert_size() {
-        static_assertions::assert_eq_size!(ScreenPorts, [u8; 16]);
-    }
 }
 
 impl ScreenPorts {

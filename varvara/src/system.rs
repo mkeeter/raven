@@ -48,9 +48,6 @@ pub struct SystemPorts {
 
 impl Ports for SystemPorts {
     const BASE: u8 = 0x00;
-    fn assert_size() {
-        static_assertions::assert_eq_size!(SystemPorts, [u8; 16]);
-    }
 }
 
 impl SystemPorts {

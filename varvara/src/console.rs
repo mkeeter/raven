@@ -25,9 +25,6 @@ pub struct ConsolePorts {
 
 impl Ports for ConsolePorts {
     const BASE: u8 = 0x10;
-    fn assert_size() {
-        static_assertions::assert_eq_size!(ConsolePorts, [u8; 16]);
-    }
 }
 
 impl ConsolePorts {
