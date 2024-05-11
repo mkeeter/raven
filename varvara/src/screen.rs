@@ -279,12 +279,9 @@ impl Screen {
 
             for dy in 0..8 {
                 let y = if s.flip_y() {
-                    y.checked_add(7).and_then(|y| y.checked_sub(dy))
+                    y.wrapping_add(7).wrapping_sub(dy)
                 } else {
-                    y.checked_add(dy)
-                };
-                let Some(y) = y else {
-                    continue;
+                    y.wrapping_add(dy)
                 };
                 if y >= self.height {
                     continue;
@@ -297,12 +294,9 @@ impl Screen {
                 };
                 for dx in 0..8 {
                     let x = if s.flip_x() {
-                        x.checked_add(7).and_then(|x| x.checked_sub(dx))
+                        x.wrapping_add(7).wrapping_sub(dx)
                     } else {
-                        x.checked_add(dx)
-                    };
-                    let Some(x) = x else {
-                        continue;
+                        x.wrapping_add(dx)
                     };
                     if x >= self.width {
                         continue;
