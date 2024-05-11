@@ -1,3 +1,4 @@
+use std::mem::offset_of;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -51,14 +52,14 @@ impl Ports for SystemPorts {
 }
 
 impl SystemPorts {
-    const EXPANSION: u8 = (std::mem::offset_of!(Self, expansion) + 1) as u8;
-    const WST: u8 = std::mem::offset_of!(Self, wst) as u8;
-    const RST: u8 = std::mem::offset_of!(Self, rst) as u8;
-    const DEBUG: u8 = std::mem::offset_of!(Self, debug) as u8;
-    const STATE: u8 = std::mem::offset_of!(Self, state) as u8;
+    const EXPANSION: u8 = (offset_of!(Self, expansion) + 1) as u8;
+    const WST: u8 = offset_of!(Self, wst) as u8;
+    const RST: u8 = offset_of!(Self, rst) as u8;
+    const DEBUG: u8 = offset_of!(Self, debug) as u8;
+    const STATE: u8 = offset_of!(Self, state) as u8;
 
     /// Looks up the color for the given index
-    #[cfg(feature = "screen")]
+    #[cfg(feature = "gui")]
     pub fn color(&self, i: u8) -> u32 {
         let i = 3 - i;
         let r = (self.red.get() >> (i * 4)) as u32 & 0xF;

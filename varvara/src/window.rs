@@ -1,10 +1,13 @@
-use crate::{screen::Screen, Event};
-use minifb::{Scale, Window as FbWindow, WindowOptions};
+use crate::{mouse::Mouse, screen::Screen, Event};
+use minifb::{MouseMode, Scale, Window as FbWindow, WindowOptions};
 use std::sync::mpsc;
 use uxn::Uxn;
 
 pub struct Window {
     pub screen: Screen,
+    pub mouse: Mouse,
+
+    has_mouse: bool,
     window: FbWindow,
 }
 
@@ -14,23 +17,52 @@ impl Window {
         const WIDTH: u16 = 640;
         const HEIGHT: u16 = 360;
         let screen = Screen::new(WIDTH, HEIGHT);
+        let mouse = Mouse::new();
 
-        let mut window = FbWindow::new(
+        let window = FbWindow::new(
             APP_NAME,
             WIDTH as usize,
             HEIGHT as usize,
             WindowOptions::default(),
         )
         .unwrap();
-        window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
         std::thread::spawn(move || loop {
-            if tx.send(Event::Screen).is_err() {
+            if tx.send(Event::Window).is_err() {
                 return;
             }
             std::thread::sleep(std::time::Duration::from_micros(16600));
         });
-        Self { screen, window }
+        Self {
+            screen,
+            mouse,
+
+            has_mouse: false,
+            window,
+        }
+    }
+
+    pub fn set_mouse(&mut self) {
+        if !self.has_mouse {
+            self.has_mouse = true;
+            self.window.set_cursor_visibility(false);
+        }
+    }
+
+    pub fn event(&mut self, vm: &mut Uxn) -> impl Iterator<Item = u16> {
+        // The screen vector should always be called
+        let v = self.screen.event(vm);
+
+        // The mouse vector should be called if it changed
+        let m = if self.has_mouse {
+            let mouse_pos =
+                self.window.get_mouse_pos(MouseMode::Clamp).unwrap();
+            let mouse_scroll = self.window.get_scroll_wheel();
+            self.mouse.event(vm, mouse_pos, mouse_scroll, 0)
+        } else {
+            None
+        };
+        [Some(v), m].into_iter().flatten()
     }
 
     /// Redraws the window and handles miscellaneous polling
@@ -60,5 +92,8 @@ impl Window {
             },
         )
         .unwrap();
+        if self.has_mouse {
+            self.window.set_cursor_visibility(false);
+        }
     }
 }

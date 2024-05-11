@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chrono.workspace = true
+log.workspace = true
 minifb = {workspace = true, optional = true }
 static_assertions.workspace = true
 zerocopy.workspace = true
-log.workspace = true
 
 uxn.path = "../uxn"
 
 [features]
-default = ["screen", "file"]
-screen = ["dep:minifb"]
-file = []
+default = ["gui"]
+gui = ["dep:minifb"]

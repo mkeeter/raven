@@ -1,6 +1,7 @@
 use crate::Event;
 use std::{
     io::{Read, Write},
+    mem::offset_of,
     sync::mpsc,
 };
 use uxn::{Ports, Uxn};
@@ -28,8 +29,8 @@ impl Ports for ConsolePorts {
 }
 
 impl ConsolePorts {
-    const WRITE: u8 = Self::BASE | std::mem::offset_of!(Self, write) as u8;
-    const ERROR: u8 = Self::BASE | std::mem::offset_of!(Self, error) as u8;
+    const WRITE: u8 = Self::BASE | offset_of!(Self, write) as u8;
+    const ERROR: u8 = Self::BASE | offset_of!(Self, error) as u8;
 }
 
 impl Console {

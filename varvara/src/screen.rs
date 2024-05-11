@@ -1,3 +1,4 @@
+use std::mem::offset_of;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -24,12 +25,12 @@ impl ScreenPorts {
     // To ensure proper ordering, the 'read from device' operation (DEO) happens
     // when the first byte is touched; the 'write to device' (DEI) operation
     // happens when the second byte is touched.
-    const WIDTH_R: u8 = Self::BASE | std::mem::offset_of!(Self, width) as u8;
+    const WIDTH_R: u8 = Self::BASE | offset_of!(Self, width) as u8;
     const WIDTH_W: u8 = Self::WIDTH_R + 1;
-    const HEIGHT_R: u8 = Self::BASE | std::mem::offset_of!(Self, height) as u8;
+    const HEIGHT_R: u8 = Self::BASE | offset_of!(Self, height) as u8;
     const HEIGHT_W: u8 = Self::HEIGHT_R + 1;
-    const PIXEL: u8 = Self::BASE | std::mem::offset_of!(Self, pixel) as u8;
-    const SPRITE: u8 = Self::BASE | std::mem::offset_of!(Self, sprite) as u8;
+    const PIXEL: u8 = Self::BASE | offset_of!(Self, pixel) as u8;
+    const SPRITE: u8 = Self::BASE | offset_of!(Self, sprite) as u8;
 }
 
 #[derive(Copy, Clone, Default)]

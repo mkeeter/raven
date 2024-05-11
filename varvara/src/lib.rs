@@ -4,13 +4,16 @@ use log::warn;
 mod console;
 mod system;
 
-#[cfg(feature = "screen")]
+#[cfg(feature = "gui")]
 mod screen;
 
-#[cfg(feature = "screen")]
+#[cfg(feature = "gui")]
+mod mouse;
+
+#[cfg(feature = "gui")]
 mod window;
 
-#[cfg(feature = "file")]
+mod datetime;
 mod file;
 
 use uxn::{Device, Ports, Uxn};
@@ -19,8 +22,10 @@ use uxn::{Device, Ports, Uxn};
 pub struct Varvara {
     system: system::System,
     console: console::Console,
-    #[cfg(feature = "screen")]
+    #[cfg(feature = "gui")]
     window: window::Window,
+    datetime: datetime::Datetime,
+
     rx: std::sync::mpsc::Receiver<Event>,
 
     already_warned: [bool; 16],
@@ -34,8 +39,8 @@ impl Default for Varvara {
 
 enum Event {
     Console(u8),
-    #[cfg(feature = "screen")]
-    Screen,
+    #[cfg(feature = "gui")]
+    Window,
 }
 
 impl Device for Varvara {
@@ -43,8 +48,10 @@ impl Device for Varvara {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.deo(vm, target),
             console::ConsolePorts::BASE => self.console.deo(vm, target),
-            #[cfg(feature = "screen")]
+            #[cfg(feature = "gui")]
             screen::ScreenPorts::BASE => self.window.screen.deo(vm, target),
+            datetime::DatetimePorts::BASE => self.datetime.deo(vm, target),
+            mouse::MousePorts::BASE => self.window.set_mouse(),
 
             t => self.warn_missing(t),
         }
@@ -53,8 +60,10 @@ impl Device for Varvara {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.dei(vm, target),
             console::ConsolePorts::BASE => self.console.dei(vm, target),
-            #[cfg(feature = "screen")]
+            #[cfg(feature = "gui")]
             screen::ScreenPorts::BASE => self.window.screen.dei(vm, target),
+            datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
+            mouse::MousePorts::BASE => self.window.set_mouse(),
 
             t => self.warn_missing(t),
         }
@@ -67,8 +76,9 @@ impl Varvara {
         Self {
             console: console::Console::new(tx.clone()),
             system: system::System::default(),
-            #[cfg(feature = "screen")]
+            #[cfg(feature = "gui")]
             window: window::Window::new(tx.clone()),
+            datetime: datetime::Datetime,
             rx,
             already_warned: [false; 16],
         }
@@ -89,14 +99,15 @@ impl Varvara {
                     let vector = self.console.event(vm, c);
                     vm.run(self, vector);
                 }
-                #[cfg(feature = "screen")]
-                Event::Screen => {
-                    let vector = self.window.screen.event(vm);
-                    vm.run(self, vector);
+                #[cfg(feature = "gui")]
+                Event::Window => {
+                    for v in self.window.event(vm) {
+                        vm.run(self, v);
+                    }
                 }
             }
 
-            #[cfg(feature = "screen")]
+            #[cfg(feature = "gui")]
             if !self.window.update(vm) {
                 break;
             }

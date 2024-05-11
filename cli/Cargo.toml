@@ -9,4 +9,4 @@ clap.workspace = true
 env_logger.workspace = true
 
 uxn.path = "../uxn"
-varvara = { path = "../varvara", default-features = false, features = ["file"] }
+varvara = { path = "../varvara", default-features = false }
