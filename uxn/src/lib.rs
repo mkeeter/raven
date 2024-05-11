@@ -661,6 +661,18 @@ impl Uxn {
 
 mod op {
     use super::*;
+
+    /// Computes a jump, either relative (signed) or absolute
+    fn jump_offset(pc: u16, v: Value) -> u16 {
+        match v {
+            Value::Short(dst) => dst,
+            Value::Byte(offset) => {
+                let offset = i16::from(offset as i8);
+                pc.wrapping_add_signed(offset)
+            }
+        }
+    }
+
     /// Break
     /// ```text
     /// BRK --
@@ -1036,13 +1048,7 @@ mod op {
         pc: u16,
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
-        Some(match s.pop() {
-            Value::Short(dst) => dst,
-            Value::Byte(offset) => {
-                let offset = i16::from(offset as i8);
-                pc.wrapping_add_signed(offset)
-            }
-        })
+        Some(jump_offset(pc, s.pop()))
     }
 
     /// Jump Conditional
@@ -1067,17 +1073,7 @@ mod op {
         let mut s = vm.stack_view::<FLAGS>();
         let dst = s.pop();
         let cond = s.pop_byte();
-        if cond != 0 {
-            Some(match dst {
-                Value::Short(dst) => dst,
-                Value::Byte(offset) => {
-                    let offset = i16::from(offset as i8);
-                    pc.wrapping_add_signed(offset)
-                }
-            })
-        } else {
-            Some(pc)
-        }
+        Some(if cond != 0 { jump_offset(pc, dst) } else { pc })
     }
 
     /// Jump Stash Return
@@ -1102,13 +1098,7 @@ mod op {
     ) -> Option<u16> {
         vm.ret.push(Value::Short(pc));
         let mut s = vm.stack_view::<FLAGS>();
-        Some(match s.pop() {
-            Value::Short(dst) => dst,
-            Value::Byte(offset) => {
-                let offset = i16::from(offset as i8);
-                pc.wrapping_add_signed(offset)
-            }
-        })
+        Some(jump_offset(pc, s.pop()))
     }
 
     /// Stash
@@ -1346,7 +1336,7 @@ mod op {
             dev.dei(vm, i);
             let hi = vm.dev[i as usize];
             let j = i.wrapping_add(1);
-            dev.dei(vm, i.wrapping_add(1));
+            dev.dei(vm, j);
             let lo = vm.dev[j as usize];
             Value::Short(u16::from_be_bytes([hi, lo]))
         } else {
