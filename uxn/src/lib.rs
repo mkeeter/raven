@@ -306,6 +306,7 @@ impl Uxn {
     }
 
     /// Reads a byte from RAM at the program counter
+    #[inline]
     fn next(&mut self, pc: &mut u16) -> u8 {
         let out = self.ram[usize::from(*pc)];
         *pc = pc.wrapping_add(1);
@@ -313,12 +314,14 @@ impl Uxn {
     }
 
     /// Reads a word from RAM at the program counter
+    #[inline]
     fn next2(&mut self, pc: &mut u16) -> u16 {
         let hi = self.next(pc);
         let lo = self.next(pc);
         u16::from_be_bytes([hi, lo])
     }
 
+    #[inline]
     fn stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.ret
@@ -328,6 +331,7 @@ impl Uxn {
         StackView::new(stack)
     }
 
+    #[inline]
     fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.stack
@@ -337,6 +341,7 @@ impl Uxn {
         StackView::new(stack)
     }
 
+    #[inline]
     fn check_dev_size<D: Ports>() {
         struct AssertSize16<D>(D);
         impl<D> AssertSize16<D> {
@@ -347,12 +352,14 @@ impl Uxn {
         AssertSize16::<D>::ASSERT
     }
 
+    #[inline]
     pub fn dev<D: Ports>(&self) -> &D {
         Self::check_dev_size::<D>();
         D::ref_from(&self.dev[D::BASE as usize..][..std::mem::size_of::<D>()])
             .unwrap()
     }
 
+    #[inline]
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
         Self::check_dev_size::<D>();
         D::mut_from(
@@ -362,36 +369,43 @@ impl Uxn {
     }
 
     /// Mutably borrows the entire RAM array
+    #[inline]
     pub fn ram_mut(&mut self) -> &mut [u8; 65536] {
         &mut self.ram
     }
 
     /// Shared borrow of the entire RAM array
+    #[inline]
     pub fn ram(&mut self) -> &[u8; 65536] {
         &self.ram
     }
 
     /// Reads a byte from RAM
+    #[inline]
     pub fn ram_read(&self, addr: u16) -> u8 {
         self.ram[addr as usize]
     }
 
     /// Shared borrow of the working stack
+    #[inline]
     pub fn stack(&self) -> &Stack {
         &self.stack
     }
 
     /// Mutable borrow of the working stack
+    #[inline]
     pub fn stack_mut(&mut self) -> &mut Stack {
         &mut self.stack
     }
 
     /// Shared borrow of the return stack
+    #[inline]
     pub fn ret(&self) -> &Stack {
         &self.ret
     }
 
     /// Mutable borrow of the return stack
+    #[inline]
     pub fn ret_mut(&mut self) -> &mut Stack {
         &mut self.ret
     }
@@ -407,267 +421,266 @@ impl Uxn {
     }
 
     /// Executes a single operation
+    #[inline]
     fn op<D: Device>(&mut self, op: u8, dev: &mut D, pc: u16) -> Option<u16> {
-        type FnOp = fn(&mut Uxn, &mut dyn Device, u16) -> Option<u16>;
-        const OPCODES: [FnOp; 256] = [
-            op::brk,
-            op::inc::<0b000>,
-            op::pop::<0b000>,
-            op::nip::<0b000>,
-            op::swp::<0b000>,
-            op::rot::<0b000>,
-            op::dup::<0b000>,
-            op::ovr::<0b000>,
-            op::equ::<0b000>,
-            op::neq::<0b000>,
-            op::gth::<0b000>,
-            op::lth::<0b000>,
-            op::jmp::<0b000>,
-            op::jcn::<0b000>,
-            op::jsr::<0b000>,
-            op::sth::<0b000>,
-            op::ldz::<0b000>,
-            op::stz::<0b000>,
-            op::ldr::<0b000>,
-            op::str::<0b000>,
-            op::lda::<0b000>,
-            op::sta::<0b000>,
-            op::dei::<0b000>,
-            op::deo::<0b000>,
-            op::add::<0b000>,
-            op::sub::<0b000>,
-            op::mul::<0b000>,
-            op::div::<0b000>,
-            op::and::<0b000>,
-            op::ora::<0b000>,
-            op::eor::<0b000>,
-            op::sft::<0b000>,
-            op::jci,
-            op::inc::<0b001>,
-            op::pop::<0b001>,
-            op::nip::<0b001>,
-            op::swp::<0b001>,
-            op::rot::<0b001>,
-            op::dup::<0b001>,
-            op::ovr::<0b001>,
-            op::equ::<0b001>,
-            op::neq::<0b001>,
-            op::gth::<0b001>,
-            op::lth::<0b001>,
-            op::jmp::<0b001>,
-            op::jcn::<0b001>,
-            op::jsr::<0b001>,
-            op::sth::<0b001>,
-            op::ldz::<0b001>,
-            op::stz::<0b001>,
-            op::ldr::<0b001>,
-            op::str::<0b001>,
-            op::lda::<0b001>,
-            op::sta::<0b001>,
-            op::dei::<0b001>,
-            op::deo::<0b001>,
-            op::add::<0b001>,
-            op::sub::<0b001>,
-            op::mul::<0b001>,
-            op::div::<0b001>,
-            op::and::<0b001>,
-            op::ora::<0b001>,
-            op::eor::<0b001>,
-            op::sft::<0b001>,
-            op::jmi,
-            op::inc::<0b010>,
-            op::pop::<0b010>,
-            op::nip::<0b010>,
-            op::swp::<0b010>,
-            op::rot::<0b010>,
-            op::dup::<0b010>,
-            op::ovr::<0b010>,
-            op::equ::<0b010>,
-            op::neq::<0b010>,
-            op::gth::<0b010>,
-            op::lth::<0b010>,
-            op::jmp::<0b010>,
-            op::jcn::<0b010>,
-            op::jsr::<0b010>,
-            op::sth::<0b010>,
-            op::ldz::<0b010>,
-            op::stz::<0b010>,
-            op::ldr::<0b010>,
-            op::str::<0b010>,
-            op::lda::<0b010>,
-            op::sta::<0b010>,
-            op::dei::<0b010>,
-            op::deo::<0b010>,
-            op::add::<0b010>,
-            op::sub::<0b010>,
-            op::mul::<0b010>,
-            op::div::<0b010>,
-            op::and::<0b010>,
-            op::ora::<0b010>,
-            op::eor::<0b010>,
-            op::sft::<0b010>,
-            op::jsi,
-            op::inc::<0b011>,
-            op::pop::<0b011>,
-            op::nip::<0b011>,
-            op::swp::<0b011>,
-            op::rot::<0b011>,
-            op::dup::<0b011>,
-            op::ovr::<0b011>,
-            op::equ::<0b011>,
-            op::neq::<0b011>,
-            op::gth::<0b011>,
-            op::lth::<0b011>,
-            op::jmp::<0b011>,
-            op::jcn::<0b011>,
-            op::jsr::<0b011>,
-            op::sth::<0b011>,
-            op::ldz::<0b011>,
-            op::stz::<0b011>,
-            op::ldr::<0b011>,
-            op::str::<0b011>,
-            op::lda::<0b011>,
-            op::sta::<0b011>,
-            op::dei::<0b011>,
-            op::deo::<0b011>,
-            op::add::<0b011>,
-            op::sub::<0b011>,
-            op::mul::<0b011>,
-            op::div::<0b011>,
-            op::and::<0b011>,
-            op::ora::<0b011>,
-            op::eor::<0b011>,
-            op::sft::<0b011>,
-            op::lit::<0b100>,
-            op::inc::<0b100>,
-            op::pop::<0b100>,
-            op::nip::<0b100>,
-            op::swp::<0b100>,
-            op::rot::<0b100>,
-            op::dup::<0b100>,
-            op::ovr::<0b100>,
-            op::equ::<0b100>,
-            op::neq::<0b100>,
-            op::gth::<0b100>,
-            op::lth::<0b100>,
-            op::jmp::<0b100>,
-            op::jcn::<0b100>,
-            op::jsr::<0b100>,
-            op::sth::<0b100>,
-            op::ldz::<0b100>,
-            op::stz::<0b100>,
-            op::ldr::<0b100>,
-            op::str::<0b100>,
-            op::lda::<0b100>,
-            op::sta::<0b100>,
-            op::dei::<0b100>,
-            op::deo::<0b100>,
-            op::add::<0b100>,
-            op::sub::<0b100>,
-            op::mul::<0b100>,
-            op::div::<0b100>,
-            op::and::<0b100>,
-            op::ora::<0b100>,
-            op::eor::<0b100>,
-            op::sft::<0b100>,
-            op::lit::<0b101>,
-            op::inc::<0b101>,
-            op::pop::<0b101>,
-            op::nip::<0b101>,
-            op::swp::<0b101>,
-            op::rot::<0b101>,
-            op::dup::<0b101>,
-            op::ovr::<0b101>,
-            op::equ::<0b101>,
-            op::neq::<0b101>,
-            op::gth::<0b101>,
-            op::lth::<0b101>,
-            op::jmp::<0b101>,
-            op::jcn::<0b101>,
-            op::jsr::<0b101>,
-            op::sth::<0b101>,
-            op::ldz::<0b101>,
-            op::stz::<0b101>,
-            op::ldr::<0b101>,
-            op::str::<0b101>,
-            op::lda::<0b101>,
-            op::sta::<0b101>,
-            op::dei::<0b101>,
-            op::deo::<0b101>,
-            op::add::<0b101>,
-            op::sub::<0b101>,
-            op::mul::<0b101>,
-            op::div::<0b101>,
-            op::and::<0b101>,
-            op::ora::<0b101>,
-            op::eor::<0b101>,
-            op::sft::<0b101>,
-            op::lit::<0b110>,
-            op::inc::<0b110>,
-            op::pop::<0b110>,
-            op::nip::<0b110>,
-            op::swp::<0b110>,
-            op::rot::<0b110>,
-            op::dup::<0b110>,
-            op::ovr::<0b110>,
-            op::equ::<0b110>,
-            op::neq::<0b110>,
-            op::gth::<0b110>,
-            op::lth::<0b110>,
-            op::jmp::<0b110>,
-            op::jcn::<0b110>,
-            op::jsr::<0b110>,
-            op::sth::<0b110>,
-            op::ldz::<0b110>,
-            op::stz::<0b110>,
-            op::ldr::<0b110>,
-            op::str::<0b110>,
-            op::lda::<0b110>,
-            op::sta::<0b110>,
-            op::dei::<0b110>,
-            op::deo::<0b110>,
-            op::add::<0b110>,
-            op::sub::<0b110>,
-            op::mul::<0b110>,
-            op::div::<0b110>,
-            op::and::<0b110>,
-            op::ora::<0b110>,
-            op::eor::<0b110>,
-            op::sft::<0b110>,
-            op::lit::<0b111>,
-            op::inc::<0b111>,
-            op::pop::<0b111>,
-            op::nip::<0b111>,
-            op::swp::<0b111>,
-            op::rot::<0b111>,
-            op::dup::<0b111>,
-            op::ovr::<0b111>,
-            op::equ::<0b111>,
-            op::neq::<0b111>,
-            op::gth::<0b111>,
-            op::lth::<0b111>,
-            op::jmp::<0b111>,
-            op::jcn::<0b111>,
-            op::jsr::<0b111>,
-            op::sth::<0b111>,
-            op::ldz::<0b111>,
-            op::stz::<0b111>,
-            op::ldr::<0b111>,
-            op::str::<0b111>,
-            op::lda::<0b111>,
-            op::sta::<0b111>,
-            op::dei::<0b111>,
-            op::deo::<0b111>,
-            op::add::<0b111>,
-            op::sub::<0b111>,
-            op::mul::<0b111>,
-            op::div::<0b111>,
-            op::and::<0b111>,
-            op::ora::<0b111>,
-            op::eor::<0b111>,
-            op::sft::<0b111>,
-        ];
-        OPCODES[op as usize](self, dev, pc)
+        match op {
+            0x00 => op::brk(self, dev, pc),
+            0x01 => op::inc::<0b000>(self, dev, pc),
+            0x02 => op::pop::<0b000>(self, dev, pc),
+            0x03 => op::nip::<0b000>(self, dev, pc),
+            0x04 => op::swp::<0b000>(self, dev, pc),
+            0x05 => op::rot::<0b000>(self, dev, pc),
+            0x06 => op::dup::<0b000>(self, dev, pc),
+            0x07 => op::ovr::<0b000>(self, dev, pc),
+            0x08 => op::equ::<0b000>(self, dev, pc),
+            0x09 => op::neq::<0b000>(self, dev, pc),
+            0x0a => op::gth::<0b000>(self, dev, pc),
+            0x0b => op::lth::<0b000>(self, dev, pc),
+            0x0c => op::jmp::<0b000>(self, dev, pc),
+            0x0d => op::jcn::<0b000>(self, dev, pc),
+            0x0e => op::jsr::<0b000>(self, dev, pc),
+            0x0f => op::sth::<0b000>(self, dev, pc),
+            0x10 => op::ldz::<0b000>(self, dev, pc),
+            0x11 => op::stz::<0b000>(self, dev, pc),
+            0x12 => op::ldr::<0b000>(self, dev, pc),
+            0x13 => op::str::<0b000>(self, dev, pc),
+            0x14 => op::lda::<0b000>(self, dev, pc),
+            0x15 => op::sta::<0b000>(self, dev, pc),
+            0x16 => op::dei::<0b000>(self, dev, pc),
+            0x17 => op::deo::<0b000>(self, dev, pc),
+            0x18 => op::add::<0b000>(self, dev, pc),
+            0x19 => op::sub::<0b000>(self, dev, pc),
+            0x1a => op::mul::<0b000>(self, dev, pc),
+            0x1b => op::div::<0b000>(self, dev, pc),
+            0x1c => op::and::<0b000>(self, dev, pc),
+            0x1d => op::ora::<0b000>(self, dev, pc),
+            0x1e => op::eor::<0b000>(self, dev, pc),
+            0x1f => op::sft::<0b000>(self, dev, pc),
+            0x20 => op::jci(self, dev, pc),
+            0x21 => op::inc::<0b001>(self, dev, pc),
+            0x22 => op::pop::<0b001>(self, dev, pc),
+            0x23 => op::nip::<0b001>(self, dev, pc),
+            0x24 => op::swp::<0b001>(self, dev, pc),
+            0x25 => op::rot::<0b001>(self, dev, pc),
+            0x26 => op::dup::<0b001>(self, dev, pc),
+            0x27 => op::ovr::<0b001>(self, dev, pc),
+            0x28 => op::equ::<0b001>(self, dev, pc),
+            0x29 => op::neq::<0b001>(self, dev, pc),
+            0x2a => op::gth::<0b001>(self, dev, pc),
+            0x2b => op::lth::<0b001>(self, dev, pc),
+            0x2c => op::jmp::<0b001>(self, dev, pc),
+            0x2d => op::jcn::<0b001>(self, dev, pc),
+            0x2e => op::jsr::<0b001>(self, dev, pc),
+            0x2f => op::sth::<0b001>(self, dev, pc),
+            0x30 => op::ldz::<0b001>(self, dev, pc),
+            0x31 => op::stz::<0b001>(self, dev, pc),
+            0x32 => op::ldr::<0b001>(self, dev, pc),
+            0x33 => op::str::<0b001>(self, dev, pc),
+            0x34 => op::lda::<0b001>(self, dev, pc),
+            0x35 => op::sta::<0b001>(self, dev, pc),
+            0x36 => op::dei::<0b001>(self, dev, pc),
+            0x37 => op::deo::<0b001>(self, dev, pc),
+            0x38 => op::add::<0b001>(self, dev, pc),
+            0x39 => op::sub::<0b001>(self, dev, pc),
+            0x3a => op::mul::<0b001>(self, dev, pc),
+            0x3b => op::div::<0b001>(self, dev, pc),
+            0x3c => op::and::<0b001>(self, dev, pc),
+            0x3d => op::ora::<0b001>(self, dev, pc),
+            0x3e => op::eor::<0b001>(self, dev, pc),
+            0x3f => op::sft::<0b001>(self, dev, pc),
+            0x40 => op::jmi(self, dev, pc),
+            0x41 => op::inc::<0b010>(self, dev, pc),
+            0x42 => op::pop::<0b010>(self, dev, pc),
+            0x43 => op::nip::<0b010>(self, dev, pc),
+            0x44 => op::swp::<0b010>(self, dev, pc),
+            0x45 => op::rot::<0b010>(self, dev, pc),
+            0x46 => op::dup::<0b010>(self, dev, pc),
+            0x47 => op::ovr::<0b010>(self, dev, pc),
+            0x48 => op::equ::<0b010>(self, dev, pc),
+            0x49 => op::neq::<0b010>(self, dev, pc),
+            0x4a => op::gth::<0b010>(self, dev, pc),
+            0x4b => op::lth::<0b010>(self, dev, pc),
+            0x4c => op::jmp::<0b010>(self, dev, pc),
+            0x4d => op::jcn::<0b010>(self, dev, pc),
+            0x4e => op::jsr::<0b010>(self, dev, pc),
+            0x4f => op::sth::<0b010>(self, dev, pc),
+            0x50 => op::ldz::<0b010>(self, dev, pc),
+            0x51 => op::stz::<0b010>(self, dev, pc),
+            0x52 => op::ldr::<0b010>(self, dev, pc),
+            0x53 => op::str::<0b010>(self, dev, pc),
+            0x54 => op::lda::<0b010>(self, dev, pc),
+            0x55 => op::sta::<0b010>(self, dev, pc),
+            0x56 => op::dei::<0b010>(self, dev, pc),
+            0x57 => op::deo::<0b010>(self, dev, pc),
+            0x58 => op::add::<0b010>(self, dev, pc),
+            0x59 => op::sub::<0b010>(self, dev, pc),
+            0x5a => op::mul::<0b010>(self, dev, pc),
+            0x5b => op::div::<0b010>(self, dev, pc),
+            0x5c => op::and::<0b010>(self, dev, pc),
+            0x5d => op::ora::<0b010>(self, dev, pc),
+            0x5e => op::eor::<0b010>(self, dev, pc),
+            0x5f => op::sft::<0b010>(self, dev, pc),
+            0x60 => op::jsi(self, dev, pc),
+            0x61 => op::inc::<0b011>(self, dev, pc),
+            0x62 => op::pop::<0b011>(self, dev, pc),
+            0x63 => op::nip::<0b011>(self, dev, pc),
+            0x64 => op::swp::<0b011>(self, dev, pc),
+            0x65 => op::rot::<0b011>(self, dev, pc),
+            0x66 => op::dup::<0b011>(self, dev, pc),
+            0x67 => op::ovr::<0b011>(self, dev, pc),
+            0x68 => op::equ::<0b011>(self, dev, pc),
+            0x69 => op::neq::<0b011>(self, dev, pc),
+            0x6a => op::gth::<0b011>(self, dev, pc),
+            0x6b => op::lth::<0b011>(self, dev, pc),
+            0x6c => op::jmp::<0b011>(self, dev, pc),
+            0x6d => op::jcn::<0b011>(self, dev, pc),
+            0x6e => op::jsr::<0b011>(self, dev, pc),
+            0x6f => op::sth::<0b011>(self, dev, pc),
+            0x70 => op::ldz::<0b011>(self, dev, pc),
+            0x71 => op::stz::<0b011>(self, dev, pc),
+            0x72 => op::ldr::<0b011>(self, dev, pc),
+            0x73 => op::str::<0b011>(self, dev, pc),
+            0x74 => op::lda::<0b011>(self, dev, pc),
+            0x75 => op::sta::<0b011>(self, dev, pc),
+            0x76 => op::dei::<0b011>(self, dev, pc),
+            0x77 => op::deo::<0b011>(self, dev, pc),
+            0x78 => op::add::<0b011>(self, dev, pc),
+            0x79 => op::sub::<0b011>(self, dev, pc),
+            0x7a => op::mul::<0b011>(self, dev, pc),
+            0x7b => op::div::<0b011>(self, dev, pc),
+            0x7c => op::and::<0b011>(self, dev, pc),
+            0x7d => op::ora::<0b011>(self, dev, pc),
+            0x7e => op::eor::<0b011>(self, dev, pc),
+            0x7f => op::sft::<0b011>(self, dev, pc),
+            0x80 => op::lit::<0b100>(self, dev, pc),
+            0x81 => op::inc::<0b100>(self, dev, pc),
+            0x82 => op::pop::<0b100>(self, dev, pc),
+            0x83 => op::nip::<0b100>(self, dev, pc),
+            0x84 => op::swp::<0b100>(self, dev, pc),
+            0x85 => op::rot::<0b100>(self, dev, pc),
+            0x86 => op::dup::<0b100>(self, dev, pc),
+            0x87 => op::ovr::<0b100>(self, dev, pc),
+            0x88 => op::equ::<0b100>(self, dev, pc),
+            0x89 => op::neq::<0b100>(self, dev, pc),
+            0x8a => op::gth::<0b100>(self, dev, pc),
+            0x8b => op::lth::<0b100>(self, dev, pc),
+            0x8c => op::jmp::<0b100>(self, dev, pc),
+            0x8d => op::jcn::<0b100>(self, dev, pc),
+            0x8e => op::jsr::<0b100>(self, dev, pc),
+            0x8f => op::sth::<0b100>(self, dev, pc),
+            0x90 => op::ldz::<0b100>(self, dev, pc),
+            0x91 => op::stz::<0b100>(self, dev, pc),
+            0x92 => op::ldr::<0b100>(self, dev, pc),
+            0x93 => op::str::<0b100>(self, dev, pc),
+            0x94 => op::lda::<0b100>(self, dev, pc),
+            0x95 => op::sta::<0b100>(self, dev, pc),
+            0x96 => op::dei::<0b100>(self, dev, pc),
+            0x97 => op::deo::<0b100>(self, dev, pc),
+            0x98 => op::add::<0b100>(self, dev, pc),
+            0x99 => op::sub::<0b100>(self, dev, pc),
+            0x9a => op::mul::<0b100>(self, dev, pc),
+            0x9b => op::div::<0b100>(self, dev, pc),
+            0x9c => op::and::<0b100>(self, dev, pc),
+            0x9d => op::ora::<0b100>(self, dev, pc),
+            0x9e => op::eor::<0b100>(self, dev, pc),
+            0x9f => op::sft::<0b100>(self, dev, pc),
+            0xa0 => op::lit::<0b101>(self, dev, pc),
+            0xa1 => op::inc::<0b101>(self, dev, pc),
+            0xa2 => op::pop::<0b101>(self, dev, pc),
+            0xa3 => op::nip::<0b101>(self, dev, pc),
+            0xa4 => op::swp::<0b101>(self, dev, pc),
+            0xa5 => op::rot::<0b101>(self, dev, pc),
+            0xa6 => op::dup::<0b101>(self, dev, pc),
+            0xa7 => op::ovr::<0b101>(self, dev, pc),
+            0xa8 => op::equ::<0b101>(self, dev, pc),
+            0xa9 => op::neq::<0b101>(self, dev, pc),
+            0xaa => op::gth::<0b101>(self, dev, pc),
+            0xab => op::lth::<0b101>(self, dev, pc),
+            0xac => op::jmp::<0b101>(self, dev, pc),
+            0xad => op::jcn::<0b101>(self, dev, pc),
+            0xae => op::jsr::<0b101>(self, dev, pc),
+            0xaf => op::sth::<0b101>(self, dev, pc),
+            0xb0 => op::ldz::<0b101>(self, dev, pc),
+            0xb1 => op::stz::<0b101>(self, dev, pc),
+            0xb2 => op::ldr::<0b101>(self, dev, pc),
+            0xb3 => op::str::<0b101>(self, dev, pc),
+            0xb4 => op::lda::<0b101>(self, dev, pc),
+            0xb5 => op::sta::<0b101>(self, dev, pc),
+            0xb6 => op::dei::<0b101>(self, dev, pc),
+            0xb7 => op::deo::<0b101>(self, dev, pc),
+            0xb8 => op::add::<0b101>(self, dev, pc),
+            0xb9 => op::sub::<0b101>(self, dev, pc),
+            0xba => op::mul::<0b101>(self, dev, pc),
+            0xbb => op::div::<0b101>(self, dev, pc),
+            0xbc => op::and::<0b101>(self, dev, pc),
+            0xbd => op::ora::<0b101>(self, dev, pc),
+            0xbe => op::eor::<0b101>(self, dev, pc),
+            0xbf => op::sft::<0b101>(self, dev, pc),
+            0xc0 => op::lit::<0b110>(self, dev, pc),
+            0xc1 => op::inc::<0b110>(self, dev, pc),
+            0xc2 => op::pop::<0b110>(self, dev, pc),
+            0xc3 => op::nip::<0b110>(self, dev, pc),
+            0xc4 => op::swp::<0b110>(self, dev, pc),
+            0xc5 => op::rot::<0b110>(self, dev, pc),
+            0xc6 => op::dup::<0b110>(self, dev, pc),
+            0xc7 => op::ovr::<0b110>(self, dev, pc),
+            0xc8 => op::equ::<0b110>(self, dev, pc),
+            0xc9 => op::neq::<0b110>(self, dev, pc),
+            0xca => op::gth::<0b110>(self, dev, pc),
+            0xcb => op::lth::<0b110>(self, dev, pc),
+            0xcc => op::jmp::<0b110>(self, dev, pc),
+            0xcd => op::jcn::<0b110>(self, dev, pc),
+            0xce => op::jsr::<0b110>(self, dev, pc),
+            0xcf => op::sth::<0b110>(self, dev, pc),
+            0xd0 => op::ldz::<0b110>(self, dev, pc),
+            0xd1 => op::stz::<0b110>(self, dev, pc),
+            0xd2 => op::ldr::<0b110>(self, dev, pc),
+            0xd3 => op::str::<0b110>(self, dev, pc),
+            0xd4 => op::lda::<0b110>(self, dev, pc),
+            0xd5 => op::sta::<0b110>(self, dev, pc),
+            0xd6 => op::dei::<0b110>(self, dev, pc),
+            0xd7 => op::deo::<0b110>(self, dev, pc),
+            0xd8 => op::add::<0b110>(self, dev, pc),
+            0xd9 => op::sub::<0b110>(self, dev, pc),
+            0xda => op::mul::<0b110>(self, dev, pc),
+            0xdb => op::div::<0b110>(self, dev, pc),
+            0xdc => op::and::<0b110>(self, dev, pc),
+            0xdd => op::ora::<0b110>(self, dev, pc),
+            0xde => op::eor::<0b110>(self, dev, pc),
+            0xdf => op::sft::<0b110>(self, dev, pc),
+            0xe0 => op::lit::<0b111>(self, dev, pc),
+            0xe1 => op::inc::<0b111>(self, dev, pc),
+            0xe2 => op::pop::<0b111>(self, dev, pc),
+            0xe3 => op::nip::<0b111>(self, dev, pc),
+            0xe4 => op::swp::<0b111>(self, dev, pc),
+            0xe5 => op::rot::<0b111>(self, dev, pc),
+            0xe6 => op::dup::<0b111>(self, dev, pc),
+            0xe7 => op::ovr::<0b111>(self, dev, pc),
+            0xe8 => op::equ::<0b111>(self, dev, pc),
+            0xe9 => op::neq::<0b111>(self, dev, pc),
+            0xea => op::gth::<0b111>(self, dev, pc),
+            0xeb => op::lth::<0b111>(self, dev, pc),
+            0xec => op::jmp::<0b111>(self, dev, pc),
+            0xed => op::jcn::<0b111>(self, dev, pc),
+            0xee => op::jsr::<0b111>(self, dev, pc),
+            0xef => op::sth::<0b111>(self, dev, pc),
+            0xf0 => op::ldz::<0b111>(self, dev, pc),
+            0xf1 => op::stz::<0b111>(self, dev, pc),
+            0xf2 => op::ldr::<0b111>(self, dev, pc),
+            0xf3 => op::str::<0b111>(self, dev, pc),
+            0xf4 => op::lda::<0b111>(self, dev, pc),
+            0xf5 => op::sta::<0b111>(self, dev, pc),
+            0xf6 => op::dei::<0b111>(self, dev, pc),
+            0xf7 => op::deo::<0b111>(self, dev, pc),
+            0xf8 => op::add::<0b111>(self, dev, pc),
+            0xf9 => op::sub::<0b111>(self, dev, pc),
+            0xfa => op::mul::<0b111>(self, dev, pc),
+            0xfb => op::div::<0b111>(self, dev, pc),
+            0xfc => op::and::<0b111>(self, dev, pc),
+            0xfd => op::ora::<0b111>(self, dev, pc),
+            0xfe => op::eor::<0b111>(self, dev, pc),
+            0xff => op::sft::<0b111>(self, dev, pc),
+        }
     }
 }
 
@@ -675,6 +688,7 @@ mod op {
     use super::*;
 
     /// Computes a jump, either relative (signed) or absolute
+    #[inline]
     fn jump_offset(pc: u16, v: Value) -> u16 {
         match v {
             Value::Short(dst) => dst,
@@ -691,6 +705,7 @@ mod op {
     /// ```
     ///
     /// Ends the evaluation of the current vector. This opcode has no modes.
+    #[inline]
     pub fn brk(_: &mut Uxn, _: &mut dyn Device, _: u16) -> Option<u16> {
         None
     }
@@ -704,6 +719,7 @@ mod op {
     /// Pops a byte from the working stack and if it is not zero, moves
     /// the `PC` to a relative address at a distance equal to the next short in
     /// memory, otherwise moves `PC+2`. This opcode has no modes.
+    #[inline]
     pub fn jci(vm: &mut Uxn, _: &mut dyn Device, mut pc: u16) -> Option<u16> {
         let dt = vm.next2(&mut pc);
         if vm.stack.pop_byte() != 0 {
@@ -716,6 +732,7 @@ mod op {
     ///
     /// JMI  -- Moves the PC to a relative address at a distance equal to the
     /// next short in memory. This opcode has no modes.
+    #[inline]
     pub fn jmi(vm: &mut Uxn, _: &mut dyn Device, mut pc: u16) -> Option<u16> {
         let dt = vm.next2(&mut pc);
         Some(pc.wrapping_add(dt))
@@ -730,6 +747,7 @@ mod op {
     /// Pushes `PC+2` to the return-stack and moves the `PC` to a relative
     /// address at a distance equal to the next short in memory. This opcode has
     /// no modes.
+    #[inline]
     pub fn jsi(vm: &mut Uxn, _: &mut dyn Device, mut pc: u16) -> Option<u16> {
         let dt = vm.next2(&mut pc);
         vm.ret.push(Value::Short(pc));
@@ -750,6 +768,7 @@ mod op {
     /// LIT 12          ( 12 )
     /// LIT2 abcd       ( ab cd )
     /// ```
+    #[inline]
     pub fn lit<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -777,6 +796,7 @@ mod op {
     /// #0001 INC2      ( 00 02 )
     /// #0001 INC2k     ( 00 01 00 02 )
     /// ```
+    #[inline]
     pub fn inc<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -801,6 +821,7 @@ mod op {
     /// #1234 POP2   ( )
     /// #1234 POP2k  ( 12 34 )
     /// ```
+    #[inline]
     pub fn pop<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -824,6 +845,7 @@ mod op {
     /// #1234 #5678 NIP2   ( 56 78 )
     /// #1234 #5678 NIP2k  ( 12 34 56 78 56 78 )
     /// ```
+    #[inline]
     pub fn nip<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -850,6 +872,7 @@ mod op {
     /// #1234 #5678 SWP2   ( 56 78 12 34 )
     /// #1234 #5678 SWP2k  ( 12 34 56 78 56 78 12 34 )
     /// ```
+    #[inline]
     pub fn swp<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -878,6 +901,7 @@ mod op {
     /// #1234 #5678 #9abc ROT2   ( 56 78 9a bc 12 34 )
     /// #1234 #5678 #9abc ROT2k  ( 12 34 56 78 9a bc 56 78 9a bc 12 34 )
     /// ```
+    #[inline]
     pub fn rot<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -906,6 +930,7 @@ mod op {
     /// #12 DUPk    ( 12 12 12 )
     /// #1234 DUP2  ( 12 34 12 34 )
     /// ```
+    #[inline]
     pub fn dup<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -932,6 +957,7 @@ mod op {
     /// #1234 #5678 OVR2   ( 12 34 56 78 12 34 )
     /// #1234 #5678 OVR2k  ( 12 34 56 78 12 34 56 78 12 34 )
     /// ```
+    #[inline]
     pub fn ovr<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -961,6 +987,7 @@ mod op {
     /// #abcd #ef01 EQU2   ( 00 )
     /// #abcd #abcd EQU2k  ( ab cd ab cd 01 )
     /// ```
+    #[inline]
     pub fn equ<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -985,6 +1012,7 @@ mod op {
     /// #abcd #ef01 NEQ2   ( 01 )
     /// #abcd #abcd NEQ2k  ( ab cd ab cd 00 )
     /// ```
+    #[inline]
     pub fn neq<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1009,6 +1037,7 @@ mod op {
     /// #3456 #1234 GTH2   ( 01 )
     /// #1234 #3456 GTH2k  ( 12 34 34 56 00 )
     /// ```
+    #[inline]
     pub fn gth<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1033,6 +1062,7 @@ mod op {
     /// #0001 #0000 LTH2   ( 00 )
     /// #0001 #0000 LTH2k  ( 00 01 00 00 00 )
     /// ```
+    #[inline]
     pub fn lth<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1054,6 +1084,7 @@ mod op {
     /// ```text
     /// ,&skip-rel JMP BRK &skip-rel #01  ( 01 )
     /// ```
+    #[inline]
     pub fn jmp<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1077,6 +1108,7 @@ mod op {
     /// #abcd #01 ,&pass JCN SWP &pass POP  ( ab )
     /// #abcd #00 ,&fail JCN SWP &fail POP  ( cd )
     /// ```
+    #[inline]
     pub fn jcn<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1102,7 +1134,7 @@ mod op {
     /// ,&routine JSR                     ( | PC* )
     /// ,&get JSR #01 BRK &get #02 JMP2r  ( 02 01 )
     /// ```
-    ///
+    #[inline]
     pub fn jsr<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1127,6 +1159,7 @@ mod op {
     /// #12 STH       ( | 12 )
     /// LITr 34 STHr  ( 34 )
     /// ```
+    #[inline]
     pub fn sth<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1148,6 +1181,7 @@ mod op {
     /// ```text
     /// |00 @cell $2 |0100 .cell LDZ ( 00 )
     /// ```
+    #[inline]
     pub fn ldz<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1176,6 +1210,7 @@ mod op {
     /// ```text
     /// |00 @cell $2 |0100 #abcd .cell STZ2  { ab cd }
     /// ```
+    #[inline]
     pub fn stz<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1208,6 +1243,7 @@ mod op {
     /// ```text
     /// ,cell LDR2 BRK @cell abcd  ( ab cd )
     /// ```
+    #[inline]
     pub fn ldr<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1240,6 +1276,7 @@ mod op {
     /// ```text
     /// #1234 ,cell STR2 BRK @cell $2  ( )
     /// ```
+    #[inline]
     pub fn str<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1273,6 +1310,7 @@ mod op {
     /// ```text
     /// ;cell LDA BRK @cell abcd ( ab )
     /// ```
+    #[inline]
     pub fn lda<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1302,6 +1340,7 @@ mod op {
     /// ```text
     /// #abcd ;cell STA BRK @cell $1 ( ab )
     /// ```
+    #[inline]
     pub fn sta<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1330,6 +1369,7 @@ mod op {
     ///
     /// Pushes a value from the device page, to the top of the stack. The target
     /// device might capture the reading to trigger an I/O event.
+    #[inline]
     pub fn dei<const FLAGS: u8>(
         vm: &mut Uxn,
         dev: &mut dyn Device,
@@ -1368,6 +1408,7 @@ mod op {
     ///
     /// Writes a value to the device page. The target device might capture the
     /// writing to trigger an I/O event.
+    #[inline]
     pub fn deo<const FLAGS: u8>(
         vm: &mut Uxn,
         dev: &mut dyn Device,
@@ -1404,6 +1445,7 @@ mod op {
     /// #02 #5d ADDk      ( 02 5d 5f )
     /// #0001 #0002 ADD2  ( 00 03 )
     /// ```
+    #[inline]
     pub fn add<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1421,6 +1463,7 @@ mod op {
     ///
     /// Pushes the difference of the first value minus the second, to the top of
     /// the stack.
+    #[inline]
     pub fn sub<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1438,6 +1481,7 @@ mod op {
     ///
     /// Pushes the product of the first and second values at the top of the
     /// stack.
+    #[inline]
     pub fn mul<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1462,6 +1506,7 @@ mod op {
     /// #10 #03 DIVk      ( 10 03 05 )
     /// #0010 #0000 DIV2  ( 00 00 )
     /// ```
+    #[inline]
     pub fn div<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1479,6 +1524,7 @@ mod op {
     ///
     /// Pushes the result of the bitwise operation `AND`, to the top of the
     /// stack.
+    #[inline]
     pub fn and<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1494,6 +1540,7 @@ mod op {
     /// ORA a b -- a|b
     /// ```
     /// Pushes the result of the bitwise operation `OR`, to the top of the stack.
+    #[inline]
     pub fn ora<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1511,6 +1558,7 @@ mod op {
     ///
     /// Pushes the result of the bitwise operation `XOR`, to the top of the
     /// stack.
+    #[inline]
     pub fn eor<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
@@ -1537,6 +1585,7 @@ mod op {
     /// #34 #33 SFTk       ( 34 33 30 )
     /// #1248 #34 SFT2k    ( 12 48 34 09 20 )
     /// ```
+    #[inline]
     pub fn sft<const FLAGS: u8>(
         vm: &mut Uxn,
         _: &mut dyn Device,
