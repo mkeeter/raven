@@ -167,7 +167,7 @@ impl System {
                 }
             }
             SystemPorts::STATE => {
-                if v.state & 0x80 != 0 {
+                if v.state != 0 {
                     std::process::exit((v.state & !0x80) as i32);
                 }
             }
