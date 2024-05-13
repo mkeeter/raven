@@ -1663,7 +1663,7 @@ mod ram {
 #[cfg(feature = "alloc")]
 pub use ram::UxnRam;
 
-#[cfg(test)]
+#[cfg(all(feature = "alloc", test))]
 mod test {
     use super::*;
 
