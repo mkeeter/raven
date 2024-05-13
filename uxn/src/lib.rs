@@ -1757,7 +1757,8 @@ mod test {
                 actual.reverse();
                 if actual != expected {
                     panic!(
-                        "failed to execute {:?}: got {actual:2x?}, expected {expected:2x?}",
+                        "failed to execute {:?}: got {actual:2x?}, \
+                         expected {expected:2x?}",
                         s.trim()
                     );
                 }
