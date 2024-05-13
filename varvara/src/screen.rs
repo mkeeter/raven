@@ -251,9 +251,9 @@ impl Screen {
             let mut addr = v.addr.get();
 
             for dy in 0..8 {
-                let lo = vm.ram_read(addr);
+                let lo = vm.ram_read_byte(addr);
                 let hi = if s.two_bpp() {
-                    vm.ram_read(addr.wrapping_add(8))
+                    vm.ram_read_byte(addr.wrapping_add(8))
                 } else {
                     0
                 };

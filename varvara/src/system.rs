@@ -87,12 +87,12 @@ impl System {
         match target {
             SystemPorts::EXPANSION => {
                 let addr = v.expansion.get();
-                let op = vm.ram_read(addr);
+                let op = vm.ram_read_byte(addr);
                 match op {
                     expansion::FILL => {
                         let mut f = Fill::new_zeroed();
                         for (i, b) in f.as_bytes_mut().iter_mut().enumerate() {
-                            *b = vm.ram_read(
+                            *b = vm.ram_read_byte(
                                 addr.wrapping_add(1).wrapping_add(i as u16),
                             );
                         }
@@ -109,7 +109,7 @@ impl System {
                     expansion::CPYL | expansion::CPYR => {
                         let mut c = Cpy::new_zeroed();
                         for (i, b) in c.as_bytes_mut().iter_mut().enumerate() {
-                            *b = vm.ram_read(
+                            *b = vm.ram_read_byte(
                                 addr.wrapping_add(1).wrapping_add(i as u16),
                             );
                         }

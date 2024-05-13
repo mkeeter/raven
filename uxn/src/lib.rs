@@ -1,13 +1,13 @@
 //! Uxn virtual machine
 #![cfg_attr(not(test), no_std)]
 
-fn keep(flags: u8) -> bool {
+const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
 }
-fn short(flags: u8) -> bool {
+const fn short(flags: u8) -> bool {
     (flags & (1 << 0)) != 0
 }
-fn ret(flags: u8) -> bool {
+const fn ret(flags: u8) -> bool {
     (flags & (1 << 1)) != 0
 }
 
@@ -312,6 +312,31 @@ impl<'a> Uxn<'a> {
     }
 
     #[inline]
+    fn ram_write(&mut self, addr: u16, v: Value) {
+        match v {
+            Value::Short(v) => {
+                let [hi, lo] = v.to_be_bytes();
+                self.ram[usize::from(addr)] = hi;
+                self.ram[usize::from(addr.wrapping_add(1))] = lo;
+            }
+            Value::Byte(v) => {
+                self.ram[usize::from(addr)] = v;
+            }
+        }
+    }
+
+    fn ram_read<const FLAGS: u8>(&self, addr: u16) -> Value {
+        if short(FLAGS) {
+            let hi = self.ram[usize::from(addr)];
+            let lo = self.ram[usize::from(addr.wrapping_add(1))];
+            Value::Short(u16::from_be_bytes([hi, lo]))
+        } else {
+            let v = self.ram[usize::from(addr)];
+            Value::Byte(v)
+        }
+    }
+
+    #[inline]
     fn stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.ret
@@ -372,7 +397,7 @@ impl<'a> Uxn<'a> {
 
     /// Reads a byte from RAM
     #[inline]
-    pub fn ram_read(&self, addr: u16) -> u8 {
+    pub fn ram_read_byte(&self, addr: u16) -> u8 {
         self.ram[addr as usize]
     }
 
@@ -1178,14 +1203,7 @@ mod op {
         pc: u16,
     ) -> Option<u16> {
         let addr = vm.stack_view::<FLAGS>().pop_byte();
-        let v = if short(FLAGS) {
-            let hi = vm.ram[usize::from(addr)];
-            let lo = vm.ram[usize::from(addr.wrapping_add(1))];
-            Value::Short(u16::from_be_bytes([hi, lo]))
-        } else {
-            let v = vm.ram[usize::from(addr)];
-            Value::Byte(v)
-        };
+        let v = vm.ram_read::<FLAGS>(u16::from(addr));
         vm.stack_view::<FLAGS>().push(v);
         Some(pc)
     }
@@ -1208,16 +1226,8 @@ mod op {
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
         let addr = s.pop_byte();
-        match s.pop() {
-            Value::Short(v) => {
-                let [hi, lo] = v.to_be_bytes();
-                vm.ram[usize::from(addr)] = hi;
-                vm.ram[usize::from(addr.wrapping_add(1))] = lo;
-            }
-            Value::Byte(v) => {
-                vm.ram[usize::from(addr)] = v;
-            }
-        }
+        let v = s.pop();
+        vm.ram_write(u16::from(addr), v);
         Some(pc)
     }
 
@@ -1241,15 +1251,7 @@ mod op {
     ) -> Option<u16> {
         let offset = vm.stack_view::<FLAGS>().pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
-
-        let v = if short(FLAGS) {
-            let hi = vm.ram[usize::from(addr)];
-            let lo = vm.ram[usize::from(addr.wrapping_add(1))];
-            Value::Short(u16::from_be_bytes([hi, lo]))
-        } else {
-            let v = vm.ram[usize::from(addr)];
-            Value::Byte(v)
-        };
+        let v = vm.ram_read::<FLAGS>(addr);
         vm.stack_view::<FLAGS>().push(v);
         Some(pc)
     }
@@ -1275,17 +1277,8 @@ mod op {
         let mut s = vm.stack_view::<FLAGS>();
         let offset = s.pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
-
-        match s.pop() {
-            Value::Short(v) => {
-                let [hi, lo] = v.to_be_bytes();
-                vm.ram[usize::from(addr)] = hi;
-                vm.ram[usize::from(addr.wrapping_add(1))] = lo;
-            }
-            Value::Byte(v) => {
-                vm.ram[usize::from(addr)] = v;
-            }
-        }
+        let v = s.pop();
+        vm.ram_write(addr, v);
         Some(pc)
     }
 
@@ -1307,14 +1300,7 @@ mod op {
         pc: u16,
     ) -> Option<u16> {
         let addr = vm.stack_view::<FLAGS>().pop_short();
-        let v = if short(FLAGS) {
-            let hi = vm.ram[usize::from(addr)];
-            let lo = vm.ram[usize::from(addr.wrapping_add(1))];
-            Value::Short(u16::from_be_bytes([hi, lo]))
-        } else {
-            let v = vm.ram[usize::from(addr)];
-            Value::Byte(v)
-        };
+        let v = vm.ram_read::<FLAGS>(addr);
         vm.stack_view::<FLAGS>().push(v);
         Some(pc)
     }
@@ -1338,16 +1324,8 @@ mod op {
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
         let addr = s.pop_short();
-        match s.pop() {
-            Value::Short(v) => {
-                let [hi, lo] = v.to_be_bytes();
-                vm.ram[usize::from(addr)] = hi;
-                vm.ram[usize::from(addr.wrapping_add(1))] = lo;
-            }
-            Value::Byte(v) => {
-                vm.ram[usize::from(addr)] = v;
-            }
-        }
+        let v = s.pop();
+        vm.ram_write(addr, v);
         Some(pc)
     }
 
