@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 zerocopy.workspace = true
+
+[features]
+alloc = []
+default = ["alloc"]

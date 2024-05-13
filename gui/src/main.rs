@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use uxn::Uxn;
+use uxn::{Uxn, UxnRam};
 use varvara::Varvara;
 
 use anyhow::{Context, Result};
@@ -27,7 +27,8 @@ fn main() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
-    let mut vm = Uxn::new(&rom);
+    let mut ram = UxnRam::new();
+    let mut vm = Uxn::new(&rom, &mut ram);
     let mut dev = Varvara::new();
     vm.run(&mut dev, 0x100);
     dev.run(&mut vm);

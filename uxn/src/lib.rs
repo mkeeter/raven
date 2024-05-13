@@ -1,4 +1,5 @@
 //! Uxn virtual machine
+#![cfg_attr(not(test), no_std)]
 
 fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
@@ -232,26 +233,15 @@ impl Stack {
 }
 
 /// The virtual machine itself
-pub struct Uxn {
+pub struct Uxn<'a> {
     /// Device memory
     dev: [u8; 256],
     /// 64 KiB of VM memory
-    pub(crate) ram: Box<[u8; 65536]>,
+    pub(crate) ram: &'a mut [u8; 65536],
     /// 256-byte data stack
     pub(crate) stack: Stack,
     /// 256-byte return stack
     pub(crate) ret: Stack,
-}
-
-impl Default for Uxn {
-    fn default() -> Self {
-        Self {
-            dev: [0u8; 256],
-            ram: Box::new([0u8; 65536]),
-            stack: Stack::default(),
-            ret: Stack::default(),
-        }
-    }
 }
 
 macro_rules! op_cmp {
@@ -289,15 +279,15 @@ macro_rules! op_bin {
     }};
 }
 
-impl Uxn {
+impl<'a> Uxn<'a> {
     /// Build a new `Uxn`, loading the given ROM at the start address
     ///
     /// # Panics
     /// If `rom` cannot fit in memory
-    pub fn new(rom: &[u8]) -> Self {
-        let mut out = Self {
+    pub fn new<'b>(rom: &'b [u8], ram: &'a mut [u8; 65536]) -> Self {
+        let out = Self {
             dev: [0u8; 256],
-            ram: Box::new([0u8; 65536]),
+            ram,
             stack: Stack::default(),
             ret: Stack::default(),
         };
@@ -345,7 +335,7 @@ impl Uxn {
     fn check_dev_size<D: Ports>() {
         struct AssertSize16<D>(D);
         impl<D> AssertSize16<D> {
-            const ASSERT: () = if std::mem::size_of::<D>() != 16 {
+            const ASSERT: () = if core::mem::size_of::<D>() != 16 {
                 panic!("dev must be 16 bytes");
             };
         }
@@ -355,7 +345,7 @@ impl Uxn {
     #[inline]
     pub fn dev<D: Ports>(&self) -> &D {
         Self::check_dev_size::<D>();
-        D::ref_from(&self.dev[D::BASE as usize..][..std::mem::size_of::<D>()])
+        D::ref_from(&self.dev[D::BASE as usize..][..core::mem::size_of::<D>()])
             .unwrap()
     }
 
@@ -363,7 +353,7 @@ impl Uxn {
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
         Self::check_dev_size::<D>();
         D::mut_from(
-            &mut self.dev[D::BASE as usize..][..std::mem::size_of::<D>()],
+            &mut self.dev[D::BASE as usize..][..core::mem::size_of::<D>()],
         )
         .unwrap()
     }
@@ -371,13 +361,13 @@ impl Uxn {
     /// Mutably borrows the entire RAM array
     #[inline]
     pub fn ram_mut(&mut self) -> &mut [u8; 65536] {
-        &mut self.ram
+        self.ram
     }
 
     /// Shared borrow of the entire RAM array
     #[inline]
     pub fn ram(&mut self) -> &[u8; 65536] {
-        &self.ram
+        self.ram
     }
 
     /// Reads a byte from RAM
@@ -1635,6 +1625,44 @@ impl Device for EmptyDevice {
     }
 }
 
+#[cfg(feature = "alloc")]
+mod ram {
+    extern crate alloc;
+    use alloc::boxed::Box;
+
+    /// Helper type for building a RAM array of the appropriate size
+    ///
+    /// This is only available if the `"alloc"` feature is enabled
+    pub struct UxnRam(Box<[u8; 65536]>);
+
+    impl UxnRam {
+        pub fn new() -> Self {
+            UxnRam(Box::new([0u8; 65536]))
+        }
+    }
+
+    impl Default for UxnRam {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl core::ops::Deref for UxnRam {
+        type Target = [u8; 65536];
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl core::ops::DerefMut for UxnRam {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+pub use ram::UxnRam;
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1693,7 +1721,8 @@ mod test {
     }
 
     fn parse_and_test(s: &str) {
-        let mut vm = Uxn::default();
+        let mut ram = UxnRam::new();
+        let mut vm = Uxn::new(&[], &mut ram);
         let mut iter = s.split_whitespace();
         let mut op = None;
         let mut dev = EmptyDevice;
