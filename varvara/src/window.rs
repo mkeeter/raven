@@ -1,14 +1,20 @@
-use crate::{mouse::Mouse, screen::Screen};
+use crate::{
+    controller::{Controller, ControllerPorts},
+    mouse::{Mouse, MousePorts},
+    screen::{Screen, ScreenPorts},
+};
 use minifb::{
     MouseButton, MouseMode, Scale, Window as FbWindow, WindowOptions,
 };
-use uxn::Uxn;
+use uxn::{Ports, Uxn};
 
 pub struct Window {
     pub screen: Screen,
     pub mouse: Mouse,
+    pub controller: Controller,
 
     has_mouse: bool,
+    has_controller: bool,
     window: FbWindow,
     frame: u64,
 }
@@ -36,14 +42,17 @@ impl Window {
         Self {
             screen,
             mouse,
+            controller: Controller,
             frame: 0,
 
             has_mouse: false,
+            has_controller: false,
             window,
         }
     }
 
-    pub fn set_mouse(&mut self) {
+    /// Sets `self.has_mouse` to true and hides the cursor
+    fn set_mouse(&mut self) {
         if !self.has_mouse {
             self.has_mouse = true;
             self.window.set_cursor_visibility(false);
@@ -109,5 +118,31 @@ impl Window {
         if self.has_mouse {
             self.window.set_cursor_visibility(false);
         }
+    }
+
+    /// Triggers a DEO operation on a child component
+    ///
+    /// Returns `true` if the operation was handled, `false` otherwise
+    pub fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool {
+        match target & 0xF0 {
+            ScreenPorts::BASE => self.screen.deo(vm, target),
+            MousePorts::BASE => self.set_mouse(),
+            ControllerPorts::BASE => self.has_controller = true,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Triggers a DEI operation on a child component
+    ///
+    /// Returns `true` if the operation was handled, `false` otherwise
+    pub fn dei(&mut self, vm: &mut Uxn, target: u8) -> bool {
+        match target & 0xF0 {
+            ScreenPorts::BASE => self.screen.dei(vm, target),
+            MousePorts::BASE => self.set_mouse(),
+            ControllerPorts::BASE => self.has_controller = true,
+            _ => return false,
+        }
+        true
     }
 }

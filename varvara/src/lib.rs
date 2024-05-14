@@ -13,6 +13,9 @@ mod mouse;
 #[cfg(feature = "gui")]
 mod window;
 
+#[cfg(feature = "gui")]
+mod controller;
+
 mod datetime;
 mod file;
 
@@ -22,9 +25,9 @@ use uxn::{Device, Ports, Uxn};
 pub struct Varvara {
     system: system::System,
     console: console::Console,
+    datetime: datetime::Datetime,
     #[cfg(feature = "gui")]
     window: window::Window,
-    datetime: datetime::Datetime,
 
     rx: std::sync::mpsc::Receiver<Event>,
 
@@ -46,12 +49,12 @@ impl Device for Varvara {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.deo(vm, target),
             console::ConsolePorts::BASE => self.console.deo(vm, target),
-            #[cfg(feature = "gui")]
-            screen::ScreenPorts::BASE => self.window.screen.deo(vm, target),
-            #[cfg(feature = "gui")]
-            mouse::MousePorts::BASE => self.window.set_mouse(),
             datetime::DatetimePorts::BASE => self.datetime.deo(vm, target),
 
+            #[cfg(feature = "gui")]
+            _ if self.window.deo(vm, target) => (), // window handler
+
+            // Default case
             t => self.warn_missing(t),
         }
     }
@@ -59,12 +62,12 @@ impl Device for Varvara {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.dei(vm, target),
             console::ConsolePorts::BASE => self.console.dei(vm, target),
-            #[cfg(feature = "gui")]
-            screen::ScreenPorts::BASE => self.window.screen.dei(vm, target),
-            #[cfg(feature = "gui")]
-            mouse::MousePorts::BASE => self.window.set_mouse(),
             datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
 
+            #[cfg(feature = "gui")]
+            _ if self.window.dei(vm, target) => (), // window handler
+
+            // Default case
             t => self.warn_missing(t),
         }
     }
@@ -76,9 +79,10 @@ impl Varvara {
         Self {
             console: console::Console::new(tx.clone()),
             system: system::System::default(),
+            datetime: datetime::Datetime,
             #[cfg(feature = "gui")]
             window: window::Window::new(),
-            datetime: datetime::Datetime,
+
             rx,
             already_warned: [false; 16],
         }
