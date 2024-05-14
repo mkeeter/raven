@@ -1,3 +1,4 @@
+use minifb::Key;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -17,7 +18,7 @@ impl Ports for ControllerPorts {
 pub struct Controller;
 
 impl Controller {
-    pub fn update(&mut self, key: Option<u8>) -> Option<u16> {
+    pub fn update(&mut self, pressed: &[Key], released: &[Key]) -> Option<u16> {
         None
     }
 }

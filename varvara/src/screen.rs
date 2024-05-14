@@ -365,6 +365,7 @@ impl Screen {
         }
     }
 
+    /// Called on screen update; returns the screen vector
     pub fn update(&mut self, vm: &mut Uxn) -> u16 {
         // Nothing to do here, but return the screen vector
         vm.dev::<ScreenPorts>().vector.get()

@@ -7,7 +7,9 @@ use std::{
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
-pub struct Console;
+pub struct Console {
+    rx: mpsc::Receiver<u8>,
+}
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
@@ -34,28 +36,30 @@ impl ConsolePorts {
 }
 
 impl Console {
-    pub fn new(tx: mpsc::Sender<Event>) -> Self {
+    pub fn new() -> Self {
+        let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             let mut i = std::io::stdin().lock();
             let mut buf = [0u8; 32];
             loop {
                 let n = i.read(&mut buf).unwrap();
                 for &c in &buf[..n] {
-                    if tx.send(Event::Console(c)).is_err() {
+                    if tx.send(c).is_err() {
                         return;
                     }
                 }
             }
         });
-        Self
+        Self { rx }
     }
 
     /// Checks whether a callback is ready
-    pub fn event(&mut self, vm: &mut Uxn, c: u8) -> u16 {
+    pub fn event(&mut self, vm: &mut Uxn, c: u8) -> Event {
         let p = vm.dev_mut::<ConsolePorts>();
         p.read = c;
         p.type_ = 1;
-        p.vector.get()
+        let vector = p.vector.get();
+        Event { vector, data: None }
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
@@ -76,5 +80,15 @@ impl Console {
     }
     pub fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
         // Nothing to do here; data is pre-populated in `vm.dev` memory
+    }
+
+    #[cfg(feature = "gui")]
+    pub fn poll(&mut self, vm: &mut Uxn) -> Option<Event> {
+        self.rx.try_recv().map(|c| self.event(vm, c)).ok()
+    }
+
+    #[cfg(not(feature = "gui"))]
+    pub fn block(&mut self, vm: &mut Uxn) -> Option<Event> {
+        self.rx.try_recv().map(|c| self.event(vm, c)).ok()
     }
 }

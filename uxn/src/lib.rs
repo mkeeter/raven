@@ -378,9 +378,14 @@ impl<'a> Uxn<'a> {
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
         Self::check_dev_size::<D>();
         D::mut_from(
-            &mut self.dev[D::BASE as usize..][..core::mem::size_of::<D>()],
+            &mut self.dev[usize::from(D::BASE)..][..core::mem::size_of::<D>()],
         )
         .unwrap()
+    }
+
+    #[inline]
+    pub fn write_dev_mem(&mut self, addr: u8, value: u8) {
+        self.dev[usize::from(addr)] = value;
     }
 
     /// Mutably borrows the entire RAM array

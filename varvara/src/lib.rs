@@ -1,7 +1,10 @@
 //! The Varvara computer system
 use log::warn;
+use std::collections::VecDeque;
 
 mod console;
+mod datetime;
+mod file;
 mod system;
 
 #[cfg(feature = "gui")]
@@ -16,10 +19,15 @@ mod window;
 #[cfg(feature = "gui")]
 mod controller;
 
-mod datetime;
-mod file;
-
 use uxn::{Device, Ports, Uxn};
+
+pub struct Event {
+    /// Tuple of `(address, value)` to write in in device memory
+    pub data: Option<(u8, u8)>,
+
+    /// Vector to trigger
+    pub vector: u16,
+}
 
 /// Handle to the Varvara system
 pub struct Varvara {
@@ -29,19 +37,16 @@ pub struct Varvara {
     #[cfg(feature = "gui")]
     window: window::Window,
 
-    rx: std::sync::mpsc::Receiver<Event>,
-
+    /// Flags indicating if we've already printed a warning about a missing dev
     already_warned: [bool; 16],
+
+    queue: VecDeque<Event>,
 }
 
 impl Default for Varvara {
     fn default() -> Self {
         Self::new()
     }
-}
-
-enum Event {
-    Console(u8),
 }
 
 impl Device for Varvara {
@@ -75,15 +80,14 @@ impl Device for Varvara {
 
 impl Varvara {
     pub fn new() -> Self {
-        let (tx, rx) = std::sync::mpsc::channel();
         Self {
-            console: console::Console::new(tx.clone()),
+            console: console::Console::new(),
             system: system::System::default(),
             datetime: datetime::Datetime,
             #[cfg(feature = "gui")]
             window: window::Window::new(),
 
-            rx,
+            queue: VecDeque::with_capacity(1),
             already_warned: [false; 16],
         }
     }
@@ -99,29 +103,26 @@ impl Varvara {
     #[cfg(feature = "gui")]
     pub fn run(&mut self, vm: &mut Uxn) {
         while self.window.redraw(vm) {
-            if let Ok(e) = self.rx.try_recv() {
-                match e {
-                    Event::Console(c) => {
-                        let vector = self.console.event(vm, c);
-                        vm.run(self, vector);
-                    }
-                }
-            }
-            for v in self.window.update(vm) {
-                vm.run(self, v);
-            }
+            self.queue.extend(self.console.poll(vm));
+            self.window.update(vm, &mut self.queue);
+            self.process_events(vm);
         }
     }
 
     #[cfg(not(feature = "gui"))]
     pub fn run(&mut self, vm: &mut Uxn) {
-        while let Ok(e) = self.rx.recv() {
-            match e {
-                Event::Console(c) => {
-                    let vector = self.console.event(vm, c);
-                    vm.run(self, vector);
-                }
+        loop {
+            self.queue.extend(self.console.poll(vm));
+            self.process_events(vm);
+        }
+    }
+
+    fn process_events(&mut self, vm: &mut Uxn) {
+        while let Some(e) = self.queue.pop_front() {
+            if let Some((addr, data)) = e.data {
+                vm.write_dev_mem(addr, data);
             }
+            vm.run(self, e.vector);
         }
     }
 }
