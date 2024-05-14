@@ -54,6 +54,7 @@ impl Console {
     }
 
     /// Checks whether a callback is ready
+    #[must_use]
     pub fn event(&mut self, vm: &mut Uxn, c: u8) -> Event {
         let p = vm.dev_mut::<ConsolePorts>();
         p.read = c;
@@ -83,11 +84,13 @@ impl Console {
     }
 
     #[cfg(feature = "gui")]
+    #[must_use]
     pub fn poll(&mut self, vm: &mut Uxn) -> Option<Event> {
         self.rx.try_recv().map(|c| self.event(vm, c)).ok()
     }
 
     #[cfg(not(feature = "gui"))]
+    #[must_use]
     pub fn block(&mut self, vm: &mut Uxn) -> Option<Event> {
         self.rx.try_recv().map(|c| self.event(vm, c)).ok()
     }

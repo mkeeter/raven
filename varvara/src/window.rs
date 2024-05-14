@@ -44,7 +44,7 @@ impl Window {
         Self {
             screen,
             mouse,
-            controller: Controller,
+            controller: Controller::default(),
             frame: 0,
 
             has_mouse: false,
@@ -89,9 +89,12 @@ impl Window {
         }
 
         if self.has_controller {
-            let released = self.window.get_keys_released();
-            let pressed = self.window.get_keys_pressed(minifb::KeyRepeat::No);
-            self.controller.update(&pressed, &released);
+            for k in self.window.get_keys_pressed(minifb::KeyRepeat::Yes) {
+                queue.extend(self.controller.pressed(vm, k));
+            }
+            for k in self.window.get_keys_released() {
+                self.controller.released(k);
+            }
         }
     }
 
