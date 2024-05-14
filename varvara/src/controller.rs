@@ -17,7 +17,7 @@ impl Ports for ControllerPorts {
 pub struct Controller;
 
 impl Controller {
-    pub fn event(&mut self, key: Option<u8>) -> Option<u16> {
+    pub fn update(&mut self, key: Option<u8>) -> Option<u16> {
         None
     }
 }

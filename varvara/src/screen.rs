@@ -148,6 +148,7 @@ impl Screen {
         }
     }
 
+    /// Resizes our internal buffers to the new width and height
     fn resize(&mut self, width: u16, height: u16) {
         if width == self.width && height == self.height {
             return;
@@ -162,15 +163,18 @@ impl Screen {
         self.resized = true;
     }
 
+    /// Checks and clears the `resized` flag
     pub fn resized(&mut self) -> bool {
         std::mem::take(&mut self.resized)
     }
 
+    /// Returns the current size as a `(width, height)` tuple
     pub fn size(&self) -> (u16, u16) {
         (self.width, self.height)
     }
 
-    pub fn update(&mut self, vm: &Uxn) -> (&[u32], u16, u16) {
+    /// Redraws the screen, returning a `(buffer, width, height)` tuple
+    pub fn redraw(&mut self, vm: &Uxn) -> (&[u32], u16, u16) {
         let sys = vm.dev::<crate::system::SystemPorts>();
         let colors = [0, 1, 2, 3].map(|i| sys.color(i));
         for (p, o) in self.pixels.iter().zip(self.buffer.iter_mut()) {
@@ -347,6 +351,7 @@ impl Screen {
         }
     }
 
+    /// Executes a DEI command against the screen
     pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev_mut::<ScreenPorts>();
         match target {
@@ -360,7 +365,7 @@ impl Screen {
         }
     }
 
-    pub fn event(&mut self, vm: &mut Uxn) -> u16 {
+    pub fn update(&mut self, vm: &mut Uxn) -> u16 {
         // Nothing to do here, but return the screen vector
         vm.dev::<ScreenPorts>().vector.get()
     }

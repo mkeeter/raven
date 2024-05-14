@@ -32,7 +32,8 @@ impl Mouse {
         Mouse::default()
     }
 
-    pub fn event(
+    /// Updates the internal mouse state, return the vector if state has changed
+    pub fn update(
         &mut self,
         vm: &mut Uxn,
         pos: (f32, f32),

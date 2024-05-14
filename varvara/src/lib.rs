@@ -98,7 +98,7 @@ impl Varvara {
     /// Runs in a wait-loop
     #[cfg(feature = "gui")]
     pub fn run(&mut self, vm: &mut Uxn) {
-        while self.window.update(vm) {
+        while self.window.redraw(vm) {
             if let Ok(e) = self.rx.try_recv() {
                 match e {
                     Event::Console(c) => {
@@ -107,7 +107,7 @@ impl Varvara {
                     }
                 }
             }
-            for v in self.window.event(vm) {
+            for v in self.window.update(vm) {
                 vm.run(self, v);
             }
         }

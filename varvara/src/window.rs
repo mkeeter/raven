@@ -59,11 +59,11 @@ impl Window {
         }
     }
 
-    pub fn event(&mut self, vm: &mut Uxn) -> impl Iterator<Item = u16> {
+    pub fn update(&mut self, vm: &mut Uxn) -> impl Iterator<Item = u16> {
         // The screen vector should be called every other frame, since we do
         // updates at ~120 FPS
         let v = if self.frame & 1 == 1 {
-            Some(self.screen.event(vm))
+            Some(self.screen.update(vm))
         } else {
             None
         };
@@ -80,7 +80,7 @@ impl Window {
                     .enumerate()
                     .map(|(i, b)| (self.window.get_mouse_down(b) as u8) << i)
                     .fold(0, |a, b| a | b);
-            self.mouse.event(vm, mouse_pos, mouse_scroll, buttons)
+            self.mouse.update(vm, mouse_pos, mouse_scroll, buttons)
         } else {
             None
         };
@@ -90,11 +90,11 @@ impl Window {
     /// Redraws the window and handles miscellaneous polling
     ///
     /// Returns `true` if the window is still open; `false` otherwise
-    pub fn update(&mut self, vm: &Uxn) -> bool {
+    pub fn redraw(&mut self, vm: &Uxn) -> bool {
         if self.screen.resized() {
             self.reopen();
         }
-        let (buffer, width, height) = self.screen.update(vm);
+        let (buffer, width, height) = self.screen.redraw(vm);
         self.window
             .update_with_buffer(buffer, width as usize, height as usize)
             .unwrap();
