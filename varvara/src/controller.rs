@@ -25,15 +25,33 @@ impl ControllerPorts {
 pub struct Controller {
     /// Non-character keys that are held down
     down: HashSet<Key>,
+
+    /// Current button state
+    buttons: u8,
 }
 
 impl Controller {
     /// Send the given key event, returning a vector [`Event`]
     #[must_use]
     pub fn pressed(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
-        if matches!(k, Key::LeftShift | Key::RightShift) {
+        if matches!(
+            k,
+            Key::LeftShift
+                | Key::RightShift
+                | Key::LeftCtrl
+                | Key::LeftAlt
+                | Key::Up
+                | Key::Down
+                | Key::Left
+                | Key::Right
+                | Key::LeftSuper
+                | Key::RightSuper
+                | Key::Home
+        ) {
             self.down.insert(k);
         }
+
+        let event = self.check_buttons(vm);
 
         let shift = self.down.contains(&Key::LeftShift)
             | self.down.contains(&Key::RightShift);
@@ -151,16 +169,58 @@ impl Controller {
             (Key::NumPadAsterisk, _) => b'*',
             (Key::NumPadMinus, _) => b'-',
             (Key::NumPadPlus, _) => b'+',
-            _ => return None,
+            _ => return event,
         };
-        let p: &ControllerPorts = vm.dev();
+        let p = vm.dev::<ControllerPorts>();
         Some(Event {
             vector: p.vector.get(),
             data: Some((ControllerPorts::KEY, c)),
         })
     }
 
-    pub fn released(&mut self, k: Key) {
+    pub fn released(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
         self.down.remove(&k);
+        self.check_buttons(vm)
+    }
+
+    fn check_buttons(&mut self, vm: &mut Uxn) -> Option<Event> {
+        let mut buttons = 0;
+        for (i, k) in [
+            Key::LeftCtrl,
+            Key::LeftAlt,
+            Key::LeftShift,
+            Key::Home,
+            Key::Up,
+            Key::Down,
+            Key::Left,
+            Key::Right,
+        ]
+        .iter()
+        .enumerate()
+        {
+            if self.down.contains(k) {
+                buttons |= 1 << i;
+            }
+        }
+        if self.down.contains(&Key::Left)
+            && (self.down.contains(&Key::LeftSuper)
+                || self.down.contains(&Key::RightSuper))
+        {
+            buttons |= 0x08;
+        }
+
+        // We'll return this event in case we don't have a keypress event;
+        // otherwise, the keypress event will call the vector (at least once)
+        if buttons != self.buttons {
+            let p = vm.dev_mut::<ControllerPorts>();
+            self.buttons = buttons;
+            p.button = buttons;
+            Some(Event {
+                vector: p.vector.get(),
+                data: None,
+            })
+        } else {
+            None
+        }
     }
 }

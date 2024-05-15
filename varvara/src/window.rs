@@ -93,7 +93,7 @@ impl Window {
                 queue.extend(self.controller.pressed(vm, k));
             }
             for k in self.window.get_keys_released() {
-                self.controller.released(k);
+                queue.extend(self.controller.released(vm, k));
             }
         }
     }
