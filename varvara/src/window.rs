@@ -1,4 +1,5 @@
 use crate::{
+    audio::{Audio, AudioPorts},
     controller::{Controller, ControllerPorts},
     mouse::{Mouse, MousePorts},
     screen::{Screen, ScreenPorts},
@@ -14,6 +15,7 @@ pub struct Window {
     pub screen: Screen,
     pub mouse: Mouse,
     pub controller: Controller,
+    pub audio: Audio,
 
     has_mouse: bool,
     has_controller: bool,
@@ -28,6 +30,7 @@ impl Window {
         const HEIGHT: u16 = 320;
         let screen = Screen::new(WIDTH, HEIGHT);
         let mouse = Mouse::new();
+        let audio = Audio::new();
 
         let mut window = FbWindow::new(
             APP_NAME,
@@ -44,6 +47,7 @@ impl Window {
         Self {
             screen,
             mouse,
+            audio,
             controller: Controller::default(),
             frame: 0,
 
@@ -139,6 +143,7 @@ impl Window {
             ScreenPorts::BASE => self.screen.deo(vm, target),
             MousePorts::BASE => self.set_mouse(),
             ControllerPorts::BASE => self.has_controller = true,
+            AudioPorts::BASE => self.audio.deo(vm, target),
             _ => return false,
         }
         true
@@ -152,6 +157,7 @@ impl Window {
             ScreenPorts::BASE => self.screen.dei(vm, target),
             MousePorts::BASE => self.set_mouse(),
             ControllerPorts::BASE => self.has_controller = true,
+            AudioPorts::BASE => self.audio.dei(vm, target),
             _ => return false,
         }
         true

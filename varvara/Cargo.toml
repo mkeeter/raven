@@ -6,12 +6,14 @@ edition = "2021"
 [dependencies]
 chrono.workspace = true
 log.workspace = true
-minifb = {workspace = true, optional = true }
 static_assertions.workspace = true
 zerocopy.workspace = true
+
+cpal = { workspace = true, optional = true }
+minifb = { workspace = true, optional = true }
 
 uxn.path = "../uxn"
 
 [features]
 default = ["gui"]
-gui = ["dep:minifb"]
+gui = ["dep:minifb", "dep:cpal"]

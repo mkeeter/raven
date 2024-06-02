@@ -19,6 +19,9 @@ mod window;
 #[cfg(feature = "gui")]
 mod controller;
 
+#[cfg(feature = "gui")]
+mod audio;
+
 use uxn::{Device, Ports, Uxn};
 
 pub struct Event {
