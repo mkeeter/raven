@@ -112,7 +112,7 @@ impl Varvara {
     #[cfg(not(feature = "gui"))]
     pub fn run(&mut self, vm: &mut Uxn) {
         loop {
-            self.queue.extend(self.console.poll(vm));
+            self.queue.extend(self.console.block(vm));
             self.process_events(vm);
         }
     }

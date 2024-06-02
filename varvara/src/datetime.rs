@@ -58,6 +58,7 @@ impl Datetime {
                 d.day_of_year.set(t.ordinal().try_into().unwrap())
             }
             DatetimePorts::IS_DST => {
+                // https://github.com/chronotope/chrono/issues/1562
                 d.is_dst = 0u8; // TODO this is not correct
             }
 

@@ -430,6 +430,7 @@ impl<'a> Uxn<'a> {
         &mut self.ret
     }
 
+    #[inline]
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) {
         loop {
             let op = self.next(&mut pc);
