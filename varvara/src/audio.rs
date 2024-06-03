@@ -1,4 +1,8 @@
-use std::mem::offset_of;
+use cpal::traits::StreamTrait;
+use std::{
+    mem::offset_of,
+    sync::{Arc, Mutex},
+};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -60,20 +64,24 @@ impl Volume {
     }
 }
 
-/// Decoder for the `volume` port
+/// Decoder for the `pitch` port
 #[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
 struct Pitch(u8);
 impl Pitch {
-    fn get_loop(&self) -> bool {
-        (self.0 >> 7) != 0
+    fn loop_sample(&self) -> bool {
+        (self.0 >> 7) == 0
     }
     fn note(&self) -> u8 {
-        (self.0 & 0x7F).min(20)
+        (self.0 & 0x7F).max(20) - 20
+    }
+    fn is_empty(&self) -> bool {
+        self.0 == 0
     }
 }
 
 // From `audio.c` in the original implementation
+#[allow(clippy::excessive_precision)]
 const TUNING: [f32; 109] = [
     0.00058853, 0.00062352, 0.00066060, 0.00069988, 0.00074150, 0.00078559,
     0.00083230, 0.00088179, 0.00093423, 0.00098978, 0.00104863, 0.00111099,
@@ -96,15 +104,57 @@ const TUNING: [f32; 109] = [
     0.30132544,
 ];
 
+const MIDDLE_C: f32 = 261.6;
+
+struct Stream {
+    stream: cpal::Stream,
+    playing: bool,
+    data: Arc<Mutex<StreamData>>,
+}
+
+#[derive(Default)]
+struct StreamData {
+    samples: Vec<u16>,
+    loop_sample: bool,
+
+    /// Position within the sample array, as a fraction
+    pos: f32,
+
+    tuning: f32,
+}
+
+impl StreamData {
+    fn next(&mut self, data: &mut [f32], opt: &cpal::OutputCallbackInfo) {
+        for d in data.iter_mut() {
+            let wrap = self.samples.len() as f32;
+            if self.pos >= wrap {
+                if self.loop_sample {
+                    self.pos %= wrap;
+                } else {
+                    todo!("stop the music!")
+                }
+            }
+
+            let lo = self.samples[self.pos.floor() as usize] as f32 / 65536f32;
+            let hi = self.samples[(self.pos.ceil() % wrap) as usize] as f32
+                / 65536f32;
+            let frac = self.pos % 1.0;
+            *d = (hi * frac + lo * (1.0 - frac)) / 10.0;
+            // TODO: volume, adsr, etc
+            self.pos += self.tuning * SAMPLE_RATE as f32 / MIDDLE_C;
+        }
+    }
+}
+
 pub struct Audio {
     device: cpal::Device,
     config: cpal::StreamConfig,
-    stream: [Option<cpal::Stream>; 4],
+    streams: [Stream; 4],
 }
 
 impl Audio {
     pub fn new() -> Self {
-        use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+        use cpal::traits::{DeviceTrait, HostTrait};
         let host = cpal::default_host();
         let device = host
             .default_output_device()
@@ -119,42 +169,65 @@ impl Audio {
             .with_sample_rate(cpal::SampleRate(SAMPLE_RATE));
         let config = supported_config.config();
 
-        /*
-        let stream = device
-            .build_output_stream(
-                &config,
-                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    for v in data.iter_mut() {
-                        let t = sample as f32 / config.sample_rate.0 as f32;
-                        *v = (t * 600.0).cos() * 1.0;
-                        sample += 1;
-                    }
-                },
-                move |err| {
-                    panic!("{err}");
-                },
-                None,
-            )
-            .expect("could not build stream");
-        stream.play().unwrap();
-        */
+        let stream_data =
+            [(); 4].map(|_| Arc::new(Mutex::new(StreamData::default())));
+        let streams = [0, 1, 2, 3].map(|i| {
+            let d = stream_data[i].clone();
+            let stream = device
+                .build_output_stream(
+                    &config,
+                    move |data: &mut [f32], opt: &cpal::OutputCallbackInfo| {
+                        d.lock().unwrap().next(data, opt);
+                    },
+                    move |err| {
+                        panic!("{err}");
+                    },
+                    None,
+                )
+                .expect("could not build stream");
+            stream.pause().unwrap();
+            Stream {
+                stream,
+                playing: false,
+                data: stream_data[i].clone(),
+            }
+        });
 
         Audio {
             device,
             config,
-            stream: [None, None, None, None],
+            streams,
         }
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
-        let stream = (target - AudioPorts::BASE) / 0x10;
-        match target & 0x0F {
-            _ => panic!(),
+        let i = (target - AudioPorts::BASE) as usize / 0x10;
+        if target == AudioPorts::PITCH {
+            let p = vm.dev_i::<AudioPorts>(i);
+            if p.pitch.is_empty() {
+                let _ = self.streams[i].stream.pause();
+            } else {
+                let mut d = self.streams[i].data.lock().unwrap();
+                d.samples.clear();
+                d.loop_sample = p.pitch.loop_sample();
+                d.pos = 0.0;
+                println!("{}", p.pitch.note());
+                d.tuning = TUNING[p.pitch.note() as usize];
+                let base_addr = p.addr.get();
+                for i in 0..p.length.get() {
+                    d.samples.push(vm.ram_read_word(base_addr + i));
+                }
+                drop(d);
+                if !self.streams[i].playing {
+                    self.streams[i].stream.play().unwrap();
+                    self.streams[i].playing = true;
+                }
+            }
         }
     }
     pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
-        let stream = (target - AudioPorts::BASE) / 0x10;
-        match target & 0x0F {
+        let stream = (target - AudioPorts::BASE) as usize / 0x10;
+        match target {
             AudioPorts::PITCH => panic!(),
             _ => (),
         }

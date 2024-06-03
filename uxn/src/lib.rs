@@ -374,6 +374,17 @@ impl<'a> Uxn<'a> {
             .unwrap()
     }
 
+    /// Returns a reference to a device within an array starting at `D::BASE`
+    #[inline]
+    pub fn dev_i<D: Ports>(&self, i: usize) -> &D {
+        Self::check_dev_size::<D>();
+        D::ref_from(
+            &self.dev[D::BASE as usize + i * 0x10..]
+                [..core::mem::size_of::<D>()],
+        )
+        .unwrap()
+    }
+
     #[inline]
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
         Self::check_dev_size::<D>();
@@ -404,6 +415,16 @@ impl<'a> Uxn<'a> {
     #[inline]
     pub fn ram_read_byte(&self, addr: u16) -> u8 {
         self.ram[addr as usize]
+    }
+
+    /// Reads a word from RAM
+    ///
+    /// If the address is at the top of RAM, the second byte will wrap to 0
+    #[inline]
+    pub fn ram_read_word(&self, addr: u16) -> u16 {
+        let hi = self.ram[addr as usize];
+        let lo = self.ram[addr.wrapping_add(1) as usize];
+        u16::from_be_bytes([hi, lo])
     }
 
     /// Shared borrow of the working stack
