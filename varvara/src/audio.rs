@@ -1,5 +1,4 @@
-use crate::Event;
-use std::{collections::HashSet, mem::offset_of};
+use std::mem::offset_of;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -24,6 +23,8 @@ impl Ports for AudioPorts {
 impl AudioPorts {
     const PITCH: u8 = Self::BASE | offset_of!(Self, pitch) as u8;
 }
+
+const SAMPLE_RATE: u32 = 44100;
 
 /// Decoder for the `adsr` port
 #[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
@@ -111,13 +112,13 @@ impl Audio {
         let mut supported_configs_range = device
             .supported_output_configs()
             .expect("error while querying configs");
+
         let supported_config = supported_configs_range
             .next()
-            .expect("no supported config?!")
-            .with_max_sample_rate();
+            .expect("no supported config?")
+            .with_sample_rate(cpal::SampleRate(SAMPLE_RATE));
         let config = supported_config.config();
 
-        let mut sample = 0;
         /*
         let stream = device
             .build_output_stream(
