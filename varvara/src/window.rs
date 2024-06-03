@@ -143,7 +143,11 @@ impl Window {
             ScreenPorts::BASE => self.screen.deo(vm, target),
             MousePorts::BASE => self.set_mouse(),
             ControllerPorts::BASE => self.has_controller = true,
-            AudioPorts::BASE => self.audio.deo(vm, target),
+
+            // The audio device manages four independent streams
+            a if (AudioPorts::BASE..AudioPorts::BASE + 0x40).contains(&a) => {
+                self.audio.deo(vm, target)
+            }
             _ => return false,
         }
         true
@@ -157,7 +161,11 @@ impl Window {
             ScreenPorts::BASE => self.screen.dei(vm, target),
             MousePorts::BASE => self.set_mouse(),
             ControllerPorts::BASE => self.has_controller = true,
-            AudioPorts::BASE => self.audio.dei(vm, target),
+
+            // The audio device manages four independent streams
+            a if (AudioPorts::BASE..AudioPorts::BASE + 0x40).contains(&a) => {
+                self.audio.dei(vm, target)
+            }
             _ => return false,
         }
         true

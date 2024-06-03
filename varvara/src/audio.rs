@@ -98,7 +98,7 @@ const TUNING: [f32; 109] = [
 pub struct Audio {
     device: cpal::Device,
     config: cpal::StreamConfig,
-    stream: Option<cpal::Stream>,
+    stream: [Option<cpal::Stream>; 4],
 }
 
 impl Audio {
@@ -141,14 +141,18 @@ impl Audio {
         Audio {
             device,
             config,
-            stream: None,
+            stream: [None, None, None, None],
         }
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
-        panic!()
+        let stream = (target - AudioPorts::BASE) / 0x10;
+        match target & 0x0F {
+            _ => panic!(),
+        }
     }
     pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+        let stream = (target - AudioPorts::BASE) / 0x10;
         match target & 0x0F {
             AudioPorts::PITCH => panic!(),
             _ => (),
