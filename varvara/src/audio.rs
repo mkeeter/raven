@@ -108,7 +108,6 @@ const MIDDLE_C: f32 = 261.6;
 
 struct Stream {
     stream: cpal::Stream,
-    playing: bool,
     data: Arc<Mutex<StreamData>>,
 }
 
@@ -117,31 +116,41 @@ struct StreamData {
     samples: Vec<u16>,
     loop_sample: bool,
 
+    playing: bool,
+
     /// Position within the sample array, as a fraction
     pos: f32,
 
-    tuning: f32,
+    inc: f32,
 }
 
 impl StreamData {
     fn next(&mut self, data: &mut [f32], opt: &cpal::OutputCallbackInfo) {
-        for d in data.iter_mut() {
-            let wrap = self.samples.len() as f32;
-            if self.pos >= wrap {
-                if self.loop_sample {
-                    self.pos %= wrap;
-                } else {
-                    todo!("stop the music!")
+        if self.playing {
+            for d in data.iter_mut() {
+                let wrap = self.samples.len() as f32;
+                if self.pos >= wrap {
+                    if self.loop_sample {
+                        self.pos %= wrap;
+                    } else {
+                        self.playing = false;
+                        break;
+                    }
                 }
-            }
 
-            let lo = self.samples[self.pos.floor() as usize] as f32 / 65536f32;
-            let hi = self.samples[(self.pos.ceil() % wrap) as usize] as f32
-                / 65536f32;
-            let frac = self.pos % 1.0;
-            *d = (hi * frac + lo * (1.0 - frac)) / 10.0;
-            // TODO: volume, adsr, etc
-            self.pos += self.tuning * SAMPLE_RATE as f32 / MIDDLE_C;
+                let lo =
+                    self.samples[self.pos.floor() as usize] as f32 / 65536f32;
+                let hi = self.samples[(self.pos.ceil() % wrap) as usize] as f32
+                    / 65536f32;
+                let frac = self.pos % 1.0;
+                *d = (hi * frac + lo * (1.0 - frac)) / 10.0;
+                // TODO: volume, adsr, etc
+
+                self.pos += self.inc / 2.0;
+                println!("{}", self.pos);
+            }
+        } else {
+            data.fill(0.0);
         }
     }
 }
@@ -164,9 +173,8 @@ impl Audio {
             .expect("error while querying configs");
 
         let supported_config = supported_configs_range
-            .next()
-            .expect("no supported config?")
-            .with_sample_rate(cpal::SampleRate(SAMPLE_RATE));
+            .find_map(|c| c.try_with_sample_rate(cpal::SampleRate(SAMPLE_RATE)))
+            .expect("no supported config?");
         let config = supported_config.config();
 
         let stream_data =
@@ -188,7 +196,6 @@ impl Audio {
             stream.pause().unwrap();
             Stream {
                 stream,
-                playing: false,
                 data: stream_data[i].clone(),
             }
         });
@@ -211,16 +218,27 @@ impl Audio {
                 d.samples.clear();
                 d.loop_sample = p.pitch.loop_sample();
                 d.pos = 0.0;
-                println!("{}", p.pitch.note());
-                d.tuning = TUNING[p.pitch.note() as usize];
+
+                // No idea what's going on here!
+                let len = p.length.get();
+                let sample_rate = if len <= 256 {
+                    len as f32
+                } else {
+                    SAMPLE_RATE as f32 / MIDDLE_C
+                };
+                // Not sure why the 2.0 is necessary, but it's required to have
+                // the same behavior as the reference implementation
+                d.inc = TUNING[p.pitch.note() as usize] * sample_rate / 2.0;
+
                 let base_addr = p.addr.get();
-                for i in 0..p.length.get() {
+                for i in 0..len {
                     d.samples.push(vm.ram_read_word(base_addr + i));
                 }
+                let start = !d.playing;
+                d.playing = true;
                 drop(d);
-                if !self.streams[i].playing {
+                if start {
                     self.streams[i].stream.play().unwrap();
-                    self.streams[i].playing = true;
                 }
             }
         }
