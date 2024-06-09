@@ -8,8 +8,8 @@ use crate::{
 use minifb::{
     MouseButton, MouseMode, Scale, Window as FbWindow, WindowOptions,
 };
+use raven::{Ports, Uxn};
 use std::collections::VecDeque;
-use uxn::{Ports, Uxn};
 
 pub struct Window {
     pub screen: Screen,

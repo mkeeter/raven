@@ -22,7 +22,7 @@ mod controller;
 #[cfg(feature = "gui")]
 mod audio;
 
-use uxn::{Device, Ports, Uxn};
+use raven::{Device, Ports, Uxn};
 
 pub struct Event {
     /// Tuple of `(address, value)` to write in in device memory

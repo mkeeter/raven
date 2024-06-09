@@ -1,7 +1,7 @@
 use crate::Event;
 use minifb::Key;
+use raven::{Ports, Uxn};
 use std::{collections::HashSet, mem::offset_of};
-use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 #[derive(AsBytes, FromZeroes, FromBytes)]

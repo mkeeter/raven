@@ -1,5 +1,5 @@
 [package]
-name = "gui"
+name = "crow-gui"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,5 +8,5 @@ anyhow.workspace = true
 clap.workspace = true
 env_logger.workspace = true
 
-uxn.path = "../uxn"
-varvara.path = "../varvara"
+raven.path = "../raven"
+crow.path = "../crow"

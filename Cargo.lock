@@ -256,17 +256,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "env_logger",
- "uxn",
- "varvara",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -329,6 +318,41 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows",
+]
+
+[[package]]
+name = "crow"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cpal",
+ "log",
+ "minifb",
+ "raven",
+ "static_assertions",
+ "zerocopy",
+]
+
+[[package]]
+name = "crow-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crow",
+ "env_logger",
+ "raven",
+]
+
+[[package]]
+name = "crow-gui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crow",
+ "env_logger",
+ "raven",
 ]
 
 [[package]]
@@ -497,17 +521,6 @@ name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
-
-[[package]]
-name = "gui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "env_logger",
- "uxn",
- "varvara",
-]
 
 [[package]]
 name = "hashbrown"
@@ -913,6 +926,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven"
+version = "0.1.0"
+dependencies = [
+ "zerocopy",
+]
+
+[[package]]
 name = "raw-window-handle"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1137,26 +1157,6 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
-
-[[package]]
-name = "uxn"
-version = "0.1.0"
-dependencies = [
- "zerocopy",
-]
-
-[[package]]
-name = "varvara"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "cpal",
- "log",
- "minifb",
- "static_assertions",
- "uxn",
- "zerocopy",
-]
 
 [[package]]
 name = "version-compare"
