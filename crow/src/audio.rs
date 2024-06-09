@@ -288,7 +288,7 @@ impl Audio {
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let i = (target - AudioPorts::BASE) as usize / 0x10;
-        if target == AudioPorts::PITCH {
+        if target == AudioPorts::PITCH + i as u8 * 16 {
             let p = vm.dev_i::<AudioPorts>(i);
             if p.pitch.is_empty() {
                 let mut d = self.streams[i].data.lock().unwrap();
@@ -340,6 +340,7 @@ impl Audio {
                     };
                     was_playing
                 };
+                println!("   {was_playing}");
 
                 if !was_playing {
                     self.streams[i].stream.play().unwrap();
