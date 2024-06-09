@@ -12,8 +12,9 @@ pub struct AudioPorts {
     vector: U16<BigEndian>,
     position: U16<BigEndian>,
     output: u8,
-    _padding: [u8; 3],
-    adsr: Adsr,
+    duration: U16<BigEndian>,
+    _padding: u8,
+    adsr: Envelope,
     length: U16<BigEndian>,
     addr: U16<BigEndian>,
     volume: Volume,
@@ -31,21 +32,32 @@ impl AudioPorts {
 const SAMPLE_RATE: u32 = 44100;
 
 /// Decoder for the `adsr` port
-#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Copy, Clone, Default, AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
-struct Adsr(U16<BigEndian>);
-impl Adsr {
-    fn attack(&self) -> u8 {
-        (self.0.get() >> 12) as u8 & 0xF
+struct Envelope(U16<BigEndian>);
+impl Envelope {
+    fn attack(&self) -> Option<f32> {
+        let a = (self.0.get() >> 12) as u8 & 0xF;
+        if a == 0 {
+            None
+        } else {
+            let a = a as f32 * 64.0;
+            Some(1000.0 / (a * SAMPLE_RATE as f32))
+        }
     }
-    fn decay(&self) -> u8 {
-        (self.0.get() >> 8) as u8 & 0xF
+    fn decay(&self) -> f32 {
+        let d = (((self.0.get() >> 8) as u8 & 0xF) as f32 * 64.0).max(10.0);
+        1000.0 / (d * SAMPLE_RATE as f32)
     }
-    fn sustain(&self) -> u8 {
-        (self.0.get() >> 4) as u8 & 0xF
+    fn sustain(&self) -> f32 {
+        ((self.0.get() >> 4) as u8 & 0xF) as f32 / 255.0
     }
-    fn release(&self) -> u8 {
-        self.0.get() as u8 & 0xF
+    fn release(&self) -> f32 {
+        let r = (self.0.get() as u8 & 0xF) as f32 * 64.0;
+        1000.0 / (r * SAMPLE_RATE as f32)
+    }
+    fn disabled(&self) -> bool {
+        self.0.get() == 0
     }
 }
 
@@ -111,7 +123,14 @@ struct Stream {
     data: Arc<Mutex<StreamData>>,
 }
 
-#[derive(Default)]
+#[derive(Debug)]
+enum Stage {
+    Attack(f32),
+    Decay,
+    Sustain,
+    Release,
+}
+
 struct StreamData {
     samples: Vec<u16>,
     loop_sample: bool,
@@ -121,7 +140,32 @@ struct StreamData {
     /// Position within the sample array, as a fraction
     pos: f32,
 
+    /// Amount to increment `pos` on each sample
     inc: f32,
+
+    /// Current stage
+    stage: Stage,
+
+    /// Current volume, modified by the envelope
+    vol: f32,
+
+    /// Envelope
+    envelope: Envelope,
+}
+
+impl Default for StreamData {
+    fn default() -> Self {
+        Self {
+            samples: vec![],
+            loop_sample: false,
+            playing: false,
+            pos: 0.0,
+            inc: 0.0,
+            stage: Stage::Attack(0.0),
+            vol: 0.0,
+            envelope: Envelope(0.into()),
+        }
+    }
 }
 
 impl StreamData {
@@ -138,16 +182,52 @@ impl StreamData {
                     }
                 }
 
-                let lo =
-                    self.samples[self.pos.floor() as usize] as f32 / 65536f32;
-                let hi = self.samples[(self.pos.ceil() % wrap) as usize] as f32
-                    / 65536f32;
+                let lo = self.samples[self.pos.floor() as usize] as f32 / 512.0;
+                let hi = self.samples
+                    [((self.pos.floor() + 1.0) % wrap) as usize]
+                    as f32
+                    / 512.0;
                 let frac = self.pos % 1.0;
-                *d = (hi * frac + lo * (1.0 - frac)) / 10.0;
-                // TODO: volume, adsr, etc
 
-                self.pos += self.inc / 2.0;
-                println!("{}", self.pos);
+                // Scaling factor of 3.0 is eyeballed (or rather earballed)
+                *d = hi * frac + lo * (1.0 - frac);
+                print!("{d} ");
+                *d = *d / 3.0 * self.vol;
+                print!("{d} ");
+                *d = f32::clamp(*d, i8::MIN as f32, i8::MAX as f32);
+                *d /= 2.0 * i8::MAX as f32;
+                println!("{d}");
+
+                self.pos += self.inc;
+                match self.stage {
+                    Stage::Attack(a) => {
+                        self.vol += a;
+                        if self.vol >= 1.0 {
+                            self.stage = Stage::Decay;
+                            self.vol = 1.0;
+                        }
+                    }
+                    Stage::Decay => {
+                        self.vol -= self.envelope.decay();
+                        if self.vol < 0.0 || self.vol <= self.envelope.sustain()
+                        {
+                            self.stage = Stage::Sustain;
+                            self.vol = self.envelope.sustain();
+                        }
+                    }
+                    Stage::Sustain => {
+                        self.vol = self.envelope.sustain();
+                    }
+                    Stage::Release => {
+                        self.vol = if self.vol <= 0.0
+                            || self.envelope.release() <= 0.0
+                        {
+                            0.0
+                        } else {
+                            self.vol - self.envelope.release()
+                        };
+                    }
+                }
             }
         } else {
             data.fill(0.0);
@@ -212,13 +292,9 @@ impl Audio {
         if target == AudioPorts::PITCH {
             let p = vm.dev_i::<AudioPorts>(i);
             if p.pitch.is_empty() {
-                let _ = self.streams[i].stream.pause();
-            } else {
                 let mut d = self.streams[i].data.lock().unwrap();
-                d.samples.clear();
-                d.loop_sample = p.pitch.loop_sample();
-                d.pos = 0.0;
-
+                d.stage = Stage::Release;
+            } else {
                 // No idea what's going on here!
                 let len = p.length.get();
                 let sample_rate = if len <= 256 {
@@ -226,18 +302,49 @@ impl Audio {
                 } else {
                     SAMPLE_RATE as f32 / MIDDLE_C
                 };
-                // Not sure why the 2.0 is necessary, but it's required to have
-                // the same behavior as the reference implementation
-                d.inc = TUNING[p.pitch.note() as usize] * sample_rate / 2.0;
 
-                let base_addr = p.addr.get();
-                for i in 0..len {
-                    d.samples.push(vm.ram_read_word(base_addr + i));
-                }
-                let start = !d.playing;
-                d.playing = true;
-                drop(d);
-                if start {
+                // Hold the lock for as short a time as possible
+                let was_playing = {
+                    let mut d = self.streams[i].data.lock().unwrap();
+                    let was_playing = d.playing;
+
+                    // Copy the entire sample into RAM, reusing allocation
+                    let mut samples = std::mem::take(&mut d.samples);
+                    samples.clear();
+                    let base_addr = p.addr.get();
+                    for i in 0..len {
+                        samples.push(vm.ram_read_word(base_addr + i));
+                    }
+
+                    // Not sure why the 2.0 is necessary, but it's required to
+                    // have the same behavior as the reference implementation
+                    let inc =
+                        TUNING[p.pitch.note() as usize] * sample_rate / 2.0;
+                    let attack = p.adsr.attack();
+
+                    *d = StreamData {
+                        samples,
+                        loop_sample: p.pitch.loop_sample(),
+                        pos: 0.0,
+                        inc,
+
+                        vol: if p.adsr.disabled() || attack.is_some() {
+                            0.0
+                        } else {
+                            1.0
+                        },
+                        envelope: p.adsr,
+                        stage: if let Some(a) = attack {
+                            Stage::Attack(a)
+                        } else {
+                            Stage::Decay
+                        },
+                        playing: true,
+                    };
+                    was_playing
+                };
+
+                if !was_playing {
                     self.streams[i].stream.play().unwrap();
                 }
             }
