@@ -132,7 +132,7 @@ enum Stage {
 }
 
 struct StreamData {
-    samples: Vec<u16>,
+    samples: Vec<u8>,
     loop_sample: bool,
 
     playing: bool,
@@ -169,9 +169,10 @@ impl Default for StreamData {
 }
 
 impl StreamData {
-    fn next(&mut self, data: &mut [f32], opt: &cpal::OutputCallbackInfo) {
+    fn next(&mut self, data: &mut [f32], _opt: &cpal::OutputCallbackInfo) {
         if self.playing {
-            for d in data.iter_mut() {
+            let mut i = 0;
+            while i < data.len() {
                 let wrap = self.samples.len() as f32;
                 if self.pos >= wrap {
                     if self.loop_sample {
@@ -182,21 +183,19 @@ impl StreamData {
                     }
                 }
 
-                let lo = self.samples[self.pos.floor() as usize] as f32 / 512.0;
-                let hi = self.samples
-                    [((self.pos.floor() + 1.0) % wrap) as usize]
-                    as f32
-                    / 512.0;
+                let lo = self.samples[self.pos.floor() as usize] as f32;
+                let hi = self.samples[(self.pos.ceil() % wrap) as usize] as f32;
                 let frac = self.pos % 1.0;
 
-                // Scaling factor of 3.0 is eyeballed (or rather earballed)
-                *d = hi * frac + lo * (1.0 - frac);
-                print!("{d} ");
-                *d = *d / 3.0 * self.vol;
-                print!("{d} ");
-                *d = f32::clamp(*d, i8::MIN as f32, i8::MAX as f32);
-                *d /= 2.0 * i8::MAX as f32;
-                println!("{d}");
+                let mut d = hi * frac + lo * (1.0 - frac);
+                d *= self.vol;
+                d = (d).min(u8::MAX as f32);
+                d -= 128.0;
+                d /= 512.0; // scale to ±0.5
+
+                data[i] = d;
+                data[i + 1] = d;
+                i += 2;
 
                 self.pos += self.inc;
                 match self.stage {
@@ -313,13 +312,11 @@ impl Audio {
                     samples.clear();
                     let base_addr = p.addr.get();
                     for i in 0..len {
-                        samples.push(vm.ram_read_word(base_addr + i));
+                        samples.push(vm.ram_read_byte(base_addr + i));
                     }
-
                     // Not sure why the 2.0 is necessary, but it's required to
                     // have the same behavior as the reference implementation
-                    let inc =
-                        TUNING[p.pitch.note() as usize] * sample_rate / 2.0;
+                    let inc = TUNING[p.pitch.note() as usize] * sample_rate;
                     let attack = p.adsr.attack();
 
                     *d = StreamData {
