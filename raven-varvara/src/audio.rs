@@ -374,7 +374,6 @@ impl Audio {
                 } else {
                     SAMPLE_RATE as f32 / MIDDLE_C
                 };
-                println!("{len} {sample_rate} {:x}", p.pitch.0);
 
                 // Compute a crossfade transition from the previous sample
                 // (this may just be all zeros, which is fine)
