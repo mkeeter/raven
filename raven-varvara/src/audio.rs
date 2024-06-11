@@ -162,8 +162,6 @@ struct StreamData {
     /// Computed samples from the previous stream, for crossfading
     crossfade: VecDeque<f32>,
 
-    playing: bool,
-
     /// Position within the sample array, as a fraction
     pos: f32,
 
@@ -201,7 +199,6 @@ impl Default for StreamData {
             samples: vec![],
             crossfade: VecDeque::new(),
             loop_sample: false,
-            playing: false,
             pos: 0.0,
             megapos: 0.0,
             inc: 0.0,
@@ -222,20 +219,20 @@ impl StreamData {
         if self.duration <= 0.0 {
             self.done.store(true, Ordering::Relaxed);
         }
-        if self.playing {
-            let mut i = 0;
+        let mut i = 0;
 
-            while i < data.len() {
-                let wrap = self.samples.len() as f32;
-                if self.pos >= wrap {
-                    if self.loop_sample {
-                        self.pos %= wrap;
-                    } else {
-                        self.playing = false;
-                        break;
-                    }
+        while i < data.len() {
+            let wrap = self.samples.len() as f32;
+            let mut valid = true;
+            if self.pos >= wrap {
+                if self.loop_sample {
+                    self.pos %= wrap;
+                } else {
+                    valid = false;
                 }
+            }
 
+            let d = if valid {
                 let lo = self.samples[self.pos.floor() as usize] as f32;
                 let hi = self.samples[(self.pos.ceil() % wrap) as usize] as f32;
                 let frac = self.pos % 1.0;
@@ -245,54 +242,53 @@ impl StreamData {
                 d = (d).min(u8::MAX as f32);
                 d -= 128.0;
                 d /= 512.0; // scale to ±0.5
+                d
+            } else {
+                0.0
+            };
 
-                data[i] = d * self.left;
-                data[i + 1] = d * self.right;
+            data[i] = d * self.left;
+            data[i + 1] = d * self.right;
 
-                if !self.crossfade.is_empty() {
-                    let x = self.crossfade.len() as f32
-                        / (CROSSFADE_COUNT as f32 - 1.0);
-                    for j in 0..2 {
-                        let v = self.crossfade.pop_front().unwrap();
-                        data[i + j] = v * x + data[i + j] * (1.0 - x);
+            if !self.crossfade.is_empty() {
+                let x = self.crossfade.len() as f32
+                    / (CROSSFADE_COUNT as f32 - 1.0);
+                for j in 0..2 {
+                    let v = self.crossfade.pop_front().unwrap();
+                    data[i + j] = v * x + data[i + j] * (1.0 - x);
+                }
+            }
+            i += 2;
+
+            self.pos += self.inc;
+            self.megapos += self.inc;
+            match self.stage {
+                Stage::Attack(a) => {
+                    self.vol += a;
+                    if self.vol >= 1.0 {
+                        self.stage = Stage::Decay;
+                        self.vol = 1.0;
                     }
                 }
-                i += 2;
-
-                self.pos += self.inc;
-                self.megapos += self.inc;
-                match self.stage {
-                    Stage::Attack(a) => {
-                        self.vol += a;
-                        if self.vol >= 1.0 {
-                            self.stage = Stage::Decay;
-                            self.vol = 1.0;
-                        }
-                    }
-                    Stage::Decay => {
-                        self.vol -= self.envelope.decay();
-                        if self.vol < 0.0 || self.vol <= self.envelope.sustain()
-                        {
-                            self.stage = Stage::Sustain;
-                            self.vol = self.envelope.sustain();
-                        }
-                    }
-                    Stage::Sustain => {
+                Stage::Decay => {
+                    self.vol -= self.envelope.decay();
+                    if self.vol < 0.0 || self.vol <= self.envelope.sustain() {
+                        self.stage = Stage::Sustain;
                         self.vol = self.envelope.sustain();
                     }
-                    Stage::Release => {
-                        self.vol = if self.vol <= 0.0
-                            || self.envelope.release() <= 0.0
-                        {
+                }
+                Stage::Sustain => {
+                    self.vol = self.envelope.sustain();
+                }
+                Stage::Release => {
+                    self.vol =
+                        if self.vol <= 0.0 || self.envelope.release() <= 0.0 {
                             0.0
                         } else {
                             self.vol - self.envelope.release()
                         };
-                    }
                 }
             }
-        } else {
-            data.fill(0.0);
         }
     }
 }
@@ -378,6 +374,7 @@ impl Audio {
                 } else {
                     SAMPLE_RATE as f32 / MIDDLE_C
                 };
+                println!("{len} {sample_rate} {:x}", p.pitch.0);
 
                 // Compute a crossfade transition from the previous sample
                 // (this may just be all zeros, which is fine)
@@ -425,7 +422,6 @@ impl Audio {
                     } else {
                         Stage::Decay
                     },
-                    playing: true,
                 };
             }
         }
