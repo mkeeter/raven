@@ -11,6 +11,9 @@ const fn ret(flags: u8) -> bool {
     (flags & (1 << 1)) != 0
 }
 
+/// Size of a device in port memory
+pub const DEV_SIZE: usize = 16;
+
 /// Simple circular stack, with room for 256 items
 #[derive(Debug)]
 pub struct Stack {
@@ -360,7 +363,7 @@ impl<'a> Uxn<'a> {
     fn check_dev_size<D: Ports>() {
         struct AssertSize16<D>(D);
         impl<D> AssertSize16<D> {
-            const ASSERT: () = if core::mem::size_of::<D>() != 16 {
+            const ASSERT: () = if core::mem::size_of::<D>() != DEV_SIZE {
                 panic!("dev must be 16 bytes");
             };
         }
@@ -380,6 +383,17 @@ impl<'a> Uxn<'a> {
         Self::check_dev_size::<D>();
         D::ref_from(
             &self.dev[D::BASE as usize + i * 0x10..]
+                [..core::mem::size_of::<D>()],
+        )
+        .unwrap()
+    }
+
+    /// Returns a reference to a device within an array starting at `D::BASE`
+    #[inline]
+    pub fn dev_i_mut<D: Ports>(&mut self, i: usize) -> &mut D {
+        Self::check_dev_size::<D>();
+        D::mut_from(
+            &mut self.dev[D::BASE as usize + i * 0x10..]
                 [..core::mem::size_of::<D>()],
         )
         .unwrap()

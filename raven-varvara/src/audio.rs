@@ -3,9 +3,10 @@ use cpal::traits::StreamTrait;
 use std::{
     collections::VecDeque,
     mem::offset_of,
+    sync::atomic::{AtomicBool, Ordering},
     sync::{Arc, Mutex},
 };
-use uxn::{Ports, Uxn};
+use uxn::{Ports, Uxn, DEV_SIZE};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
@@ -28,7 +29,12 @@ impl Ports for AudioPorts {
 }
 
 impl AudioPorts {
-    const PITCH: u8 = Self::BASE | offset_of!(Self, pitch) as u8;
+    // Note that PITCH and POSITION are relative instead of absolute values,
+    // because we have to support multiple Audio ports at different offsets.
+    const PITCH: u8 = offset_of!(Self, pitch) as u8;
+    const POSITION_H: u8 = offset_of!(Self, position) as u8;
+    const POSITION_L: u8 = Self::POSITION_H + 1;
+    const VOLUME: u8 = offset_of!(Self, volume) as u8;
 
     fn duration(&self) -> f32 {
         // No idea what's going on here; copied from the reference impl
@@ -45,6 +51,7 @@ impl AudioPorts {
 }
 
 const SAMPLE_RATE: u32 = 44100;
+const CHANNELS: u16 = 2;
 
 /// Decoder for the `adsr` port
 #[derive(Copy, Clone, Default, AsBytes, FromZeroes, FromBytes)]
@@ -65,7 +72,7 @@ impl Envelope {
         1000.0 / (d * SAMPLE_RATE as f32)
     }
     fn sustain(&self) -> f32 {
-        ((self.0.get() >> 4) as u8 & 0xF) as f32 / 255.0
+        ((self.0.get() >> 4) as u8 & 0xF) as f32 / 16.0
     }
     fn release(&self) -> f32 {
         let r = (self.0.get() as u8 & 0xF) as f32 * 64.0;
@@ -134,7 +141,8 @@ const TUNING: [f32; 109] = [
 const MIDDLE_C: f32 = 261.6;
 
 struct Stream {
-    stream: cpal::Stream,
+    _stream: cpal::Stream,
+    done: Arc<AtomicBool>,
     data: Arc<Mutex<StreamData>>,
 }
 
@@ -155,6 +163,9 @@ struct StreamData {
     /// Position within the sample array, as a fraction
     pos: f32,
 
+    /// Absolute position
+    megapos: f32,
+
     /// Amount to increment `pos` on each sample
     inc: f32,
 
@@ -170,36 +181,42 @@ struct StreamData {
     /// Remaining time
     duration: f32,
 
-    /// Set in the audio thread when the note is done
-    done: bool,
+    /// Volume adjustment for left ear
+    left: f32,
 
-    index: usize,
+    /// Volume adjustment for right ear
+    right: f32,
+
+    /// Set in the audio thread when the note is done
+    done: Arc<AtomicBool>,
 }
 
 impl Default for StreamData {
     fn default() -> Self {
         Self {
-            index: 0,
             samples: vec![],
             loop_sample: false,
             playing: false,
             pos: 0.0,
+            megapos: 0.0,
             inc: 0.0,
             duration: 0.0,
             stage: Stage::Attack(0.0),
             vol: 0.0,
+            left: 0.0,
+            right: 0.0,
             envelope: Envelope(0.into()),
-            done: false,
+            done: Arc::new(AtomicBool::new(false)),
         }
     }
 }
 
 impl StreamData {
     fn next(&mut self, data: &mut [f32], _opt: &cpal::OutputCallbackInfo) {
-        if self.duration <= 0.0 {
-            self.done = true;
-        }
         self.duration -= (data.len() / 2) as f32 / SAMPLE_RATE as f32 * 1000.0;
+        if self.duration <= 0.0 {
+            self.done.store(true, Ordering::Relaxed);
+        }
         if self.playing {
             let mut i = 0;
 
@@ -224,11 +241,12 @@ impl StreamData {
                 d -= 128.0;
                 d /= 512.0; // scale to ±0.5
 
-                data[i] = d;
-                data[i + 1] = d;
+                data[i] = d * self.left;
+                data[i + 1] = d * self.right;
                 i += 2;
 
                 self.pos += self.inc;
+                self.megapos += self.inc;
                 match self.stage {
                     Stage::Attack(a) => {
                         self.vol += a;
@@ -266,8 +284,7 @@ impl StreamData {
 }
 
 pub struct Audio {
-    device: cpal::Device,
-    config: cpal::StreamConfig,
+    _device: cpal::Device,
     streams: [Stream; 4],
 }
 
@@ -284,7 +301,7 @@ impl Audio {
 
         let supported_config = supported_configs_range
             .find_map(|c| c.try_with_sample_rate(cpal::SampleRate(SAMPLE_RATE)))
-            .filter(|c| c.channels() == 2)
+            .filter(|c| c.channels() == CHANNELS)
             .expect("no supported config?");
         let config = supported_config.config();
 
@@ -306,14 +323,14 @@ impl Audio {
                 .expect("could not build stream");
             stream.play().unwrap();
             Stream {
-                stream,
+                _stream: stream,
+                done: stream_data[i].lock().unwrap().done.clone(),
                 data: stream_data[i].clone(),
             }
         });
 
         Audio {
-            device,
-            config,
+            _device: device,
             streams,
         }
     }
@@ -321,8 +338,7 @@ impl Audio {
     /// Push any relevant "note done" vectors to the event queue
     pub fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
         for (i, s) in self.streams.iter().enumerate() {
-            let mut s = s.data.lock().unwrap();
-            if std::mem::take(&mut s.done) {
+            if s.done.swap(false, Ordering::Relaxed) {
                 let p = vm.dev_i::<AudioPorts>(i);
                 let vector = p.vector.get();
                 if vector != 0 {
@@ -333,8 +349,8 @@ impl Audio {
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
-        let i = (target - AudioPorts::BASE) as usize / 0x10;
-        if target == AudioPorts::PITCH + i as u8 * 16 {
+        let (i, target) = Self::decode_target(target);
+        if target == AudioPorts::PITCH {
             let p = vm.dev_i::<AudioPorts>(i);
             if p.pitch.is_empty() {
                 let mut d = self.streams[i].data.lock().unwrap();
@@ -363,20 +379,24 @@ impl Audio {
 
                 let duration = p.duration();
 
+                let done = self.streams[i].done.clone();
+                done.store(false, Ordering::Relaxed);
                 *d = StreamData {
-                    index: i,
                     samples,
                     loop_sample: p.pitch.loop_sample(),
                     pos: 0.0,
+                    megapos: 0.0,
                     inc,
                     duration,
-                    done: false,
+                    done,
 
                     vol: if p.adsr.disabled() || attack.is_some() {
                         0.0
                     } else {
                         1.0
                     },
+                    left: p.volume.left(),
+                    right: p.volume.right(),
                     envelope: p.adsr,
                     stage: if let Some(a) = attack {
                         Stage::Attack(a)
@@ -388,11 +408,32 @@ impl Audio {
             }
         }
     }
+
     pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
-        let stream = (target - AudioPorts::BASE) as usize / 0x10;
+        let (i, target) = Self::decode_target(target);
+        let p = vm.dev_i_mut::<AudioPorts>(i);
+
+        // TODO: do we need the ability to read back DEI values without changing
+        // the existing values in device port memory?
         match target {
-            AudioPorts::PITCH => panic!(),
+            AudioPorts::POSITION_H => {
+                let pos = self.streams[i].data.lock().unwrap().pos as u16;
+                p.position = pos.into();
+            }
+            AudioPorts::POSITION_L => {
+                // We assume POSITION_H is read first, so this is already loaded
+            }
+            AudioPorts::VOLUME => {
+                let vol = self.streams[i].data.lock().unwrap().vol * 255.0;
+                p.volume = Volume(vol as u8);
+            }
             _ => (),
         }
+    }
+
+    /// Decodes a port address into an `(index, offset)` tuple
+    fn decode_target(target: u8) -> (usize, u8) {
+        let i = (target - AudioPorts::BASE) as usize / DEV_SIZE;
+        (i, target & 0xF)
     }
 }
