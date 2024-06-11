@@ -8,8 +8,8 @@ use crate::{
 use minifb::{
     MouseButton, MouseMode, Scale, Window as FbWindow, WindowOptions,
 };
-use uxn::{Ports, Uxn};
 use std::collections::VecDeque;
+use uxn::{Ports, Uxn};
 
 pub struct Window {
     pub screen: Screen,
@@ -19,6 +19,7 @@ pub struct Window {
 
     has_mouse: bool,
     has_controller: bool,
+    has_audio: bool,
     window: FbWindow,
     frame: u64,
 }
@@ -53,6 +54,7 @@ impl Window {
 
             has_mouse: false,
             has_controller: false,
+            has_audio: false,
             window,
         }
     }
@@ -100,6 +102,10 @@ impl Window {
                 queue.extend(self.controller.released(vm, k));
             }
         }
+
+        if self.has_audio {
+            self.audio.update(vm, queue);
+        }
     }
 
     /// Redraws the window and handles miscellaneous polling
@@ -146,6 +152,7 @@ impl Window {
 
             // The audio device manages four independent streams
             a if (AudioPorts::BASE..AudioPorts::BASE + 0x40).contains(&a) => {
+                self.has_audio = true;
                 self.audio.deo(vm, target)
             }
             _ => return false,
@@ -164,6 +171,7 @@ impl Window {
 
             // The audio device manages four independent streams
             a if (AudioPorts::BASE..AudioPorts::BASE + 0x40).contains(&a) => {
+                self.has_audio = true;
                 self.audio.dei(vm, target)
             }
             _ => return false,

@@ -1,5 +1,7 @@
+use crate::Event;
 use cpal::traits::StreamTrait;
 use std::{
+    collections::VecDeque,
     mem::offset_of,
     sync::{Arc, Mutex},
 };
@@ -170,11 +172,14 @@ struct StreamData {
 
     /// Set in the audio thread when the note is done
     done: bool,
+
+    index: usize,
 }
 
 impl Default for StreamData {
     fn default() -> Self {
         Self {
+            index: 0,
             samples: vec![],
             loop_sample: false,
             playing: false,
@@ -191,12 +196,12 @@ impl Default for StreamData {
 
 impl StreamData {
     fn next(&mut self, data: &mut [f32], _opt: &cpal::OutputCallbackInfo) {
+        if self.duration <= 0.0 {
+            self.done = true;
+        }
+        self.duration -= (data.len() / 2) as f32 / SAMPLE_RATE as f32 * 1000.0;
         if self.playing {
             let mut i = 0;
-            if self.duration <= 0.0 {
-                self.done = true;
-            }
-            self.duration -= data.len() as f32 / (SAMPLE_RATE as f32 * 1000.0);
 
             while i < data.len() {
                 let wrap = self.samples.len() as f32;
@@ -298,7 +303,7 @@ impl Audio {
                     None,
                 )
                 .expect("could not build stream");
-            stream.pause().unwrap();
+            stream.play().unwrap();
             Stream {
                 stream,
                 data: stream_data[i].clone(),
@@ -312,9 +317,22 @@ impl Audio {
         }
     }
 
+    /// Push any relevant "note done" vectors to the event queue
+    pub fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
+        for (i, s) in self.streams.iter().enumerate() {
+            let mut s = s.data.lock().unwrap();
+            if std::mem::take(&mut s.done) {
+                let p = vm.dev_i::<AudioPorts>(i);
+                let vector = p.vector.get();
+                if vector != 0 {
+                    queue.push_back(Event { data: None, vector });
+                }
+            }
+        }
+    }
+
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let i = (target - AudioPorts::BASE) as usize / 0x10;
-        println!("{i}");
         if target == AudioPorts::PITCH + i as u8 * 16 {
             let p = vm.dev_i::<AudioPorts>(i);
             if p.pitch.is_empty() {
@@ -330,51 +348,42 @@ impl Audio {
                     SAMPLE_RATE as f32 / MIDDLE_C
                 };
 
-                // Hold the lock for as short a time as possible
-                let was_playing = {
-                    let mut d = self.streams[i].data.lock().unwrap();
-                    let was_playing = d.playing;
+                let mut d = self.streams[i].data.lock().unwrap();
 
-                    // Copy the entire sample into RAM, reusing allocation
-                    let mut samples = std::mem::take(&mut d.samples);
-                    samples.clear();
-                    let base_addr = p.addr.get();
-                    for i in 0..len {
-                        samples.push(vm.ram_read_byte(base_addr + i));
-                    }
-                    let inc = TUNING[p.pitch.note() as usize] * sample_rate;
-                    let attack = p.adsr.attack();
-
-                    let duration = p.duration();
-
-                    *d = StreamData {
-                        samples,
-                        loop_sample: p.pitch.loop_sample(),
-                        pos: 0.0,
-                        inc,
-                        duration,
-                        done: false,
-
-                        vol: if p.adsr.disabled() || attack.is_some() {
-                            0.0
-                        } else {
-                            1.0
-                        },
-                        envelope: p.adsr,
-                        stage: if let Some(a) = attack {
-                            Stage::Attack(a)
-                        } else {
-                            Stage::Decay
-                        },
-                        playing: true,
-                    };
-                    was_playing
-                };
-                println!("   {was_playing}");
-
-                if !was_playing {
-                    self.streams[i].stream.play().unwrap();
+                // Copy the entire sample into RAM, reusing allocation
+                let mut samples = std::mem::take(&mut d.samples);
+                samples.clear();
+                let base_addr = p.addr.get();
+                for i in 0..len {
+                    samples.push(vm.ram_read_byte(base_addr + i));
                 }
+                let inc = TUNING[p.pitch.note() as usize] * sample_rate;
+                let attack = p.adsr.attack();
+
+                let duration = p.duration();
+
+                *d = StreamData {
+                    index: i,
+                    samples,
+                    loop_sample: p.pitch.loop_sample(),
+                    pos: 0.0,
+                    inc,
+                    duration,
+                    done: false,
+
+                    vol: if p.adsr.disabled() || attack.is_some() {
+                        0.0
+                    } else {
+                        1.0
+                    },
+                    envelope: p.adsr,
+                    stage: if let Some(a) = attack {
+                        Stage::Attack(a)
+                    } else {
+                        Stage::Decay
+                    },
+                    playing: true,
+                };
             }
         }
     }

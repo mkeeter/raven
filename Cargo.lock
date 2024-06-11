@@ -321,17 +321,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crow-gui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "env_logger",
- "raven-uxn",
- "raven-varvara",
-]
-
-[[package]]
 name = "dasp_sample"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -903,6 +892,17 @@ dependencies = [
 
 [[package]]
 name = "raven-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "env_logger",
+ "raven-uxn",
+ "raven-varvara",
+]
+
+[[package]]
+name = "raven-gui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
