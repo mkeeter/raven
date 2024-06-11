@@ -284,6 +284,7 @@ impl Audio {
 
         let supported_config = supported_configs_range
             .find_map(|c| c.try_with_sample_rate(cpal::SampleRate(SAMPLE_RATE)))
+            .filter(|c| c.channels() == 2)
             .expect("no supported config?");
         let config = supported_config.config();
 
