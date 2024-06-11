@@ -321,38 +321,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "crow"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "cpal",
- "log",
- "minifb",
- "raven",
- "static_assertions",
- "zerocopy",
-]
-
-[[package]]
-name = "crow-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "crow",
- "env_logger",
- "raven",
-]
-
-[[package]]
 name = "crow-gui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "crow",
  "env_logger",
- "raven",
+ "raven-uxn",
+ "raven-varvara",
 ]
 
 [[package]]
@@ -926,9 +902,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "raven"
+name = "raven-cli"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "clap",
+ "env_logger",
+ "raven-uxn",
+ "raven-varvara",
+]
+
+[[package]]
+name = "raven-uxn"
+version = "0.1.0"
+dependencies = [
+ "zerocopy",
+]
+
+[[package]]
+name = "raven-varvara"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cpal",
+ "log",
+ "minifb",
+ "raven-uxn",
+ "static_assertions",
  "zerocopy",
 ]
 

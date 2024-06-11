@@ -1,5 +1,5 @@
 [package]
-name = "crow"
+name = "raven-varvara"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,7 +12,7 @@ zerocopy.workspace = true
 cpal = { workspace = true, optional = true }
 minifb = { workspace = true, optional = true }
 
-raven.path = "../raven"
+uxn = { path = "../raven-uxn", package = "raven-uxn" }
 
 [features]
 default = ["gui"]

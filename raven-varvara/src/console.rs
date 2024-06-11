@@ -1,10 +1,10 @@
 use crate::Event;
-use raven::{Ports, Uxn};
 use std::{
     io::{Read, Write},
     mem::offset_of,
     sync::mpsc,
 };
+use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct Console {

@@ -8,5 +8,5 @@ anyhow.workspace = true
 clap.workspace = true
 env_logger.workspace = true
 
-raven.path = "../raven"
-crow.path = "../crow"
+uxn = { path = "../raven-uxn", package = "raven-uxn" }
+varvara = { path = "../raven-varvara", package = "raven-varvara" }

@@ -1,6 +1,6 @@
 use crate::Event;
 use minifb::Key;
-use raven::{Ports, Uxn};
+use uxn::{Ports, Uxn};
 use std::{collections::HashSet, mem::offset_of};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 

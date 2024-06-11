@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "crow",
-    "raven",
-    "crow-cli",
-    "crow-gui",
+    "raven-uxn",
+    "raven-varvara",
+    "raven-cli",
+    "raven-gui",
 ]
 
 [workspace.dependencies]
