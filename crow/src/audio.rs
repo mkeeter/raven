@@ -27,6 +27,19 @@ impl Ports for AudioPorts {
 
 impl AudioPorts {
     const PITCH: u8 = Self::BASE | offset_of!(Self, pitch) as u8;
+
+    fn duration(&self) -> f32 {
+        // No idea what's going on here; copied from the reference impl
+        let dur = self.duration.get();
+        if dur > 0 {
+            dur as f32
+        } else {
+            let len = self.length.get();
+            let pitch = self.pitch.note();
+            let scale = TUNING[pitch as usize] / TUNING[0x28];
+            len as f32 / (scale * 44.1)
+        }
+    }
 }
 
 const SAMPLE_RATE: u32 = 44100;
@@ -151,6 +164,12 @@ struct StreamData {
 
     /// Envelope
     envelope: Envelope,
+
+    /// Remaining time
+    duration: f32,
+
+    /// Set in the audio thread when the note is done
+    done: bool,
 }
 
 impl Default for StreamData {
@@ -161,9 +180,11 @@ impl Default for StreamData {
             playing: false,
             pos: 0.0,
             inc: 0.0,
+            duration: 0.0,
             stage: Stage::Attack(0.0),
             vol: 0.0,
             envelope: Envelope(0.into()),
+            done: false,
         }
     }
 }
@@ -172,6 +193,11 @@ impl StreamData {
     fn next(&mut self, data: &mut [f32], _opt: &cpal::OutputCallbackInfo) {
         if self.playing {
             let mut i = 0;
+            if self.duration <= 0.0 {
+                self.done = true;
+            }
+            self.duration -= data.len() as f32 / (SAMPLE_RATE as f32 * 1000.0);
+
             while i < data.len() {
                 let wrap = self.samples.len() as f32;
                 if self.pos >= wrap {
@@ -288,11 +314,13 @@ impl Audio {
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let i = (target - AudioPorts::BASE) as usize / 0x10;
+        println!("{i}");
         if target == AudioPorts::PITCH + i as u8 * 16 {
             let p = vm.dev_i::<AudioPorts>(i);
             if p.pitch.is_empty() {
                 let mut d = self.streams[i].data.lock().unwrap();
                 d.stage = Stage::Release;
+                d.duration = p.duration();
             } else {
                 // No idea what's going on here!
                 let len = p.length.get();
@@ -314,16 +342,18 @@ impl Audio {
                     for i in 0..len {
                         samples.push(vm.ram_read_byte(base_addr + i));
                     }
-                    // Not sure why the 2.0 is necessary, but it's required to
-                    // have the same behavior as the reference implementation
                     let inc = TUNING[p.pitch.note() as usize] * sample_rate;
                     let attack = p.adsr.attack();
+
+                    let duration = p.duration();
 
                     *d = StreamData {
                         samples,
                         loop_sample: p.pitch.loop_sample(),
                         pos: 0.0,
                         inc,
+                        duration,
+                        done: false,
 
                         vol: if p.adsr.disabled() || attack.is_some() {
                             0.0
