@@ -52,6 +52,7 @@ impl AudioPorts {
 
 const SAMPLE_RATE: u32 = 44100;
 const CHANNELS: u16 = 2;
+const CROSSFADE_COUNT: usize = 200;
 
 /// Decoder for the `adsr` port
 #[derive(Copy, Clone, Default, AsBytes, FromZeroes, FromBytes)]
@@ -158,6 +159,9 @@ struct StreamData {
     samples: Vec<u8>,
     loop_sample: bool,
 
+    /// Computed samples from the previous stream, for crossfading
+    crossfade: VecDeque<f32>,
+
     playing: bool,
 
     /// Position within the sample array, as a fraction
@@ -195,6 +199,7 @@ impl Default for StreamData {
     fn default() -> Self {
         Self {
             samples: vec![],
+            crossfade: VecDeque::new(),
             loop_sample: false,
             playing: false,
             pos: 0.0,
@@ -212,7 +217,7 @@ impl Default for StreamData {
 }
 
 impl StreamData {
-    fn next(&mut self, data: &mut [f32], _opt: &cpal::OutputCallbackInfo) {
+    fn next(&mut self, data: &mut [f32]) {
         self.duration -= (data.len() / 2) as f32 / SAMPLE_RATE as f32 * 1000.0;
         if self.duration <= 0.0 {
             self.done.store(true, Ordering::Relaxed);
@@ -243,6 +248,15 @@ impl StreamData {
 
                 data[i] = d * self.left;
                 data[i + 1] = d * self.right;
+
+                if !self.crossfade.is_empty() {
+                    let x = self.crossfade.len() as f32
+                        / (CROSSFADE_COUNT as f32 - 1.0);
+                    for j in 0..2 {
+                        let v = self.crossfade.pop_front().unwrap();
+                        data[i + j] = v * x + data[i + j] * (1.0 - x);
+                    }
+                }
                 i += 2;
 
                 self.pos += self.inc;
@@ -312,8 +326,8 @@ impl Audio {
             let stream = device
                 .build_output_stream(
                     &config,
-                    move |data: &mut [f32], opt: &cpal::OutputCallbackInfo| {
-                        d.lock().unwrap().next(data, opt);
+                    move |data: &mut [f32], _opt: &cpal::OutputCallbackInfo| {
+                        d.lock().unwrap().next(data);
                     },
                     move |err| {
                         panic!("{err}");
@@ -365,7 +379,14 @@ impl Audio {
                     SAMPLE_RATE as f32 / MIDDLE_C
                 };
 
+                // Compute a crossfade transition from the previous sample
+                // (this may just be all zeros, which is fine)
                 let mut d = self.streams[i].data.lock().unwrap();
+
+                // Populate crossfade samples by sampling the previous stream
+                let mut crossfade = std::mem::take(&mut d.crossfade);
+                crossfade.resize(CROSSFADE_COUNT, 0.0f32);
+                d.next(crossfade.make_contiguous());
 
                 // Copy the entire sample into RAM, reusing allocation
                 let mut samples = std::mem::take(&mut d.samples);
@@ -383,6 +404,7 @@ impl Audio {
                 done.store(false, Ordering::Relaxed);
                 *d = StreamData {
                     samples,
+                    crossfade,
                     loop_sample: p.pitch.loop_sample(),
                     pos: 0.0,
                     megapos: 0.0,
