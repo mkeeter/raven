@@ -36,6 +36,16 @@ impl AudioPorts {
     const POSITION_L: u8 = Self::POSITION_H + 1;
     const VOLUME: u8 = offset_of!(Self, volume) as u8;
 
+    fn dev<'a>(vm: &'a Uxn, i: usize) -> &'a Self {
+        let pos = Self::BASE + (i * DEV_SIZE) as u8;
+        vm.dev_at(pos)
+    }
+
+    fn dev_mut<'a>(vm: &'a mut Uxn, i: usize) -> &'a mut Self {
+        let pos = Self::BASE + (i * DEV_SIZE) as u8;
+        vm.dev_mut_at(pos)
+    }
+
     fn duration(&self) -> f32 {
         // No idea what's going on here; copied from the reference impl
         let dur = self.duration.get();
@@ -349,7 +359,7 @@ impl Audio {
     pub fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
         for (i, s) in self.streams.iter().enumerate() {
             if s.done.swap(false, Ordering::Relaxed) {
-                let p = vm.dev_i::<AudioPorts>(i);
+                let p = AudioPorts::dev(vm, i);
                 let vector = p.vector.get();
                 if vector != 0 {
                     queue.push_back(Event { data: None, vector });
@@ -361,7 +371,7 @@ impl Audio {
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let (i, target) = Self::decode_target(target);
         if target == AudioPorts::PITCH {
-            let p = vm.dev_i::<AudioPorts>(i);
+            let p = AudioPorts::dev(vm, i);
             if p.pitch.is_empty() {
                 let mut d = self.streams[i].data.lock().unwrap();
                 d.stage = Stage::Release;
@@ -428,7 +438,7 @@ impl Audio {
 
     pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
         let (i, target) = Self::decode_target(target);
-        let p = vm.dev_i_mut::<AudioPorts>(i);
+        let p = AudioPorts::dev_mut(vm, i);
 
         // TODO: do we need the ability to read back DEI values without changing
         // the existing values in device port memory?

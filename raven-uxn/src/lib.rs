@@ -364,53 +364,39 @@ impl<'a> Uxn<'a> {
 
     #[inline]
     fn check_dev_size<D: Ports>() {
-        struct AssertSize16<D>(D);
-        impl<D> AssertSize16<D> {
+        struct AssertDevSize<D>(D);
+        impl<D> AssertDevSize<D> {
             const ASSERT: () = if core::mem::size_of::<D>() != DEV_SIZE {
                 panic!("dev must be 16 bytes");
             };
         }
-        AssertSize16::<D>::ASSERT
+        AssertDevSize::<D>::ASSERT
     }
 
     /// Converts raw ports memory into a [`Ports`] object
     #[inline]
     pub fn dev<D: Ports>(&self) -> &D {
-        Self::check_dev_size::<D>();
-        D::ref_from(&self.dev[D::BASE as usize..][..core::mem::size_of::<D>()])
-            .unwrap()
+        self.dev_at(D::BASE)
     }
 
-    /// Returns a reference to a device within an array starting at `D::BASE`
+    /// Returns a reference to a device located at `pos`
     #[inline]
-    pub fn dev_i<D: Ports>(&self, i: usize) -> &D {
+    pub fn dev_at<D: Ports>(&self, pos: u8) -> &D {
         Self::check_dev_size::<D>();
-        D::ref_from(
-            &self.dev[D::BASE as usize + i * 0x10..]
-                [..core::mem::size_of::<D>()],
-        )
-        .unwrap()
+        D::ref_from(&self.dev[pos as usize..][..DEV_SIZE]).unwrap()
     }
 
-    /// Returns a reference to a device within an array starting at `D::BASE`
+    /// Returns a reference to a device located at `pos`
     #[inline]
-    pub fn dev_i_mut<D: Ports>(&mut self, i: usize) -> &mut D {
+    pub fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
         Self::check_dev_size::<D>();
-        D::mut_from(
-            &mut self.dev[D::BASE as usize + i * 0x10..]
-                [..core::mem::size_of::<D>()],
-        )
-        .unwrap()
+        D::mut_from(&mut self.dev[pos as usize..][..DEV_SIZE]).unwrap()
     }
 
     /// Returns a mutable reference to the given [`Ports`] object
     #[inline]
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
-        Self::check_dev_size::<D>();
-        D::mut_from(
-            &mut self.dev[usize::from(D::BASE)..][..core::mem::size_of::<D>()],
-        )
-        .unwrap()
+        self.dev_mut_at(D::BASE)
     }
 
     /// Writes to the given address in device memory
