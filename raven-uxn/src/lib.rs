@@ -1,6 +1,7 @@
 //! Uxn virtual machine
 #![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
+#![forbid(unsafe_code)]
 
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
