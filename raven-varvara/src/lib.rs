@@ -1,4 +1,5 @@
 //! The Varvara computer system
+#![warn(missing_docs)]
 use log::warn;
 use std::collections::VecDeque;
 
@@ -24,7 +25,7 @@ mod audio;
 
 use uxn::{Device, Ports, Uxn};
 
-pub struct Event {
+struct Event {
     /// Tuple of `(address, value)` to write in in device memory
     pub data: Option<(u8, u8)>,
 
@@ -82,6 +83,7 @@ impl Device for Varvara {
 }
 
 impl Varvara {
+    /// Builds a new instance of the Varvara peripherals
     pub fn new() -> Self {
         Self {
             console: console::Console::new(),
@@ -112,6 +114,7 @@ impl Varvara {
         }
     }
 
+    /// Runs in a loop that blocks on console events
     #[cfg(not(feature = "gui"))]
     pub fn run(&mut self, vm: &mut Uxn) {
         loop {
