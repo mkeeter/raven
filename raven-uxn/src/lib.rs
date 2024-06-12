@@ -1,5 +1,6 @@
 //! Uxn virtual machine
 #![cfg_attr(not(test), no_std)]
+#![warn(missing_docs)]
 
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
@@ -204,6 +205,7 @@ impl Stack {
         }
     }
 
+    /// Peeks at a byte from the data stack
     #[inline]
     pub fn peek_byte_at(&self, offset: u8) -> u8 {
         self.data[usize::from(self.index.wrapping_sub(offset))]
@@ -370,6 +372,7 @@ impl<'a> Uxn<'a> {
         AssertSize16::<D>::ASSERT
     }
 
+    /// Converts raw ports memory into a [`Ports`] object
     #[inline]
     pub fn dev<D: Ports>(&self) -> &D {
         Self::check_dev_size::<D>();
@@ -399,6 +402,7 @@ impl<'a> Uxn<'a> {
         .unwrap()
     }
 
+    /// Returns a mutable reference to the given [`Ports`] object
     #[inline]
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
         Self::check_dev_size::<D>();
@@ -408,6 +412,7 @@ impl<'a> Uxn<'a> {
         .unwrap()
     }
 
+    /// Writes to the given address in device memory
     #[inline]
     pub fn write_dev_mem(&mut self, addr: u8, value: u8) {
         self.dev[usize::from(addr)] = value;
@@ -465,6 +470,7 @@ impl<'a> Uxn<'a> {
         &mut self.ret
     }
 
+    /// Runs the VM starting at the given address until it terminates
     #[inline]
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) {
         loop {
@@ -1655,6 +1661,7 @@ mod ram {
     pub struct UxnRam(Box<[u8; 65536]>);
 
     impl UxnRam {
+        /// Builds a new zero-initialized RAM
         pub fn new() -> Self {
             UxnRam(Box::new([0u8; 65536]))
         }
