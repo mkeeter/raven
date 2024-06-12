@@ -5,7 +5,8 @@ This implementation is focused on speed, safety, and correctness.
 
 It is written in Rust as a `#[no_std]` crate, so it can used as part of a
 bare-metal system.  A `#![forbid(unsafe_code)]` annotation ensures that the
-crate only uses safe Rust, and the crate has no dependencies.
+crate only uses safe Rust, and the crate has only one dependency (
+[`zerocopy`](https://https://crates.io/crates/zerocopy)).
 
 ## Performance
 Running the

@@ -51,6 +51,7 @@ impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
     ///
     /// If `self.keep` is set, then only the view offset ([`StackView::offset`])
     /// is changed; otherwise, the stack index ([`Stack::index`]) is changed.
+    #[inline]
     fn pop(&mut self) -> Value {
         if short(FLAGS) {
             Value::Short(self.pop_short())
@@ -124,18 +125,21 @@ enum Value {
 }
 
 impl Value {
+    #[inline]
     fn wrapping_add(&self, i: u8) -> Self {
         match self {
             Value::Short(v) => Value::Short(v.wrapping_add(u16::from(i))),
             Value::Byte(v) => Value::Byte(v.wrapping_add(i)),
         }
     }
+    #[inline]
     fn wrapping_shr(&self, i: u32) -> Self {
         match self {
             Value::Short(v) => Value::Short(v.wrapping_shr(i)),
             Value::Byte(v) => Value::Byte(v.wrapping_shr(i)),
         }
     }
+    #[inline]
     fn wrapping_shl(&self, i: u32) -> Self {
         match self {
             Value::Short(v) => Value::Short(v.wrapping_shl(i)),

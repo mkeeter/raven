@@ -1,5 +1,5 @@
-use uxn::{Ports, Uxn};
 use std::mem::offset_of;
+use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct System {
