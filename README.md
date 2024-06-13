@@ -12,14 +12,25 @@ crate only uses safe Rust, and the crate has only one dependency (
 Running the
 [`mandelbrot.tal` demo](https://git.sr.ht/~rabbits/uxn/tree/main/item/projects/examples/demos/mandelbrot.tal)
 at max scale (`#0020`), `raven-gui` is about 20% faster than the `uxnemu`
-reference implementation: it calculates the fractal in 1.60 seconds, versus 2.03
+reference implementation: it calculates the fractal in 1.57 seconds, versus 2.03
 seconds for `uxnemu`.
 
 Calculating the first 35 Fibonnaci numbers using [`fib.tal`], `raven-cli` takes
 1.44 seconds (versus 1.65 seconds for `uxnemu`).
 
 ## Design
+The Uxn processor has 256 instructions.  This sounds like a lot, but – compared
+to a register machine – it's very few possibilities!
 
+`raven-uxn` implements each of the 256 instructions as functions, then runs a
+tight loop that dispatches based on opcode.  _Everything_ is inlined, so
+`Uxn::run` ends up being a single gigantic (11.4 KiB) function; this sounds like
+a lot, but it's only an average of 11 instructions per opcode.  Pervasive
+inlining means that all of our important data – stack pointers, offsets, etc –
+can be kept in registers, making the evaluation loop very efficient.
+
+The assembly is also hand-inspected for inefficiency and panics; `Uxn::run`
+currently has no panicking paths.
 
 # Varvara
 ## Devices

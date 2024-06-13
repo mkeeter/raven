@@ -3,22 +3,6 @@
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
 
-// NOTE: `u16::to/from_be_bytes` has suboptimal codegen that produces a bunch of
-// extra instructions; see https://godbolt.org/z/cTnaro7vj
-//
-// These are hand-rolled equivalent functions
-#[inline(always)]
-fn to_u16(hi: u8, lo: u8) -> u16 {
-    ((hi as u16) << 8) | (lo as u16)
-}
-
-#[inline(always)]
-fn from_u16(v: u16) -> [u8; 2] {
-    let hi = (v >> 8) as u8;
-    let lo = v as u8;
-    [hi, lo]
-}
-
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
 }
@@ -185,7 +169,7 @@ impl Stack {
     fn pop_short(&mut self) -> u16 {
         let lo = self.pop_byte();
         let hi = self.pop_byte();
-        to_u16(hi, lo)
+        u16::from_le_bytes([lo, hi])
     }
 
     #[inline]
@@ -201,7 +185,7 @@ impl Stack {
 
     #[inline]
     fn emplace_short(&mut self, v: u16) {
-        let [hi, lo] = from_u16(v);
+        let [lo, hi] = v.to_le_bytes();
         self.data[usize::from(self.index.wrapping_sub(1))] = hi;
         self.data[usize::from(self.index)] = lo;
     }
@@ -213,7 +197,7 @@ impl Stack {
 
     #[inline]
     fn push_short(&mut self, v: u16) {
-        let [hi, lo] = from_u16(v);
+        let [lo, hi] = v.to_le_bytes();
         self.push_byte(hi);
         self.push_byte(lo);
     }
@@ -236,7 +220,7 @@ impl Stack {
     fn peek_short_at(&self, offset: u8) -> u16 {
         let lo = self.peek_byte_at(offset);
         let hi = self.peek_byte_at(offset.wrapping_add(1));
-        to_u16(hi, lo)
+        u16::from_le_bytes([lo, hi])
     }
 
     /// Returns the number of items in the stack
@@ -334,14 +318,14 @@ impl<'a> Uxn<'a> {
     fn next2(&mut self, pc: &mut u16) -> u16 {
         let hi = self.next(pc);
         let lo = self.next(pc);
-        to_u16(hi, lo)
+        u16::from_le_bytes([lo, hi])
     }
 
     #[inline]
     fn ram_write(&mut self, addr: u16, v: Value) {
         match v {
             Value::Short(v) => {
-                let [hi, lo] = from_u16(v);
+                let [lo, hi] = v.to_le_bytes();
                 self.ram[usize::from(addr)] = hi;
                 self.ram[usize::from(addr.wrapping_add(1))] = lo;
             }
@@ -355,7 +339,7 @@ impl<'a> Uxn<'a> {
         if short(FLAGS) {
             let hi = self.ram[usize::from(addr)];
             let lo = self.ram[usize::from(addr.wrapping_add(1))];
-            Value::Short(to_u16(hi, lo))
+            Value::Short(u16::from_le_bytes([lo, hi]))
         } else {
             let v = self.ram[usize::from(addr)];
             Value::Byte(v)
@@ -450,7 +434,7 @@ impl<'a> Uxn<'a> {
     pub fn ram_read_word(&self, addr: u16) -> u16 {
         let hi = self.ram[addr as usize];
         let lo = self.ram[addr.wrapping_add(1) as usize];
-        to_u16(hi, lo)
+        u16::from_le_bytes([lo, hi])
     }
 
     /// Shared borrow of the working stack
@@ -1412,7 +1396,7 @@ mod op {
             let j = i.wrapping_add(1);
             dev.dei(vm, j);
             let lo = vm.dev[j as usize];
-            Value::Short(to_u16(hi, lo))
+            Value::Short(u16::from_le_bytes([lo, hi]))
         } else {
             s.reserve(1);
             dev.dei(vm, i);
@@ -1440,7 +1424,7 @@ mod op {
         let i = s.pop_byte();
         match s.pop() {
             Value::Short(v) => {
-                let [hi, lo] = from_u16(v);
+                let [lo, hi] = v.to_le_bytes();
                 let j = i.wrapping_add(1);
                 vm.dev[i as usize] = hi;
                 dev.deo(vm, i);
