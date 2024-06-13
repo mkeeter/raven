@@ -15,6 +15,9 @@ at max scale (`#0020`), `raven-gui` is about 20% faster than the `uxnemu`
 reference implementation: it calculates the fractal in 1.60 seconds, versus 2.03
 seconds for `uxnemu`.
 
+Calculating the first 35 Fibonnaci numbers using [`fib.tal`], `raven-cli` takes
+1.44 seconds (versus 1.65 seconds for `uxnemu`).
+
 ## Design
 
 
