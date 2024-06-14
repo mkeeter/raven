@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     let mut ram = UxnRam::new();
     let mut vm = Uxn::new(&rom, &mut ram);
     let mut dev = Varvara::new();
-    let mut start = std::time::Instant::now();
+    let start = std::time::Instant::now();
     vm.run(&mut dev, 0x100);
     println!("{:?}", start.elapsed());
     dev.run(&mut vm);

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+cpal.workspace = true
 env_logger.workspace = true
 
 uxn = { path = "../raven-uxn", package = "raven-uxn" }

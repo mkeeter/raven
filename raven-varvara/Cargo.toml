@@ -9,11 +9,10 @@ log.workspace = true
 static_assertions.workspace = true
 zerocopy.workspace = true
 
-cpal = { workspace = true, optional = true }
 minifb = { workspace = true, optional = true }
 
 uxn = { path = "../raven-uxn", package = "raven-uxn" }
 
 [features]
 default = ["gui"]
-gui = ["dep:minifb", "dep:cpal"]
+gui = ["dep:minifb"]

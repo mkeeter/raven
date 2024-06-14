@@ -1,5 +1,4 @@
 use crate::{
-    audio::{Audio, AudioPorts},
     controller::{Controller, ControllerPorts},
     mouse::{Mouse, MousePorts},
     screen::{Screen, ScreenPorts},
@@ -15,11 +14,9 @@ pub struct Window {
     pub screen: Screen,
     pub mouse: Mouse,
     pub controller: Controller,
-    pub audio: Audio,
 
     has_mouse: bool,
     has_controller: bool,
-    has_audio: bool,
     window: FbWindow,
     frame: u64,
 }
@@ -31,7 +28,6 @@ impl Window {
         const HEIGHT: u16 = 320;
         let screen = Screen::new(WIDTH, HEIGHT);
         let mouse = Mouse::new();
-        let audio = Audio::new();
 
         let mut window = FbWindow::new(
             APP_NAME,
@@ -48,13 +44,11 @@ impl Window {
         Self {
             screen,
             mouse,
-            audio,
             controller: Controller::default(),
             frame: 0,
 
             has_mouse: false,
             has_controller: false,
-            has_audio: false,
             window,
         }
     }
@@ -102,10 +96,6 @@ impl Window {
                 queue.extend(self.controller.released(vm, k));
             }
         }
-
-        if self.has_audio {
-            self.audio.update(vm, queue);
-        }
     }
 
     /// Redraws the window and handles miscellaneous polling
@@ -150,11 +140,6 @@ impl Window {
             MousePorts::BASE => self.set_mouse(),
             ControllerPorts::BASE => self.has_controller = true,
 
-            // The audio device manages four independent streams
-            a if (AudioPorts::BASE..AudioPorts::BASE + 0x40).contains(&a) => {
-                self.has_audio = true;
-                self.audio.deo(vm, target)
-            }
             _ => return false,
         }
         true
@@ -169,11 +154,6 @@ impl Window {
             MousePorts::BASE => self.set_mouse(),
             ControllerPorts::BASE => self.has_controller = true,
 
-            // The audio device manages four independent streams
-            a if (AudioPorts::BASE..AudioPorts::BASE + 0x40).contains(&a) => {
-                self.has_audio = true;
-                self.audio.dei(vm, target)
-            }
             _ => return false,
         }
         true

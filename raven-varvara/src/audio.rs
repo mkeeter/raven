@@ -1,5 +1,4 @@
 use crate::Event;
-use cpal::traits::StreamTrait;
 use std::{
     collections::VecDeque,
     mem::offset_of,
@@ -11,7 +10,7 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
-pub struct AudioPorts {
+pub(crate) struct AudioPorts {
     vector: U16<BigEndian>,
     position: U16<BigEndian>,
     output: u8,
@@ -35,6 +34,11 @@ impl AudioPorts {
     const POSITION_H: u8 = offset_of!(Self, position) as u8;
     const POSITION_L: u8 = Self::POSITION_H + 1;
     const VOLUME: u8 = offset_of!(Self, volume) as u8;
+
+    /// Checks whether the given value is in the audio ports memory space
+    pub(crate) fn matches(t: u8) -> bool {
+        (Self::BASE..Self::BASE + 0x40).contains(&t)
+    }
 
     fn dev<'a>(vm: &'a Uxn, i: usize) -> &'a Self {
         let pos = Self::BASE + (i * DEV_SIZE) as u8;
@@ -60,8 +64,12 @@ impl AudioPorts {
     }
 }
 
-const SAMPLE_RATE: u32 = 44100;
-const CHANNELS: u16 = 2;
+/// Expected audio sample rate
+pub const SAMPLE_RATE: u32 = 44100;
+
+/// Expected number of audio channels
+pub const CHANNELS: u16 = 2;
+
 const CROSSFADE_COUNT: usize = 200;
 
 /// Decoder for the `adsr` port
@@ -152,7 +160,6 @@ const TUNING: [f32; 109] = [
 const MIDDLE_C: f32 = 261.6;
 
 struct Stream {
-    _stream: cpal::Stream,
     done: Arc<AtomicBool>,
     data: Arc<Mutex<StreamData>>,
 }
@@ -165,7 +172,8 @@ enum Stage {
     Release,
 }
 
-struct StreamData {
+/// Handle into an audio stream
+pub struct StreamData {
     samples: Vec<u8>,
     loop_sample: bool,
 
@@ -224,7 +232,8 @@ impl Default for StreamData {
 }
 
 impl StreamData {
-    fn next(&mut self, data: &mut [f32]) {
+    /// Fills the buffer with stream data
+    pub fn next(&mut self, data: &mut [f32]) {
         self.duration -= (data.len() / 2) as f32 / SAMPLE_RATE as f32 * 1000.0;
         if self.duration <= 0.0 {
             self.done.store(true, Ordering::Relaxed);
@@ -303,60 +312,24 @@ impl StreamData {
     }
 }
 
-pub struct Audio {
-    _device: cpal::Device,
+pub(crate) struct Audio {
     streams: [Stream; 4],
 }
 
 impl Audio {
-    pub fn new() -> Self {
-        use cpal::traits::{DeviceTrait, HostTrait};
-        let host = cpal::default_host();
-        let device = host
-            .default_output_device()
-            .expect("no output device available");
-        let mut supported_configs_range = device
-            .supported_output_configs()
-            .expect("error while querying configs");
-
-        let supported_config = supported_configs_range
-            .find_map(|c| c.try_with_sample_rate(cpal::SampleRate(SAMPLE_RATE)))
-            .filter(|c| c.channels() == CHANNELS)
-            .expect("no supported config?");
-        let config = supported_config.config();
-
+    pub(crate) fn new() -> Self {
         let stream_data =
             [(); 4].map(|_| Arc::new(Mutex::new(StreamData::default())));
-        let streams = [0, 1, 2, 3].map(|i| {
-            let d = stream_data[i].clone();
-            let stream = device
-                .build_output_stream(
-                    &config,
-                    move |data: &mut [f32], _opt: &cpal::OutputCallbackInfo| {
-                        d.lock().unwrap().next(data);
-                    },
-                    move |err| {
-                        panic!("{err}");
-                    },
-                    None,
-                )
-                .expect("could not build stream");
-            stream.play().unwrap();
-            Stream {
-                _stream: stream,
-                done: stream_data[i].lock().unwrap().done.clone(),
-                data: stream_data[i].clone(),
-            }
+        let streams = [0, 1, 2, 3].map(|i| Stream {
+            done: stream_data[i].lock().unwrap().done.clone(),
+            data: stream_data[i].clone(),
         });
 
-        Audio {
-            _device: device,
-            streams,
-        }
+        Audio { streams }
     }
 
     /// Push any relevant "note done" vectors to the event queue
-    pub fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
+    pub(crate) fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
         for (i, s) in self.streams.iter().enumerate() {
             if s.done.swap(false, Ordering::Relaxed) {
                 let p = AudioPorts::dev(vm, i);
@@ -368,7 +341,7 @@ impl Audio {
         }
     }
 
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub(crate) fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let (i, target) = Self::decode_target(target);
         if target == AudioPorts::PITCH {
             let p = AudioPorts::dev(vm, i);
@@ -436,7 +409,7 @@ impl Audio {
         }
     }
 
-    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub(crate) fn dei(&mut self, vm: &mut Uxn, target: u8) {
         let (i, target) = Self::decode_target(target);
         let p = AudioPorts::dev_mut(vm, i);
 
@@ -462,5 +435,10 @@ impl Audio {
     fn decode_target(target: u8) -> (usize, u8) {
         let i = (target - AudioPorts::BASE) as usize / DEV_SIZE;
         (i, target & 0xF)
+    }
+
+    /// Returns a handle to the given stream data
+    pub(crate) fn stream(&self, i: usize) -> Arc<Mutex<StreamData>> {
+        self.streams[i].data.clone()
     }
 }

@@ -36,7 +36,8 @@ currently has no panicking paths.
 ## Devices
 ### Audio
 #### Implementation notes
-The reference implementation is very different from the specification!
+The reference implementation is very different from the specification; we
+attempt to match the behavior of the reference implementation.
 
 ### Datetime
 #### Limitations

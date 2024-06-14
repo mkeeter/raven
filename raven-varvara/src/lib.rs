@@ -1,7 +1,10 @@
 //! The Varvara computer system
 #![warn(missing_docs)]
 use log::warn;
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 mod console;
 mod datetime;
@@ -20,8 +23,8 @@ mod window;
 #[cfg(feature = "gui")]
 mod controller;
 
-#[cfg(feature = "gui")]
-mod audio;
+/// Audio handler implementation
+pub mod audio;
 
 use uxn::{Device, Ports, Uxn};
 
@@ -38,6 +41,8 @@ pub struct Varvara {
     system: system::System,
     console: console::Console,
     datetime: datetime::Datetime,
+    audio: audio::Audio,
+
     #[cfg(feature = "gui")]
     window: window::Window,
 
@@ -59,6 +64,7 @@ impl Device for Varvara {
             system::SystemPorts::BASE => self.system.deo(vm, target),
             console::ConsolePorts::BASE => self.console.deo(vm, target),
             datetime::DatetimePorts::BASE => self.datetime.deo(vm, target),
+            a if audio::AudioPorts::matches(a) => self.audio.deo(vm, target),
 
             #[cfg(feature = "gui")]
             _ if self.window.deo(vm, target) => (), // window handler
@@ -72,6 +78,7 @@ impl Device for Varvara {
             system::SystemPorts::BASE => self.system.dei(vm, target),
             console::ConsolePorts::BASE => self.console.dei(vm, target),
             datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
+            a if audio::AudioPorts::matches(a) => self.audio.dei(vm, target),
 
             #[cfg(feature = "gui")]
             _ if self.window.dei(vm, target) => (), // window handler
@@ -89,6 +96,7 @@ impl Varvara {
             console: console::Console::new(),
             system: system::System::default(),
             datetime: datetime::Datetime,
+            audio: audio::Audio::new(),
             #[cfg(feature = "gui")]
             window: window::Window::new(),
 
@@ -110,6 +118,7 @@ impl Varvara {
         while self.window.redraw(vm) {
             self.queue.extend(self.console.poll(vm));
             self.window.update(vm, &mut self.queue);
+            self.audio.update(vm, &mut self.queue);
             self.process_events(vm);
         }
     }
@@ -130,5 +139,13 @@ impl Varvara {
             }
             vm.run(self, e.vector);
         }
+    }
+
+    /// Returns a handle to the given audio stream data
+    ///
+    /// # Panics
+    /// There are only four audio streams, so this function panics if `i >= 4`
+    pub fn audio_stream(&self, i: usize) -> Arc<Mutex<audio::StreamData>> {
+        self.audio.stream(i)
     }
 }
