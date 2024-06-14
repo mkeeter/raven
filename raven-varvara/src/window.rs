@@ -74,7 +74,8 @@ impl Window {
         if self.has_mouse {
             let mouse_pos =
                 self.window.get_mouse_pos(MouseMode::Clamp).unwrap();
-            let mouse_scroll = self.window.get_scroll_wheel();
+            let mouse_scroll =
+                self.window.get_scroll_wheel().unwrap_or((0.0, 0.0));
             let buttons =
                 [MouseButton::Left, MouseButton::Middle, MouseButton::Right]
                     .into_iter()

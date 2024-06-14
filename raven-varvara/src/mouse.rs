@@ -37,7 +37,7 @@ impl Mouse {
         &mut self,
         vm: &mut Uxn,
         pos: (f32, f32),
-        scroll: Option<(f32, f32)>,
+        scroll: (f32, f32),
         buttons: u8,
     ) -> Option<u16> {
         let mut changed = false;
@@ -50,10 +50,8 @@ impl Mouse {
             self.pos = pos;
         }
 
-        if let Some((sx, sy)) = scroll {
-            self.scroll_x += sx;
-            self.scroll_y += sy;
-        }
+        self.scroll_x += scroll.0;
+        self.scroll_y += scroll.1;
 
         // Send scrolls as one-tick updates on a per-frame basis
         if self.scroll_x > 1.0 {
