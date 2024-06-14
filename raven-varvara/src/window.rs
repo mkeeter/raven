@@ -1,6 +1,6 @@
 use crate::{
     controller::{Controller, ControllerPorts},
-    mouse::{Mouse, MousePorts},
+    mouse::{Mouse, MousePorts, MouseState},
     screen::{Screen, ScreenPorts},
     Event,
 };
@@ -61,6 +61,22 @@ impl Window {
         }
     }
 
+    fn mouse_state(window: &FbWindow) -> MouseState {
+        let pos = window.get_mouse_pos(MouseMode::Clamp).unwrap();
+        let scroll = window.get_scroll_wheel().unwrap_or((0.0, 0.0));
+        let buttons =
+            [MouseButton::Left, MouseButton::Middle, MouseButton::Right]
+                .into_iter()
+                .enumerate()
+                .map(|(i, b)| (window.get_mouse_down(b) as u8) << i)
+                .fold(0, |a, b| a | b);
+        MouseState {
+            pos,
+            scroll,
+            buttons,
+        }
+    }
+
     pub fn update(&mut self, vm: &mut Uxn, queue: &mut VecDeque<Event>) {
         // The screen vector should be called every other frame, since we do
         // updates at ~120 FPS
@@ -72,19 +88,8 @@ impl Window {
 
         // The mouse vector should be called if it changed
         if self.has_mouse {
-            let mouse_pos =
-                self.window.get_mouse_pos(MouseMode::Clamp).unwrap();
-            let mouse_scroll =
-                self.window.get_scroll_wheel().unwrap_or((0.0, 0.0));
-            let buttons =
-                [MouseButton::Left, MouseButton::Middle, MouseButton::Right]
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, b)| (self.window.get_mouse_down(b) as u8) << i)
-                    .fold(0, |a, b| a | b);
-            if let Some(vector) =
-                self.mouse.update(vm, mouse_pos, mouse_scroll, buttons)
-            {
+            let state = Self::mouse_state(&self.window);
+            if let Some(vector) = self.mouse.update(vm, state) {
                 queue.push_back(Event { vector, data: None });
             }
         }

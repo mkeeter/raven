@@ -19,12 +19,30 @@ impl Ports for MousePorts {
     const BASE: u8 = 0x90;
 }
 
+/// Stored mouse state
 #[derive(Default)]
-pub struct Mouse {
+pub(crate) struct Mouse {
+    /// Current position
     pos: (f32, f32),
-    scroll_x: f32,
-    scroll_y: f32,
+
+    /// Accumulated scroll values, used for fractional scrolling
+    scroll: (f32, f32),
+
+    /// Bitfield of button state (bit 0: left, bit 1: middle, bit 2: right)
     buttons: u8,
+}
+
+/// Update to mouse state
+#[derive(Default)]
+pub struct MouseState {
+    /// Current position
+    pub pos: (f32, f32),
+
+    /// Accumulated scroll values, used for fractional scrolling
+    pub scroll: (f32, f32),
+
+    /// Bitfield of button state (bit 0: left, bit 1: middle, bit 2: right)
+    pub buttons: u8,
 }
 
 impl Mouse {
@@ -33,50 +51,44 @@ impl Mouse {
     }
 
     /// Updates the internal mouse state, return the vector if state has changed
-    pub fn update(
-        &mut self,
-        vm: &mut Uxn,
-        pos: (f32, f32),
-        scroll: (f32, f32),
-        buttons: u8,
-    ) -> Option<u16> {
+    pub fn update(&mut self, vm: &mut Uxn, state: MouseState) -> Option<u16> {
         let mut changed = false;
         let m = vm.dev_mut::<MousePorts>();
 
-        if pos != self.pos {
-            m.x.set(pos.0 as u16);
-            m.y.set(pos.1 as u16);
+        if state.pos != self.pos {
+            m.x.set(state.pos.0 as u16);
+            m.y.set(state.pos.1 as u16);
             changed = true;
-            self.pos = pos;
+            self.pos = state.pos;
         }
 
-        self.scroll_x += scroll.0;
-        self.scroll_y += scroll.1;
+        self.scroll.0 += state.scroll.0;
+        self.scroll.1 += state.scroll.1;
 
         // Send scrolls as one-tick updates on a per-frame basis
-        if self.scroll_x > 1.0 {
+        if self.scroll.0 > 1.0 {
             changed = true;
             m.scroll_x.set(1);
-            self.scroll_x -= 1.0;
-        } else if self.scroll_x < -1.0 {
+            self.scroll.0 -= 1.0;
+        } else if self.scroll.0 < -1.0 {
             changed = true;
             m.scroll_x.set(0xFFFF);
-            self.scroll_x += 1.0;
+            self.scroll.0 += 1.0;
         }
-        if self.scroll_y > 1.0 {
+        if self.scroll.1 > 1.0 {
             changed = true;
             m.scroll_y.set(1);
-            self.scroll_y -= 1.0;
-        } else if self.scroll_y < -1.0 {
+            self.scroll.1 -= 1.0;
+        } else if self.scroll.1 < -1.0 {
             changed = true;
             m.scroll_y.set(0xFFFF);
-            self.scroll_y += 1.0;
+            self.scroll.1 += 1.0;
         }
 
-        if buttons != self.buttons {
-            m.state = buttons;
+        if state.buttons != self.buttons {
+            m.state = state.buttons;
             changed = true;
-            self.buttons = buttons;
+            self.buttons = state.buttons;
         }
 
         if changed {

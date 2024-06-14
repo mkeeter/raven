@@ -28,12 +28,40 @@ pub mod audio;
 
 use uxn::{Device, Ports, Uxn};
 
+/// Internal events, accumulated by devices then applied to the CPU
 struct Event {
     /// Tuple of `(address, value)` to write in in device memory
     pub data: Option<(u8, u8)>,
 
     /// Vector to trigger
     pub vector: u16,
+}
+
+/// Input to [`Varvara::update`], including all incoming events
+pub struct Input {
+    /// Current mouse state
+    pub mouse: mouse::MouseState,
+
+    /// Keys pressed
+    pub pressed: Vec<minifb::Key>,
+
+    /// Keys released
+    pub released: Vec<minifb::Key>,
+
+    /// Incoming console character
+    pub console: Option<u8>,
+}
+
+/// Output from [`Varvara::update`], which may modify the GUI
+pub struct Output {
+    /// The window has been programmatically resized
+    pub resized: Option<(u16, u16)>,
+
+    /// The system's mouse cursor should be hidden
+    pub hide_mouse: bool,
+
+    /// Outgoing console characters
+    pub console: Vec<u8>,
 }
 
 /// Handle to the Varvara system
