@@ -3,6 +3,7 @@ use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct System {
+    exit: Option<i32>,
     banks: [Box<[u8; 65536]>; 15],
 }
 
@@ -59,7 +60,6 @@ impl SystemPorts {
     const STATE: u8 = offset_of!(Self, state) as u8;
 
     /// Looks up the color for the given index
-    #[cfg(feature = "gui")]
     pub fn color(&self, i: u8) -> u32 {
         let i = 3 - i;
         let r = (self.red.get() >> (i * 4)) as u32 & 0xF;
@@ -79,7 +79,7 @@ mod expansion {
 impl System {
     fn new() -> Self {
         let banks = [(); 15].map(|_| Box::new([0u8; 65536]));
-        Self { banks }
+        Self { banks, exit: None }
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
@@ -168,7 +168,7 @@ impl System {
             }
             SystemPorts::STATE => {
                 if v.state != 0 {
-                    std::process::exit((v.state & !0x80) as i32);
+                    self.exit = Some((v.state & !0x80) as i32);
                 }
             }
             _ => (),
@@ -187,5 +187,15 @@ impl System {
             }
             _ => (),
         }
+    }
+
+    /// Returns `true` if the exit flag is set
+    pub fn should_exit(&self) -> bool {
+        self.exit.is_some()
+    }
+
+    /// Clears and returns the exit code (if present)
+    pub fn exit(&mut self) -> Option<i32> {
+        self.exit.take()
     }
 }

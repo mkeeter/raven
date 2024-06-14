@@ -30,10 +30,30 @@ fn main() -> Result<()> {
     let mut ram = UxnRam::new();
     let mut vm = Uxn::new(&rom, &mut ram);
     let mut dev = Varvara::new();
-    let start = std::time::Instant::now();
+
+    // Run the reset vector
     vm.run(&mut dev, 0x100);
-    println!("{:?}", start.elapsed());
-    dev.run(&mut vm);
+
+    // Dummy update to get any console messages printed during startup
+    let out = dev.update(&mut vm, Default::default());
+    out.print()?;
+    if let Some(e) = out.exit {
+        std::process::exit(e);
+    }
+
+    // Blocking loop, listening to the stdin reader thread
+    let rx = varvara::console_worker();
+    while let Ok(c) = rx.recv() {
+        let i = varvara::Input {
+            console: Some(c),
+            ..Default::default()
+        };
+        let out = dev.update(&mut vm, i);
+        out.print()?;
+        if let Some(e) = out.exit {
+            std::process::exit(e);
+        }
+    }
 
     Ok(())
 }

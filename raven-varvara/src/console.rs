@@ -1,14 +1,11 @@
 use crate::Event;
-use std::{
-    io::{Read, Write},
-    mem::offset_of,
-    sync::mpsc,
-};
+use std::{collections::VecDeque, io::Read, mem::offset_of, sync::mpsc};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 pub struct Console {
-    rx: mpsc::Receiver<u8>,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
 }
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
@@ -35,46 +32,40 @@ impl ConsolePorts {
     const ERROR: u8 = Self::BASE | offset_of!(Self, error) as u8;
 }
 
-impl Console {
-    pub fn new() -> Self {
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let mut i = std::io::stdin().lock();
-            let mut buf = [0u8; 32];
-            loop {
-                let n = i.read(&mut buf).unwrap();
-                for &c in &buf[..n] {
-                    if tx.send(c).is_err() {
-                        return;
-                    }
+/// Spawns a worker thread that listens on `stdin` and emits characters
+pub fn worker() -> mpsc::Receiver<u8> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut i = std::io::stdin().lock();
+        let mut buf = [0u8; 32];
+        loop {
+            let n = i.read(&mut buf).unwrap();
+            for &c in &buf[..n] {
+                if tx.send(c).is_err() {
+                    return;
                 }
             }
-        });
-        Self { rx }
-    }
+        }
+    });
+    rx
+}
 
-    /// Checks whether a callback is ready
-    #[must_use]
-    pub fn event(&mut self, vm: &mut Uxn, c: u8) -> Event {
-        let p = vm.dev_mut::<ConsolePorts>();
-        p.read = c;
-        p.type_ = 1;
-        let vector = p.vector.get();
-        Event { vector, data: None }
+impl Console {
+    pub fn new() -> Self {
+        Self {
+            stdout: vec![],
+            stderr: vec![],
+        }
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<ConsolePorts>();
         match target {
             ConsolePorts::WRITE => {
-                let mut out = std::io::stdout().lock();
-                out.write_all(&[v.write]).unwrap();
-                out.flush().unwrap();
+                self.stdout.push(v.write);
             }
             ConsolePorts::ERROR => {
-                let mut out = std::io::stderr().lock();
-                out.write_all(&[v.write]).unwrap();
-                out.flush().unwrap();
+                self.stderr.push(v.error);
             }
             _ => (),
         }
@@ -83,15 +74,21 @@ impl Console {
         // Nothing to do here; data is pre-populated in `vm.dev` memory
     }
 
-    #[cfg(feature = "gui")]
-    #[must_use]
-    pub fn poll(&mut self, vm: &mut Uxn) -> Option<Event> {
-        self.rx.try_recv().map(|c| self.event(vm, c)).ok()
+    pub fn update(&mut self, vm: &mut Uxn, c: u8, queue: &mut VecDeque<Event>) {
+        let p = vm.dev_mut::<ConsolePorts>();
+        p.read = c;
+        p.type_ = 1; // TODO arguments
+        let vector = p.vector.get();
+        queue.push_back(Event { vector, data: None })
     }
 
-    #[cfg(not(feature = "gui"))]
-    #[must_use]
-    pub fn block(&mut self, vm: &mut Uxn) -> Option<Event> {
-        self.rx.try_recv().map(|c| self.event(vm, c)).ok()
+    /// Takes the `stderr` buffer, leaving it empty
+    pub fn stdout(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.stdout)
+    }
+
+    /// Takes the `stderr` buffer, leaving it empty
+    pub fn stderr(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.stderr)
     }
 }

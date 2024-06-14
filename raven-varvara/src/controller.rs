@@ -1,5 +1,8 @@
 use crate::Event;
-use std::{collections::HashSet, mem::offset_of};
+use std::{
+    collections::{HashSet, VecDeque},
+    mem::offset_of,
+};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -47,18 +50,27 @@ pub enum Key {
 }
 
 impl Controller {
+    /// Builds a new controller with no keys held
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Checks whether either shift key is held
     pub fn shift_held(&self) -> bool {
         self.down.contains(&Key::LeftShift)
             | self.down.contains(&Key::RightShift)
     }
 
-    /// Send the given key event, returning a vector [`Event`]
-    #[must_use]
-    pub fn pressed(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
+    /// Send the given key event, appending an event to the queue if needed
+    pub fn pressed(
+        &mut self,
+        vm: &mut Uxn,
+        k: Key,
+        queue: &mut VecDeque<Event>,
+    ) {
         self.down.insert(k);
 
-        match k {
+        let e = match k {
             Key::Char(c) => {
                 let p = vm.dev::<ControllerPorts>();
                 Some(Event {
@@ -67,15 +79,21 @@ impl Controller {
                 })
             }
             _ => self.check_buttons(vm),
-        }
+        };
+        queue.extend(e);
     }
 
     /// Indicate that the given key has been released
     ///
-    /// This may change our button state and return an [`Event`]
-    pub fn released(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
+    /// This may change our button state and push an [`Event`] to the queue
+    pub fn released(
+        &mut self,
+        vm: &mut Uxn,
+        k: Key,
+        queue: &mut VecDeque<Event>,
+    ) {
         self.down.remove(&k);
-        self.check_buttons(vm)
+        queue.extend(self.check_buttons(vm));
     }
 
     fn check_buttons(&mut self, vm: &mut Uxn) -> Option<Event> {

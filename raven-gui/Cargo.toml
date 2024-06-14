@@ -8,6 +8,7 @@ anyhow.workspace = true
 clap.workspace = true
 cpal.workspace = true
 env_logger.workspace = true
+minifb.workspace = true
 
 uxn = { path = "../raven-uxn", package = "raven-uxn" }
 varvara = { path = "../raven-varvara", package = "raven-varvara" }

@@ -909,6 +909,7 @@ dependencies = [
  "clap",
  "cpal",
  "env_logger",
+ "minifb",
  "raven-uxn",
  "raven-varvara",
 ]
@@ -926,7 +927,6 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "log",
- "minifb",
  "raven-uxn",
  "static_assertions",
  "zerocopy",

@@ -1422,21 +1422,26 @@ mod op {
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
         let i = s.pop_byte();
+        let mut halt = false;
         match s.pop() {
             Value::Short(v) => {
                 let [lo, hi] = v.to_le_bytes();
                 let j = i.wrapping_add(1);
                 vm.dev[i as usize] = hi;
-                dev.deo(vm, i);
+                halt |= dev.deo(vm, i);
                 vm.dev[j as usize] = lo;
-                dev.deo(vm, j);
+                halt |= dev.deo(vm, j);
             }
             Value::Byte(v) => {
                 vm.dev[i as usize] = v;
-                dev.deo(vm, i);
+                halt |= dev.deo(vm, i);
             }
         }
-        Some(pc)
+        if halt {
+            None
+        } else {
+            Some(pc)
+        }
     }
 
     /// Add
@@ -1619,7 +1624,11 @@ pub trait Device {
     ///
     /// The input byte (if any) will be read from `vm.dev[target]`, and must be
     /// stored before this function is called.
-    fn deo(&mut self, vm: &mut Uxn, target: u8);
+    ///
+    /// Returns `true` if the CPU should keep running, `false` if it should
+    /// exit.
+    #[must_use]
+    fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool;
 }
 
 /// Trait for a type which can be cast to a device ports `struct`
@@ -1636,8 +1645,9 @@ impl Device for EmptyDevice {
     fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
         // nothing to do here
     }
-    fn deo(&mut self, _vm: &mut Uxn, _target: u8) {
-        // nothing to do here
+    fn deo(&mut self, _vm: &mut Uxn, _target: u8) -> bool {
+        // nothing to do here, keep running
+        true
     }
 }
 

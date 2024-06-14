@@ -10,7 +10,7 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
 #[repr(C)]
-pub(crate) struct AudioPorts {
+pub struct AudioPorts {
     vector: U16<BigEndian>,
     position: U16<BigEndian>,
     output: u8,
@@ -36,7 +36,7 @@ impl AudioPorts {
     const VOLUME: u8 = offset_of!(Self, volume) as u8;
 
     /// Checks whether the given value is in the audio ports memory space
-    pub(crate) fn matches(t: u8) -> bool {
+    pub fn matches(t: u8) -> bool {
         (Self::BASE..Self::BASE + 0x40).contains(&t)
     }
 
@@ -312,12 +312,12 @@ impl StreamData {
     }
 }
 
-pub(crate) struct Audio {
+pub struct Audio {
     streams: [Stream; 4],
 }
 
 impl Audio {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let stream_data =
             [(); 4].map(|_| Arc::new(Mutex::new(StreamData::default())));
         let streams = [0, 1, 2, 3].map(|i| Stream {
@@ -329,7 +329,7 @@ impl Audio {
     }
 
     /// Push any relevant "note done" vectors to the event queue
-    pub(crate) fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
+    pub fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
         for (i, s) in self.streams.iter().enumerate() {
             if s.done.swap(false, Ordering::Relaxed) {
                 let p = AudioPorts::dev(vm, i);
@@ -341,7 +341,7 @@ impl Audio {
         }
     }
 
-    pub(crate) fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let (i, target) = Self::decode_target(target);
         if target == AudioPorts::PITCH {
             let p = AudioPorts::dev(vm, i);
@@ -409,7 +409,7 @@ impl Audio {
         }
     }
 
-    pub(crate) fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
         let (i, target) = Self::decode_target(target);
         let p = AudioPorts::dev_mut(vm, i);
 
@@ -438,7 +438,7 @@ impl Audio {
     }
 
     /// Returns a handle to the given stream data
-    pub(crate) fn stream(&self, i: usize) -> Arc<Mutex<StreamData>> {
+    pub fn stream(&self, i: usize) -> Arc<Mutex<StreamData>> {
         self.streams[i].data.clone()
     }
 }

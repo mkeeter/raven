@@ -1,5 +1,5 @@
-use uxn::{Ports, Uxn};
 use std::mem::offset_of;
+use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
@@ -131,7 +131,6 @@ pub struct Screen {
     pixels: Vec<ScreenPixel>,
     width: u16,
     height: u16,
-    resized: bool,
 }
 
 impl Screen {
@@ -144,7 +143,6 @@ impl Screen {
             pixels,
             width,
             height,
-            resized: false,
         }
     }
 
@@ -159,13 +157,6 @@ impl Screen {
         let size = self.width as usize * self.height as usize;
         self.pixels.resize(size, ScreenPixel::default());
         self.buffer.resize(size, 0u32);
-
-        self.resized = true;
-    }
-
-    /// Checks and clears the `resized` flag
-    pub fn resized(&mut self) -> bool {
-        std::mem::take(&mut self.resized)
     }
 
     /// Returns the current size as a `(width, height)` tuple
@@ -173,8 +164,8 @@ impl Screen {
         (self.width, self.height)
     }
 
-    /// Redraws the screen, returning a `(buffer, width, height)` tuple
-    pub fn redraw(&mut self, vm: &Uxn) -> (&[u32], u16, u16) {
+    /// Gets the current frame, returning a `(buffer, width, height)` tuple
+    pub fn frame(&mut self, vm: &Uxn) -> (&[u32], u16, u16) {
         let sys = vm.dev::<crate::system::SystemPorts>();
         let colors = [0, 1, 2, 3].map(|i| sys.color(i));
         for (p, o) in self.pixels.iter().zip(self.buffer.iter_mut()) {

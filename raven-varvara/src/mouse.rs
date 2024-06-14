@@ -1,3 +1,5 @@
+use crate::Event;
+use std::collections::VecDeque;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -30,10 +32,13 @@ pub(crate) struct Mouse {
 
     /// Bitfield of button state (bit 0: left, bit 1: middle, bit 2: right)
     buttons: u8,
+
+    /// Set as true when a mouse DEI / DEO operator is called
+    active: bool,
 }
 
 /// Update to mouse state
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MouseState {
     /// Current position
     pub pos: (f32, f32),
@@ -50,8 +55,23 @@ impl Mouse {
         Mouse::default()
     }
 
-    /// Updates the internal mouse state, return the vector if state has changed
-    pub fn update(&mut self, vm: &mut Uxn, state: MouseState) -> Option<u16> {
+    /// Sets the active flag
+    pub fn set_active(&mut self) {
+        self.active = true
+    }
+
+    /// Checks whether the active flag has been set
+    pub fn active(&self) -> bool {
+        self.active
+    }
+
+    /// Updates the internal mouse state, pushing an event if it has changed
+    pub fn update(
+        &mut self,
+        vm: &mut Uxn,
+        state: MouseState,
+        queue: &mut VecDeque<Event>,
+    ) {
         let mut changed = false;
         let m = vm.dev_mut::<MousePorts>();
 
@@ -92,9 +112,10 @@ impl Mouse {
         }
 
         if changed {
-            Some(m.vector.get())
-        } else {
-            None
+            queue.push_back(Event {
+                data: None,
+                vector: m.vector.get(),
+            });
         }
     }
 }
