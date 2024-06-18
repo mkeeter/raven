@@ -187,7 +187,24 @@ impl Varvara {
         vm.run(self, v)
     }
 
+    /// Returns the current output state of the system
+    ///
+    /// This is not idempotent; the output is taken from various accumulators
+    /// and will be empty if this is called multiple times.
+    #[must_use]
+    pub fn output(&mut self, vm: &Uxn) -> Output {
+        Output {
+            size: self.screen.size(),
+            frame: self.screen.frame(vm),
+            hide_mouse: self.mouse.active(),
+            stdout: self.console.stdout(),
+            stderr: self.console.stderr(),
+            exit: self.system.exit(),
+        }
+    }
+
     /// Handles incoming events
+    #[must_use]
     pub fn update(&mut self, vm: &mut Uxn, e: Input) -> Output {
         if let Some(c) = e.console {
             self.console.update(vm, c, &mut self.queue);
@@ -202,15 +219,7 @@ impl Varvara {
         }
 
         self.process_events(vm);
-
-        Output {
-            size: self.screen.size(),
-            frame: self.screen.frame(vm),
-            hide_mouse: self.mouse.active(),
-            stdout: self.console.stdout(),
-            stderr: self.console.stderr(),
-            exit: self.system.exit(),
-        }
+        self.output(vm)
     }
 
     fn process_events(&mut self, vm: &mut Uxn) {

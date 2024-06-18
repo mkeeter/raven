@@ -242,8 +242,7 @@ fn main() -> Result<()> {
     // Run the reset vector
     vm.run(&mut dev, 0x100);
 
-    // Dummy update to get any console messages printed during startup
-    let out = dev.update(&mut vm, Default::default());
+    let out = dev.output(&vm);
     out.print()?;
     if let Some(e) = out.exit {
         std::process::exit(e);
