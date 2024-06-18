@@ -2,7 +2,6 @@
 #![warn(missing_docs)]
 use log::warn;
 use std::{
-    collections::VecDeque,
     io::Write,
     sync::{Arc, Mutex},
 };
@@ -27,6 +26,7 @@ pub use mouse::MouseState;
 use uxn::{Device, Ports, Uxn};
 
 /// Internal events, accumulated by devices then applied to the CPU
+#[derive(Debug)]
 struct Event {
     /// Tuple of `(address, value)` to write in in device memory
     pub data: Option<(u8, u8)>,
@@ -102,7 +102,7 @@ pub struct Varvara {
     /// Flags indicating if we've already printed a warning about a missing dev
     already_warned: [bool; 16],
 
-    queue: VecDeque<Event>,
+    queue: Vec<Event>,
 }
 
 impl Default for Varvara {
@@ -157,7 +157,7 @@ impl Varvara {
             mouse: mouse::Mouse::new(),
             controller: controller::Controller::new(),
 
-            queue: VecDeque::with_capacity(1),
+            queue: vec![],
             already_warned: [false; 16],
         }
     }
@@ -223,12 +223,17 @@ impl Varvara {
     }
 
     fn process_events(&mut self, vm: &mut Uxn) {
-        while let Some(e) = self.queue.pop_front() {
+        // Borrow the event queue, so we can reuse the allocation
+        let mut queue = std::mem::take(&mut self.queue);
+        for e in queue.iter() {
             if let Some((addr, data)) = e.data {
                 vm.write_dev_mem(addr, data);
             }
             vm.run(self, e.vector);
         }
+        // Replace self.queue, reusing the allocation
+        queue.clear();
+        self.queue = queue;
     }
 
     /// Returns a handle to the given audio stream data

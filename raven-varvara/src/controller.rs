@@ -1,8 +1,5 @@
 use crate::Event;
-use std::{
-    collections::{HashSet, VecDeque},
-    mem::offset_of,
-};
+use std::{collections::HashSet, mem::offset_of};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -63,12 +60,7 @@ impl Controller {
     }
 
     /// Send the given key event, appending an event to the queue if needed
-    pub fn pressed(
-        &mut self,
-        vm: &mut Uxn,
-        k: Key,
-        queue: &mut VecDeque<Event>,
-    ) {
+    pub fn pressed(&mut self, vm: &mut Uxn, k: Key, queue: &mut Vec<Event>) {
         self.down.insert(k);
 
         let e = match k {
@@ -87,12 +79,7 @@ impl Controller {
     /// Indicate that the given key has been released
     ///
     /// This may change our button state and push an [`Event`] to the queue
-    pub fn released(
-        &mut self,
-        vm: &mut Uxn,
-        k: Key,
-        queue: &mut VecDeque<Event>,
-    ) {
+    pub fn released(&mut self, vm: &mut Uxn, k: Key, queue: &mut Vec<Event>) {
         self.down.remove(&k);
         queue.extend(self.check_buttons(vm));
     }

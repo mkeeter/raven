@@ -1,5 +1,4 @@
 use crate::Event;
-use std::collections::VecDeque;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -70,7 +69,7 @@ impl Mouse {
         &mut self,
         vm: &mut Uxn,
         state: MouseState,
-        queue: &mut VecDeque<Event>,
+        queue: &mut Vec<Event>,
     ) {
         let mut changed = false;
         let m = vm.dev_mut::<MousePorts>();
@@ -112,7 +111,7 @@ impl Mouse {
         }
 
         if changed {
-            queue.push_back(Event {
+            queue.push(Event {
                 data: None,
                 vector: m.vector.get(),
             });

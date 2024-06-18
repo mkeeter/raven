@@ -329,13 +329,13 @@ impl Audio {
     }
 
     /// Push any relevant "note done" vectors to the event queue
-    pub fn update(&self, vm: &Uxn, queue: &mut VecDeque<Event>) {
+    pub fn update(&self, vm: &Uxn, queue: &mut Vec<Event>) {
         for (i, s) in self.streams.iter().enumerate() {
             if s.done.swap(false, Ordering::Relaxed) {
                 let p = AudioPorts::dev(vm, i);
                 let vector = p.vector.get();
                 if vector != 0 {
-                    queue.push_back(Event { data: None, vector });
+                    queue.push(Event { data: None, vector });
                 }
             }
         }

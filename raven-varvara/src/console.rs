@@ -1,5 +1,5 @@
 use crate::Event;
-use std::{collections::VecDeque, io::Read, mem::offset_of, sync::mpsc};
+use std::{io::Read, mem::offset_of, sync::mpsc};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -74,12 +74,12 @@ impl Console {
         // Nothing to do here; data is pre-populated in `vm.dev` memory
     }
 
-    pub fn update(&mut self, vm: &mut Uxn, c: u8, queue: &mut VecDeque<Event>) {
+    pub fn update(&mut self, vm: &mut Uxn, c: u8, queue: &mut Vec<Event>) {
         let p = vm.dev_mut::<ConsolePorts>();
         p.read = c;
         p.type_ = 1; // TODO arguments
         let vector = p.vector.get();
-        queue.push_back(Event { vector, data: None })
+        queue.push(Event { vector, data: None })
     }
 
     /// Takes the `stderr` buffer, leaving it empty
