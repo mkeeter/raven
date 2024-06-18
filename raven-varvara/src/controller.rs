@@ -33,6 +33,7 @@ pub struct Controller {
 }
 
 /// Key input to the controller device
+#[allow(missing_docs)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Key {
     LeftShift,
