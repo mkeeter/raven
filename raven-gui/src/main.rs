@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::PathBuf;
 
 use uxn::{Uxn, UxnRam};
@@ -300,9 +300,12 @@ fn main() -> Result<()> {
         }
 
         // Redraw
-        let (buffer, width, height) = dev.frame(&vm);
         window
-            .update_with_buffer(buffer, width as usize, height as usize)
+            .update_with_buffer(
+                out.frame,
+                out.size.0 as usize,
+                out.size.1 as usize,
+            )
             .unwrap();
     }
 

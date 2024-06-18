@@ -127,10 +127,17 @@ impl Auto {
 }
 
 pub struct Screen {
-    buffer: Vec<u32>,
+    /// Screen buffer
     pixels: Vec<ScreenPixel>,
+
+    /// Local buffer for rendered RGBA values
+    buffer: Vec<u32>,
+
     width: u16,
     height: u16,
+
+    /// Flag indicating whether `buffer` should be recalculated
+    changed: bool,
 }
 
 impl Screen {
@@ -143,6 +150,7 @@ impl Screen {
             pixels,
             width,
             height,
+            changed: true,
         }
     }
 
@@ -165,13 +173,15 @@ impl Screen {
     }
 
     /// Gets the current frame, returning a `(buffer, width, height)` tuple
-    pub fn frame(&mut self, vm: &Uxn) -> (&[u32], u16, u16) {
-        let sys = vm.dev::<crate::system::SystemPorts>();
-        let colors = [0, 1, 2, 3].map(|i| sys.color(i));
-        for (p, o) in self.pixels.iter().zip(self.buffer.iter_mut()) {
-            *o = colors[(p.get() & 0b11) as usize];
+    pub fn frame(&mut self, vm: &Uxn) -> &[u32] {
+        if std::mem::take(&mut self.changed) {
+            let sys = vm.dev::<crate::system::SystemPorts>();
+            let colors = [0, 1, 2, 3].map(|i| sys.color(i));
+            for (p, o) in self.pixels.iter().zip(self.buffer.iter_mut()) {
+                *o = colors[(p.get() & 0b11) as usize];
+            }
         }
-        (&self.buffer, self.width, self.height)
+        &self.buffer
     }
 
     fn set_pixel(&mut self, layer: Layer, x: u16, y: u16, color: u8) {
@@ -323,6 +333,7 @@ impl Screen {
     /// Executes a DEO command against the screen
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<ScreenPorts>();
+        self.changed = true;
         match target {
             ScreenPorts::WIDTH_W => {
                 let new_width = v.width.get();

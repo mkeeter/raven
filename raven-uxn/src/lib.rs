@@ -1422,25 +1422,25 @@ mod op {
     ) -> Option<u16> {
         let mut s = vm.stack_view::<FLAGS>();
         let i = s.pop_byte();
-        let mut halt = false;
+        let mut run = true;
         match s.pop() {
             Value::Short(v) => {
                 let [lo, hi] = v.to_le_bytes();
                 let j = i.wrapping_add(1);
                 vm.dev[i as usize] = hi;
-                halt |= dev.deo(vm, i);
+                run &= dev.deo(vm, i);
                 vm.dev[j as usize] = lo;
-                halt |= dev.deo(vm, j);
+                run &= dev.deo(vm, j);
             }
             Value::Byte(v) => {
                 vm.dev[i as usize] = v;
-                halt |= dev.deo(vm, i);
+                run &= dev.deo(vm, i);
             }
         }
-        if halt {
-            None
-        } else {
+        if run {
             Some(pc)
+        } else {
+            None
         }
     }
 

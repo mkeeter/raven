@@ -52,9 +52,12 @@ pub struct Input {
 }
 
 /// Output from [`Varvara::update`], which may modify the GUI
-pub struct Output {
+pub struct Output<'a> {
     /// Current window size
     pub size: (u16, u16),
+
+    /// Current screen contents, as RGBA values
+    pub frame: &'a [u32],
 
     /// The system's mouse cursor should be hidden
     pub hide_mouse: bool,
@@ -69,7 +72,7 @@ pub struct Output {
     pub exit: Option<i32>,
 }
 
-impl Output {
+impl Output<'_> {
     /// Prints `stdout` and `stderr` to the console
     pub fn print(&self) -> std::io::Result<()> {
         if !self.stdout.is_empty() {
@@ -122,7 +125,7 @@ impl Device for Varvara {
             // Default case
             t => self.warn_missing(t),
         }
-        self.system.should_exit()
+        !self.system.should_exit()
     }
     fn dei(&mut self, vm: &mut Uxn, target: u8) {
         match target & 0xF0 {
@@ -184,11 +187,6 @@ impl Varvara {
         vm.run(self, v)
     }
 
-    /// Gets the current frame, returning a `(buffer, width, height)` tuple
-    pub fn frame(&mut self, vm: &Uxn) -> (&[u32], u16, u16) {
-        self.screen.frame(vm)
-    }
-
     /// Handles incoming events
     pub fn update(&mut self, vm: &mut Uxn, e: Input) -> Output {
         if let Some(c) = e.console {
@@ -207,6 +205,7 @@ impl Varvara {
 
         Output {
             size: self.screen.size(),
+            frame: self.screen.frame(vm),
             hide_mouse: self.mouse.active(),
             stdout: self.console.stdout(),
             stderr: self.console.stderr(),
