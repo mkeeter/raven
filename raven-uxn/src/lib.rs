@@ -1672,6 +1672,11 @@ mod ram {
         pub fn new() -> Self {
             UxnRam(Box::new([0u8; 65536]))
         }
+
+        /// Leaks memory, setting it to a static lifetime
+        pub fn leak(self) -> &'static mut [u8; 65536] {
+            Box::leak(self.0)
+        }
     }
 
     impl Default for UxnRam {

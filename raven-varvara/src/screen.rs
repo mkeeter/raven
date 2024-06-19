@@ -131,7 +131,7 @@ pub struct Screen {
     pixels: Vec<ScreenPixel>,
 
     /// Local buffer for rendered RGBA values
-    buffer: Vec<u32>,
+    buffer: Vec<u8>,
 
     width: u16,
     height: u16,
@@ -143,7 +143,7 @@ pub struct Screen {
 impl Screen {
     pub fn new(width: u16, height: u16) -> Self {
         let size = width as usize * height as usize;
-        let buffer = vec![0; size];
+        let buffer = vec![0; size * 4];
         let pixels = vec![ScreenPixel::default(); size];
         Self {
             buffer,
@@ -164,7 +164,7 @@ impl Screen {
 
         let size = self.width as usize * self.height as usize;
         self.pixels.resize(size, ScreenPixel::default());
-        self.buffer.resize(size, 0u32);
+        self.buffer.resize(size * 4, 0u8);
     }
 
     /// Returns the current size as a `(width, height)` tuple
@@ -173,12 +173,14 @@ impl Screen {
     }
 
     /// Gets the current frame, returning a `(buffer, width, height)` tuple
-    pub fn frame(&mut self, vm: &Uxn) -> &[u32] {
+    pub fn frame(&mut self, vm: &Uxn) -> &[u8] {
         if std::mem::take(&mut self.changed) {
             let sys = vm.dev::<crate::system::SystemPorts>();
             let colors = [0, 1, 2, 3].map(|i| sys.color(i));
-            for (p, o) in self.pixels.iter().zip(self.buffer.iter_mut()) {
-                *o = colors[(p.get() & 0b11) as usize];
+            for (p, o) in self.pixels.iter().zip(self.buffer.chunks_mut(4)) {
+                o.copy_from_slice(
+                    &colors[(p.get() & 0b11) as usize].to_le_bytes(),
+                );
             }
         }
         &self.buffer

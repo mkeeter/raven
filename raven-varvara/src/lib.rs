@@ -65,7 +65,7 @@ pub struct Output<'a> {
     pub size: (u16, u16),
 
     /// Current screen contents, as RGBA values
-    pub frame: &'a [u32],
+    pub frame: &'a [u8],
 
     /// The system's mouse cursor should be hidden
     pub hide_mouse: bool,
