@@ -7,6 +7,7 @@ edition = "2021"
 anyhow.workspace = true
 clap.workspace = true
 env_logger.workspace = true
+log.workspace = true
 
 uxn = { path = "../raven-uxn", package = "raven-uxn" }
-varvara = { path = "../raven-varvara", package = "raven-varvara", default-features = false }
+varvara = { path = "../raven-varvara", package = "raven-varvara" }

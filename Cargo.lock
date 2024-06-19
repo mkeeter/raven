@@ -897,6 +897,7 @@ dependencies = [
  "anyhow",
  "clap",
  "env_logger",
+ "log",
  "raven-uxn",
  "raven-varvara",
 ]
@@ -909,6 +910,7 @@ dependencies = [
  "clap",
  "cpal",
  "env_logger",
+ "log",
  "minifb",
  "raven-uxn",
  "raven-varvara",

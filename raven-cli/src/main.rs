@@ -6,6 +6,7 @@ use varvara::Varvara;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use log::info;
 
 /// Uxn runner
 #[derive(Parser)]
@@ -32,7 +33,9 @@ fn main() -> Result<()> {
     let mut dev = Varvara::new();
 
     // Run the reset vector
+    let start = std::time::Instant::now();
     vm.run(&mut dev, 0x100);
+    info!("startup complete in {:?}", start.elapsed());
 
     let out = dev.output(&vm);
     out.print()?;

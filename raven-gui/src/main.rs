@@ -9,6 +9,7 @@ use varvara::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use cpal::traits::StreamTrait;
+use log::info;
 use minifb::{MouseButton, MouseMode, Scale, Window, WindowOptions};
 
 /// Uxn runner
@@ -240,7 +241,9 @@ fn main() -> Result<()> {
     let _audio = audio_setup(&dev);
 
     // Run the reset vector
+    let start = std::time::Instant::now();
     vm.run(&mut dev, 0x100);
+    info!("startup complete in {:?}", start.elapsed());
 
     let out = dev.output(&vm);
     out.print()?;
