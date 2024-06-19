@@ -36,7 +36,6 @@ currently has no panicking paths.
 ## Devices
 ### Console
 #### Limitations
-- Input arguments are not yet implemented
 - Output streams are buffered and printing is delegated to the caller.  For
   example, a program that prints many lines before halting will run to
   completion, _then_ the caller is responsible for printing those lines

@@ -13,6 +13,9 @@ use log::info;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     rom: PathBuf,
+
+    #[arg(last = true)]
+    args: Vec<String>,
 }
 
 fn main() -> Result<()> {
@@ -37,11 +40,8 @@ fn main() -> Result<()> {
     vm.run(&mut dev, 0x100);
     info!("startup complete in {:?}", start.elapsed());
 
-    let out = dev.output(&vm);
-    out.print()?;
-    if let Some(e) = out.exit {
-        std::process::exit(e);
-    }
+    dev.output(&vm).check()?;
+    dev.send_args(&mut vm, &args.args).check()?;
 
     // Blocking loop, listening to the stdin reader thread
     let rx = varvara::console_worker();
@@ -50,11 +50,7 @@ fn main() -> Result<()> {
             console: Some(c),
             ..Default::default()
         };
-        let out = dev.update(&mut vm, i);
-        out.print()?;
-        if let Some(e) = out.exit {
-            std::process::exit(e);
-        }
+        dev.update(&mut vm, i).check()?;
     }
 
     Ok(())

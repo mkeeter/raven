@@ -95,6 +95,18 @@ impl Output<'_> {
         }
         Ok(())
     }
+
+    /// Checks the results
+    ///
+    /// `stdout` and `stderr` are printed, and `exit(..)` is called if it has
+    /// been requested by the VM.
+    pub fn check(&self) -> std::io::Result<()> {
+        self.print()?;
+        if let Some(e) = self.exit {
+            std::process::exit(e);
+        }
+        Ok(())
+    }
 }
 
 /// Handle to the Varvara system
@@ -209,6 +221,30 @@ impl Varvara {
             stderr: self.console.stderr(),
             exit: self.system.exit(),
         }
+    }
+
+    /// Sends arguments to the console device
+    ///
+    /// Leaves the console type set to `stdin`, and returns the current output
+    /// state of the system
+    pub fn send_args(&mut self, vm: &mut Uxn, args: &[String]) -> Output {
+        for (i, a) in args.iter().enumerate() {
+            self.console.set_type(vm, console::Type::Argument);
+            self.queue
+                .extend(a.bytes().map(|c| self.console.event(vm, c)));
+            self.process_events(vm);
+
+            let ty = if i == args.len() - 1 {
+                console::Type::ArgumentEnd
+            } else {
+                console::Type::ArgumentSpacer
+            };
+            self.console.set_type(vm, ty);
+            self.queue.push(self.console.event(vm, b'\n'));
+            self.process_events(vm);
+        }
+        self.console.set_type(vm, console::Type::Stdin);
+        self.output(vm)
     }
 
     /// Handles incoming events

@@ -17,6 +17,9 @@ use minifb::{MouseButton, MouseMode, Scale, Window, WindowOptions};
 #[clap(author, version, about, long_about = None)]
 struct Args {
     rom: PathBuf,
+
+    #[arg(last = true)]
+    args: Vec<String>,
 }
 
 fn audio_setup(dev: &Varvara) -> (cpal::Device, [cpal::Stream; 4]) {
@@ -245,11 +248,8 @@ fn main() -> Result<()> {
     vm.run(&mut dev, 0x100);
     info!("startup complete in {:?}", start.elapsed());
 
-    let out = dev.output(&vm);
-    out.print()?;
-    if let Some(e) = out.exit {
-        std::process::exit(e);
-    }
+    dev.output(&vm).check()?;
+    dev.send_args(&mut vm, &args.args).check()?;
 
     let mut window = open_window(dev.screen_size(), false);
 
@@ -296,10 +296,8 @@ fn main() -> Result<()> {
             window = open_window(out.size, hide_mouse);
         }
 
-        out.print()?;
-        if let Some(e) = out.exit {
-            std::process::exit(e);
-        }
+        // Update stdout / stderr / exiting
+        out.check()?;
 
         // Redraw
         window

@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::{Event, EventData};
 use std::{io::Read, mem::offset_of, sync::mpsc};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
@@ -23,11 +23,22 @@ pub struct ConsolePorts {
     _pad: [u8; 6],
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum Type {
+    #[allow(unused)]
+    NoQueue = 0,
+    Stdin = 1,
+    Argument = 2,
+    ArgumentSpacer = 3,
+    ArgumentEnd = 4,
+}
+
 impl Ports for ConsolePorts {
     const BASE: u8 = 0x10;
 }
 
 impl ConsolePorts {
+    const READ: u8 = Self::BASE | offset_of!(Self, read) as u8;
     const WRITE: u8 = Self::BASE | offset_of!(Self, write) as u8;
     const ERROR: u8 = Self::BASE | offset_of!(Self, error) as u8;
 }
@@ -74,12 +85,37 @@ impl Console {
         // Nothing to do here; data is pre-populated in `vm.dev` memory
     }
 
-    pub fn update(&mut self, vm: &mut Uxn, c: u8, queue: &mut Vec<Event>) {
+    /// Sets the current character type
+    ///
+    /// This should be called before sending a console event
+    pub fn set_type(&mut self, vm: &mut Uxn, ty: Type) {
         let p = vm.dev_mut::<ConsolePorts>();
-        p.read = c;
-        p.type_ = 1; // TODO arguments
+        p.type_ = ty as u8;
+    }
+
+    /// Returns an event that sets the given character and calls the vector
+    ///
+    /// Note that this function does not set the type, which should be
+    /// configured by calling [`Self::set_type`] before firing the vector.
+    pub fn event(&self, vm: &Uxn, c: u8) -> Event {
+        let p = vm.dev::<ConsolePorts>();
         let vector = p.vector.get();
-        queue.push(Event { vector, data: None })
+        Event {
+            vector,
+            data: Some(EventData {
+                addr: ConsolePorts::READ,
+                value: c,
+                clear: false,
+            }),
+        }
+    }
+
+    /// Pushes the given character event to the queue
+    ///
+    /// Note that this function does not set the type, which should be
+    /// configured by calling [`Self::set_type`] before firing the vector.
+    pub fn update(&self, vm: &Uxn, c: u8, queue: &mut Vec<Event>) {
+        queue.push(self.event(vm, c));
     }
 
     /// Takes the `stderr` buffer, leaving it empty
