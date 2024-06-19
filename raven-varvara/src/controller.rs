@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::{Event, EventData};
 use std::{collections::HashSet, mem::offset_of};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
@@ -68,7 +68,11 @@ impl Controller {
                 let p = vm.dev::<ControllerPorts>();
                 Some(Event {
                     vector: p.vector.get(),
-                    data: Some((ControllerPorts::KEY, c)),
+                    data: Some(EventData {
+                        addr: ControllerPorts::KEY,
+                        value: c,
+                        clear: true,
+                    }),
                 })
             }
             _ => self.check_buttons(vm),

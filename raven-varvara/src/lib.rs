@@ -25,11 +25,19 @@ pub use mouse::MouseState;
 
 use uxn::{Device, Ports, Uxn};
 
+/// Write to execute before calling the event vector
+#[derive(Copy, Clone, Debug)]
+struct EventData {
+    addr: u8,
+    value: u8,
+    clear: bool,
+}
+
 /// Internal events, accumulated by devices then applied to the CPU
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 struct Event {
     /// Tuple of `(address, value)` to write in in device memory
-    pub data: Option<(u8, u8)>,
+    pub data: Option<EventData>,
 
     /// Vector to trigger
     pub vector: u16,
@@ -226,10 +234,15 @@ impl Varvara {
         // Borrow the event queue, so we can reuse the allocation
         let mut queue = std::mem::take(&mut self.queue);
         for e in queue.iter() {
-            if let Some((addr, data)) = e.data {
-                vm.write_dev_mem(addr, data);
+            if let Some(d) = e.data {
+                vm.write_dev_mem(d.addr, d.value);
             }
             vm.run(self, e.vector);
+            if let Some(d) = e.data {
+                if d.clear {
+                    vm.write_dev_mem(d.addr, 0);
+                }
+            }
         }
         // Replace self.queue, reusing the allocation
         queue.clear();
