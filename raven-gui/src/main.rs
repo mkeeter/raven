@@ -199,6 +199,8 @@ fn decode_key(k: minifb::Key, shift: bool) -> Option<Key> {
         (minifb::Key::NumPadAsterisk, _) => Key::Char(b'*'),
         (minifb::Key::NumPadMinus, _) => Key::Char(b'-'),
         (minifb::Key::NumPadPlus, _) => Key::Char(b'+'),
+        (minifb::Key::Backspace, _) => Key::Char(0x08),
+        (minifb::Key::Enter, _) => Key::Char(b'\r'),
         _ => return None,
     };
     Some(c)
