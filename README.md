@@ -9,14 +9,19 @@ crate only uses safe Rust, and the crate has only one dependency (
 [`zerocopy`](https://https://crates.io/crates/zerocopy)).
 
 ## Performance
+`raven-uxn` is typically 10-20% faster for CPU-heavy workloads than the
+reference implementation
+([`uxnemu`](https://git.sr.ht/~rabbits/uxn/tree/main/item/src)).
+
 Running the
 [`mandelbrot.tal` demo](https://git.sr.ht/~rabbits/uxn/tree/main/item/projects/examples/demos/mandelbrot.tal)
 at max scale (`#0020`), `raven-gui` is about 20% faster than the `uxnemu`
 reference implementation: it calculates the fractal in 1.57 seconds, versus 2.03
 seconds for `uxnemu`.
 
-Calculating the first 35 Fibonnaci numbers using [`fib.tal`], `raven-cli` takes
-1.44 seconds (versus 1.65 seconds for `uxnemu`).
+Calculating the first 35 Fibonnaci numbers using
+[`fib.tal`](https://git.sr.ht/~rabbits/uxn/tree/main/item/projects/examples/exercises/fib.tal),
+`raven-cli` takes 1.44 seconds (versus 1.65 seconds for `uxnemu`).
 
 ## Design
 The Uxn processor has 256 instructions.  This sounds like a lot, but – compared
@@ -33,23 +38,30 @@ The assembly is also hand-inspected for inefficiency and panics; `Uxn::run`
 currently has no panicking paths.
 
 # Varvara
+## Design
+The `raven-varvara` crate is independent of any specific GUI / windowing
+implementation.  Instead, the application _using_ the crate is responsible for
+running the event loop, sending keyboard / mouse state, and drawing the returned
+frames.  This makes the library very flexible!
+
 ## Devices
 ### Console
 #### Limitations
-- Output streams are buffered and printing is delegated to the caller.  For
-  example, a program that prints many lines before halting will run to
-  completion, _then_ the caller is responsible for printing those lines
+Output streams are buffered and printing is delegated to the caller.  For
+example, a program that prints many lines before halting will run to completion,
+_then_ the caller is responsible for printing those lines
 
 ### Audio
 #### Implementation notes
 The [reference implementation](https://git.sr.ht/~rabbits/uxn/tree/main/item/src/devices/audio.c)
 is very different from the
 [specification](https://wiki.xxiivv.com/site/varvara.html#audio);
-`raven` attempt to match the behavior of the reference implementation.
+`raven-varvara` attempt to match the behavior of the reference implementation.
 
 ### Controller
 #### Implementation notes
-The `key` port **must** be cleared after the vector is called.
+The `key` port **must** be cleared after the vector is called.  Otherwise,
+button handling is broken in some ROMs.
 
 ### Datetime
 #### Limitations
