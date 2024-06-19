@@ -247,11 +247,11 @@ pub struct Uxn<'a> {
     /// Device memory
     dev: [u8; 256],
     /// 64 KiB of VM memory
-    pub(crate) ram: &'a mut [u8; 65536],
+    ram: &'a mut [u8; 65536],
     /// 256-byte data stack
-    pub(crate) stack: Stack,
+    stack: Stack,
     /// 256-byte return stack
-    pub(crate) ret: Stack,
+    ret: Stack,
 }
 
 macro_rules! op_cmp {
