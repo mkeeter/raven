@@ -43,8 +43,14 @@ currently has no panicking paths.
 
 ### Audio
 #### Implementation notes
-The reference implementation is very different from the specification; we
-attempt to match the behavior of the reference implementation.
+The [reference implementation](https://git.sr.ht/~rabbits/uxn/tree/main/item/src/devices/audio.c)
+is very different from the
+[specification](https://wiki.xxiivv.com/site/varvara.html#audio);
+`raven` attempt to match the behavior of the reference implementation.
+
+### Controller
+#### Implementation notes
+The `key` port **must** be cleared after the vector is called.
 
 ### Datetime
 #### Limitations
