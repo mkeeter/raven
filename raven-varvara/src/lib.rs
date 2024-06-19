@@ -140,7 +140,7 @@ impl Device for Varvara {
             datetime::DatetimePorts::BASE => self.datetime.deo(vm, target),
             screen::ScreenPorts::BASE => self.screen.deo(vm, target),
             mouse::MousePorts::BASE => self.mouse.set_active(),
-            file::FilePorts::BASE => self.file.deo(vm, target),
+            f if file::FilePorts::matches(f) => self.file.deo(vm, target),
             controller::ControllerPorts::BASE => (),
             a if audio::AudioPorts::matches(a) => self.audio.deo(vm, target),
 
@@ -156,7 +156,7 @@ impl Device for Varvara {
             datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
             screen::ScreenPorts::BASE => self.screen.dei(vm, target),
             mouse::MousePorts::BASE => self.mouse.set_active(),
-            file::FilePorts::BASE => (),
+            f if file::FilePorts::matches(f) => (),
             controller::ControllerPorts::BASE => (),
             a if audio::AudioPorts::matches(a) => self.audio.dei(vm, target),
 

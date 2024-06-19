@@ -4,7 +4,7 @@ use std::{
     io::{Read, Write},
     mem::offset_of,
 };
-use uxn::{Ports, Uxn};
+use uxn::{Ports, Uxn, DEV_SIZE};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
@@ -38,19 +38,42 @@ impl FilePorts {
             addr = addr.wrapping_add(1);
         }
         out.pop();
-        String::from_utf8(out).ok()
+        match String::from_utf8(out) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                error!("could not read filename from VM: {e}");
+                None
+            }
+        }
+    }
+
+    /// Checks whether the given value is in the file ports memory space
+    pub fn matches(t: u8) -> bool {
+        (Self::BASE..Self::BASE + 0x20).contains(&t)
+    }
+
+    fn dev<'a>(vm: &'a Uxn, i: usize) -> &'a Self {
+        let pos = Self::BASE + (i * DEV_SIZE) as u8;
+        vm.dev_at(pos)
+    }
+
+    fn dev_mut<'a>(vm: &'a mut Uxn, i: usize) -> &'a mut Self {
+        let pos = Self::BASE + (i * DEV_SIZE) as u8;
+        vm.dev_mut_at(pos)
     }
 }
 
 impl FilePorts {
-    const NAME_H: u8 = Self::BASE | offset_of!(Self, name) as u8;
+    const NAME_H: u8 = offset_of!(Self, name) as u8;
     const NAME_L: u8 = Self::NAME_H + 1;
-    const LENGTH_H: u8 = Self::BASE | offset_of!(Self, length) as u8;
+    const LENGTH_H: u8 = offset_of!(Self, length) as u8;
     const LENGTH_L: u8 = Self::LENGTH_H + 1;
-    const READ_H: u8 = Self::BASE | offset_of!(Self, read) as u8;
+    const READ_H: u8 = offset_of!(Self, read) as u8;
     const READ_L: u8 = Self::READ_H + 1;
-    const WRITE_H: u8 = Self::BASE | offset_of!(Self, write) as u8;
+    const WRITE_H: u8 = offset_of!(Self, write) as u8;
     const WRITE_L: u8 = Self::WRITE_H + 1;
+    const APPEND: u8 = offset_of!(Self, append) as u8;
+    const DELETE: u8 = offset_of!(Self, delete) as u8;
 }
 
 enum Handle {
@@ -90,63 +113,100 @@ impl File {
         }
     }
 
+    /// Decodes a port address into an `(index, offset)` tuple
+    fn decode_target(target: u8) -> (usize, u8) {
+        let i = (target - FilePorts::BASE) as usize / DEV_SIZE;
+        (i, target & 0xF)
+    }
+
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+        let (i, target) = Self::decode_target(target);
         match target {
-            FilePorts::READ_H => (), // ignored, action is on READ_L
-            FilePorts::READ_L => self.read(vm),
-            FilePorts::WRITE_H => (), // ignored, action is on WRITE_L
-            FilePorts::WRITE_L => self.write(vm),
+            FilePorts::DELETE => self.delete(vm, i),
+            FilePorts::APPEND => (), // Ignored, this sets the append flag
             FilePorts::NAME_H | FilePorts::NAME_L => {
                 self.f = None;
             }
             FilePorts::LENGTH_H | FilePorts::LENGTH_L => {
                 // Ignored, this sets the buffer length
             }
+            FilePorts::READ_H => (), // ignored, action is on READ_L
+            FilePorts::READ_L => self.read(vm, i),
+            FilePorts::WRITE_H => (), // ignored, action is on WRITE_L
+            FilePorts::WRITE_L => self.write(vm, i),
+
             _ => warn!("unknown file deo: {target:2x}"),
         }
     }
 
-    fn write(&mut self, vm: &mut Uxn) {
+    /// Checks that the given path is local and does not escape our working dir
+    ///
+    /// Note that this simply checks depth; symlinks must be examined separately
+    fn is_path_local(path: &std::path::Path) -> bool {
+        let mut depth = 0;
+        for component in path.components() {
+            match component {
+                std::path::Component::Prefix(..)
+                | std::path::Component::RootDir => {
+                    error!("path {path:?} is not relative");
+                    return false;
+                }
+                std::path::Component::CurDir => {}
+                std::path::Component::ParentDir => {
+                    if depth == 0 {
+                        error!("path {path:?} escapes working directory");
+                        return false;
+                    } else {
+                        depth -= 1;
+                    }
+                }
+                std::path::Component::Normal(..) => {
+                    depth += 1;
+                }
+            }
+        }
+        true
+    }
+
+    fn delete(&mut self, vm: &mut Uxn, index: usize) {
+        // Close the file, if it happens to be open
+        self.f = None;
+
+        // Set the return flag to -1
+        FilePorts::dev_mut(vm, index).success.set(u16::MAX);
+
+        let ports = FilePorts::dev(vm, index);
+        let Some(filename) = ports.filename(vm) else {
+            return;
+        };
+        let path = std::path::PathBuf::from(&filename);
+        if !Self::is_path_local(&path) {
+            return;
+        }
+        if std::fs::remove_file(&path).is_ok() {
+            FilePorts::dev_mut(vm, index).success.set(0);
+        };
+    }
+
+    fn write(&mut self, vm: &mut Uxn, index: usize) {
         // Clear the success flag
-        let ports = vm.dev_mut::<FilePorts>();
+        let ports = FilePorts::dev_mut(vm, index);
         ports.success.set(0);
 
-        let ports = vm.dev::<FilePorts>();
+        let ports = FilePorts::dev(vm, index);
         if !matches!(self.f, Some(Handle::Write { .. })) {
             let Some(filename) = ports.filename(vm) else {
-                error!("could not read filename");
                 return;
             };
             let path = std::path::PathBuf::from(&filename);
-            if !path.exists() {
-                if self.missing_files.insert(filename.to_owned()) {
-                    error!("{filename:?} is missing");
-                }
-                return;
-            }
-            let path = match path.canonicalize() {
-                Ok(p) => p,
-                Err(e) => {
-                    error!("could not canonicalize path {filename:?}: {e}");
-                    return;
-                }
-            };
-            let pwd = match std::env::current_dir() {
-                Ok(f) => f,
-                Err(e) => {
-                    error!("could not get pwd: {e}");
-                    return;
-                }
-            };
-            if !path.starts_with(&pwd) {
-                warn!(
-                    "requested path {path:?} is outside of
-                     working directory {pwd:?}"
-                );
+            if !Self::is_path_local(&path) {
+                error!("path {path:?} escapes working directory");
                 return;
             }
 
             let file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
                 .append(ports.append == 0x1)
                 .open(&path);
             let file = match file {
@@ -170,7 +230,7 @@ impl File {
                 warn!("{path:?} is a directory; skipping");
                 return;
             } else {
-                trace!("opened {path:?} as file");
+                trace!("opened {path:?} as file for writing");
                 self.f = Some(Handle::Write { path, file });
             }
         }
@@ -199,19 +259,18 @@ impl File {
             error!("could not write all bytes to file");
             return;
         }
-        let ports = vm.dev_mut::<FilePorts>();
+        let ports = FilePorts::dev_mut(vm, index);
         ports.success.set(n as u16);
     }
 
-    fn read(&mut self, vm: &mut Uxn) {
+    fn read(&mut self, vm: &mut Uxn, index: usize) {
         // Clear the success flag
-        let ports = vm.dev_mut::<FilePorts>();
+        let ports = FilePorts::dev_mut(vm, index);
         ports.success.set(0);
 
         if !matches!(self.f, Some(Handle::File { .. } | Handle::Dir { .. })) {
-            let ports = vm.dev::<FilePorts>();
+            let ports = FilePorts::dev(vm, index);
             let Some(filename) = ports.filename(vm) else {
-                error!("could not read filename");
                 return;
             };
             let path = std::path::PathBuf::from(&filename);
@@ -221,25 +280,9 @@ impl File {
                 }
                 return;
             }
-            let path = match path.canonicalize() {
-                Ok(p) => p,
-                Err(e) => {
-                    error!("could not canonicalize path {filename:?}: {e}");
-                    return;
-                }
-            };
-            let pwd = match std::env::current_dir() {
-                Ok(f) => f,
-                Err(e) => {
-                    error!("could not get pwd: {e}");
-                    return;
-                }
-            };
-            if !path.starts_with(&pwd) {
-                warn!(
-                    "requested path {path:?} is outside of
-                     working directory {pwd:?}"
-                );
+            let path = std::path::PathBuf::from(&filename);
+            if !Self::is_path_local(&path) {
+                error!("path {path:?} escapes working directory");
                 return;
             }
 
@@ -268,18 +311,19 @@ impl File {
                         return;
                     }
                 };
+                trace!("opened {path:?} as dir for reading");
                 self.f = Some(Handle::Dir {
                     path,
                     dir,
                     scratch: Default::default(),
                 });
             } else {
-                trace!("opened {path:?} as file");
+                trace!("opened {path:?} as file for reading");
                 self.f = Some(Handle::File { path, file });
             }
         }
 
-        let ports = vm.dev_mut::<FilePorts>();
+        let ports = FilePorts::dev_mut(vm, index);
         self.buf.resize(ports.length.get() as usize, 0u8);
         let n = match self.f.as_mut().unwrap() {
             Handle::Write { .. } => unreachable!(),
