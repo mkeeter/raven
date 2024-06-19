@@ -427,6 +427,12 @@ impl<'a> Uxn<'a> {
         self.ram[addr as usize]
     }
 
+    /// Writes a byte to RAM
+    #[inline]
+    pub fn ram_write_byte(&mut self, addr: u16, v: u8) {
+        self.ram[addr as usize] = v;
+    }
+
     /// Reads a word from RAM
     ///
     /// If the address is at the top of RAM, the second byte will wrap to 0

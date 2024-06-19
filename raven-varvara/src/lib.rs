@@ -156,7 +156,7 @@ impl Device for Varvara {
             datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
             screen::ScreenPorts::BASE => self.screen.dei(vm, target),
             mouse::MousePorts::BASE => self.mouse.set_active(),
-            file::FilePorts::BASE => self.file.dei(vm, target),
+            file::FilePorts::BASE => (),
             controller::ControllerPorts::BASE => (),
             a if audio::AudioPorts::matches(a) => self.audio.dei(vm, target),
 
