@@ -1,7 +1,7 @@
 use log::{error, trace, warn};
 use std::{
     collections::{HashSet, VecDeque},
-    io::Read,
+    io::{Read, Write},
     mem::offset_of,
 };
 use uxn::{Ports, Uxn};
@@ -45,10 +45,12 @@ impl FilePorts {
 impl FilePorts {
     const NAME_H: u8 = Self::BASE | offset_of!(Self, name) as u8;
     const NAME_L: u8 = Self::NAME_H + 1;
-    const READ_H: u8 = Self::BASE | offset_of!(Self, read) as u8;
-    const READ_L: u8 = Self::READ_H + 1;
     const LENGTH_H: u8 = Self::BASE | offset_of!(Self, length) as u8;
     const LENGTH_L: u8 = Self::LENGTH_H + 1;
+    const READ_H: u8 = Self::BASE | offset_of!(Self, read) as u8;
+    const READ_L: u8 = Self::READ_H + 1;
+    const WRITE_H: u8 = Self::BASE | offset_of!(Self, write) as u8;
+    const WRITE_L: u8 = Self::WRITE_H + 1;
 }
 
 enum Handle {
@@ -62,6 +64,10 @@ enum Handle {
 
         /// Buffer of left-over characters to write
         scratch: VecDeque<u8>,
+    },
+    Write {
+        path: std::path::PathBuf,
+        file: std::fs::File,
     },
 }
 
@@ -85,18 +91,11 @@ impl File {
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
-        let f = vm.dev::<FilePorts>();
         match target {
             FilePorts::READ_H => (), // ignored, action is on READ_L
-            FilePorts::READ_L => {
-                if let Some(filename) = f.filename(vm) {
-                    trace!("reading file {filename}");
-                    self.read(vm, &filename);
-                } else {
-                    warn!("could not read filename");
-                }
-                // TODO
-            }
+            FilePorts::READ_L => self.read(vm),
+            FilePorts::WRITE_H => (), // ignored, action is on WRITE_L
+            FilePorts::WRITE_L => self.write(vm),
             FilePorts::NAME_H | FilePorts::NAME_L => {
                 self.f = None;
             }
@@ -107,14 +106,18 @@ impl File {
         }
     }
 
-    fn read(&mut self, vm: &mut Uxn, filename: &str) {
-        let ports = vm.dev_mut::<FilePorts>();
-
+    fn write(&mut self, vm: &mut Uxn) {
         // Clear the success flag
+        let ports = vm.dev_mut::<FilePorts>();
         ports.success.set(0);
 
-        if self.f.is_none() {
-            let path = std::path::PathBuf::from(filename);
+        let ports = vm.dev::<FilePorts>();
+        if !matches!(self.f, Some(Handle::Write { .. })) {
+            let Some(filename) = ports.filename(vm) else {
+                error!("could not read filename");
+                return;
+            };
+            let path = std::path::PathBuf::from(&filename);
             if !path.exists() {
                 if self.missing_files.insert(filename.to_owned()) {
                     error!("{filename:?} is missing");
@@ -143,7 +146,103 @@ impl File {
                 return;
             }
 
-            // TODO prevent path traversal attacks
+            let file = std::fs::OpenOptions::new()
+                .append(ports.append == 0x1)
+                .open(&path);
+            let file = match file {
+                Ok(f) => f,
+                Err(e) => {
+                    error!("could not open {path:?}: {e}");
+                    return;
+                }
+            };
+            let m = match file.metadata() {
+                Ok(m) => m,
+                Err(e) => {
+                    error!("could not check metadata for {path:?}: {e}");
+                    return;
+                }
+            };
+            if m.is_symlink() {
+                warn!("{path:?} is a symlink; skipping");
+                return;
+            } else if m.is_dir() {
+                warn!("{path:?} is a directory; skipping");
+                return;
+            } else {
+                trace!("opened {path:?} as file");
+                self.f = Some(Handle::Write { path, file });
+            }
+        }
+
+        self.buf.resize(ports.length.get() as usize, 0u8);
+        let Some(Handle::Write { path, file }) = self.f.as_mut() else {
+            unreachable!();
+        };
+
+        // Copy data out of the VM
+        self.buf.resize(ports.length.get() as usize, 0u8);
+        let mut addr = ports.write.get();
+        for b in self.buf.iter_mut() {
+            *b = vm.ram_read_byte(addr);
+            addr = addr.wrapping_add(1);
+        }
+
+        let n = match file.write(&self.buf) {
+            Ok(n) => n,
+            Err(e) => {
+                error!("could not write to {path:?}: {e}");
+                return;
+            }
+        };
+        if n != self.buf.len() {
+            error!("could not write all bytes to file");
+            return;
+        }
+        let ports = vm.dev_mut::<FilePorts>();
+        ports.success.set(n as u16);
+    }
+
+    fn read(&mut self, vm: &mut Uxn) {
+        // Clear the success flag
+        let ports = vm.dev_mut::<FilePorts>();
+        ports.success.set(0);
+
+        if !matches!(self.f, Some(Handle::File { .. } | Handle::Dir { .. })) {
+            let ports = vm.dev::<FilePorts>();
+            let Some(filename) = ports.filename(vm) else {
+                error!("could not read filename");
+                return;
+            };
+            let path = std::path::PathBuf::from(&filename);
+            if !path.exists() {
+                if self.missing_files.insert(filename.to_owned()) {
+                    error!("{filename:?} is missing");
+                }
+                return;
+            }
+            let path = match path.canonicalize() {
+                Ok(p) => p,
+                Err(e) => {
+                    error!("could not canonicalize path {filename:?}: {e}");
+                    return;
+                }
+            };
+            let pwd = match std::env::current_dir() {
+                Ok(f) => f,
+                Err(e) => {
+                    error!("could not get pwd: {e}");
+                    return;
+                }
+            };
+            if !path.starts_with(&pwd) {
+                warn!(
+                    "requested path {path:?} is outside of
+                     working directory {pwd:?}"
+                );
+                return;
+            }
+
             let file = match std::fs::File::open(&path) {
                 Ok(f) => f,
                 Err(e) => {
@@ -180,8 +279,10 @@ impl File {
             }
         }
 
+        let ports = vm.dev_mut::<FilePorts>();
         self.buf.resize(ports.length.get() as usize, 0u8);
         let n = match self.f.as_mut().unwrap() {
+            Handle::Write { .. } => unreachable!(),
             Handle::File { path, file } => match file.read(&mut self.buf) {
                 Ok(n) => n,
                 Err(e) => {
