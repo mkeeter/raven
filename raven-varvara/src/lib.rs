@@ -117,6 +117,7 @@ pub struct Varvara {
     audio: audio::Audio,
     screen: screen::Screen,
     mouse: mouse::Mouse,
+    file: file::File,
     controller: controller::Controller,
 
     /// Flags indicating if we've already printed a warning about a missing dev
@@ -139,6 +140,7 @@ impl Device for Varvara {
             datetime::DatetimePorts::BASE => self.datetime.deo(vm, target),
             screen::ScreenPorts::BASE => self.screen.deo(vm, target),
             mouse::MousePorts::BASE => self.mouse.set_active(),
+            file::FilePorts::BASE => self.file.deo(vm, target),
             controller::ControllerPorts::BASE => (),
             a if audio::AudioPorts::matches(a) => self.audio.deo(vm, target),
 
@@ -154,6 +156,7 @@ impl Device for Varvara {
             datetime::DatetimePorts::BASE => self.datetime.dei(vm, target),
             screen::ScreenPorts::BASE => self.screen.dei(vm, target),
             mouse::MousePorts::BASE => self.mouse.set_active(),
+            file::FilePorts::BASE => self.file.dei(vm, target),
             controller::ControllerPorts::BASE => (),
             a if audio::AudioPorts::matches(a) => self.audio.dei(vm, target),
 
@@ -175,6 +178,7 @@ impl Varvara {
             audio: audio::Audio::new(),
             screen: screen::Screen::new(WIDTH, HEIGHT),
             mouse: mouse::Mouse::new(),
+            file: file::File::new(),
             controller: controller::Controller::new(),
 
             queue: vec![],
