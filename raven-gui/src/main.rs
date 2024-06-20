@@ -2,7 +2,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use uxn::{Uxn, UxnRam};
-use varvara::{Key, Varvara, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
+use varvara::{Key, MouseState, Varvara, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
@@ -26,7 +26,8 @@ struct Stage<'a> {
     vm: Uxn<'a>,
     dev: Varvara,
 
-    mouse_hidden: bool,
+    scroll: (f32, f32),
+    cursor_pos: Option<(f32, f32)>,
     console_rx: std::sync::mpsc::Receiver<u8>,
 
     texture: egui::TextureHandle,
@@ -46,12 +47,12 @@ impl<'a> Stage<'a> {
         let texture =
             ctx.load_texture("frame", image, egui::TextureOptions::NEAREST);
 
-        let mouse_hidden = out.hide_mouse;
         Stage {
             vm,
             dev,
 
-            mouse_hidden,
+            scroll: (0.0, 0.0),
+            cursor_pos: None,
             console_rx,
 
             texture,
@@ -78,11 +79,25 @@ impl eframe::App for Stage<'_> {
                             }
                         }
                     }
+                    egui::Event::Scroll(s) => {
+                        self.scroll.0 += s.x;
+                        self.scroll.1 += s.y;
+                    }
                     _ => (),
                 }
             }
+            let ptr = &i.pointer;
+            if let Some(p) = ptr.latest_pos() {
+                self.cursor_pos = Some((p.x, p.y));
+            }
+            let m = MouseState {
+                pos: self.cursor_pos.unwrap_or((0.0, 0.0)),
+                scroll: std::mem::take(&mut self.scroll),
+                buttons: 0,
+            };
+            self.dev.mouse(&mut self.vm, m);
+            // TODO debug mouse
         });
-        // TODO mouse
 
         // Listen for console characters
         if let Ok(c) = self.console_rx.try_recv() {
@@ -96,9 +111,8 @@ impl eframe::App for Stage<'_> {
         let out = self.dev.output(&self.vm);
 
         // Update our GUI based on current state
-        if out.hide_mouse && !self.mouse_hidden {
+        if out.hide_mouse {
             ctx.set_cursor_icon(egui::CursorIcon::None);
-            self.mouse_hidden = true;
         }
         if prev_size != out.size {
             warn!("can't programmatically resize window");
