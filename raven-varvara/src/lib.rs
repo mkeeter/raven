@@ -173,10 +173,6 @@ impl Varvara {
     }
 
     /// Checks whether the SHIFT key is currently down
-    pub fn shift_held(&self) -> bool {
-        self.controller.shift_held()
-    }
-
     fn warn_missing(&mut self, t: u8) {
         if !self.already_warned[(t >> 4) as usize] {
             warn!("unimplemented device {t:#02x}");

@@ -33,17 +33,15 @@ pub struct Controller {
 #[allow(missing_docs)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum Key {
-    LeftShift,
-    RightShift,
-    LeftCtrl,
-    LeftAlt,
+    Shift,
+    Ctrl,
+    Alt,
     Up,
     Down,
     Left,
     Right,
-    LeftSuper,
-    RightSuper,
     Home,
+    End,
     Char(u8),
 }
 
@@ -51,12 +49,6 @@ impl Controller {
     /// Builds a new controller with no keys held
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Checks whether either shift key is held
-    pub fn shift_held(&self) -> bool {
-        self.down.contains(&Key::LeftShift)
-            | self.down.contains(&Key::RightShift)
     }
 
     /// Sends a single character event
@@ -97,9 +89,9 @@ impl Controller {
     fn check_buttons(&mut self, vm: &mut Uxn) -> Option<Event> {
         let mut buttons = 0;
         for (i, k) in [
-            Key::LeftCtrl,
-            Key::LeftAlt,
-            Key::LeftShift,
+            Key::Ctrl,
+            Key::Alt,
+            Key::Shift,
             Key::Home,
             Key::Up,
             Key::Down,
@@ -112,12 +104,6 @@ impl Controller {
             if self.down.contains(k) {
                 buttons |= 1 << i;
             }
-        }
-        if self.down.contains(&Key::Left)
-            && (self.down.contains(&Key::LeftSuper)
-                || self.down.contains(&Key::RightSuper))
-        {
-            buttons |= 0x08;
         }
 
         // We'll return this event in case we don't have a keypress event;

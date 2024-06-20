@@ -94,6 +94,18 @@ impl eframe::App for Stage<'_> {
                     _ => (),
                 }
             }
+            for (b, k) in [
+                (i.modifiers.ctrl, Key::Ctrl),
+                (i.modifiers.alt, Key::Alt),
+                (i.modifiers.shift, Key::Shift),
+            ] {
+                if b {
+                    self.dev.pressed(&mut self.vm, k)
+                } else {
+                    self.dev.released(&mut self.vm, k)
+                }
+            }
+
             let ptr = &i.pointer;
             if let Some(p) = ptr.latest_pos() {
                 self.cursor_pos = Some((p.x, p.y));
