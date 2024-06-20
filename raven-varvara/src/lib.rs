@@ -216,7 +216,7 @@ impl Varvara {
         for (i, a) in args.iter().enumerate() {
             self.console.set_type(vm, console::Type::Argument);
             for c in a.bytes() {
-                self.process_event(vm, self.console.event(vm, c));
+                self.process_event(vm, self.console.update(vm, c));
             }
 
             let ty = if i == args.len() - 1 {
@@ -225,7 +225,7 @@ impl Varvara {
                 console::Type::ArgumentSpacer
             };
             self.console.set_type(vm, ty);
-            self.process_event(vm, self.console.event(vm, b'\n'));
+            self.process_event(vm, self.console.update(vm, b'\n'));
         }
         self.console.set_type(vm, console::Type::Stdin);
         self.output(vm)
@@ -274,14 +274,18 @@ impl Varvara {
     }
 
     /// Processes a single vector event
+    ///
+    /// Events with an unassigned vector (i.e. 0) are ignored
     fn process_event(&mut self, vm: &mut Uxn, e: Event) {
-        if let Some(d) = e.data {
-            vm.write_dev_mem(d.addr, d.value);
-        }
-        vm.run(self, e.vector);
-        if let Some(d) = e.data {
-            if d.clear {
-                vm.write_dev_mem(d.addr, 0);
+        if e.vector != 0 {
+            if let Some(d) = e.data {
+                vm.write_dev_mem(d.addr, d.value);
+            }
+            vm.run(self, e.vector);
+            if let Some(d) = e.data {
+                if d.clear {
+                    vm.write_dev_mem(d.addr, 0);
+                }
             }
         }
     }

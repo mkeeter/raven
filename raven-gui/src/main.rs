@@ -126,7 +126,6 @@ impl eframe::App for Stage<'_> {
 
         // Screen callback (limited to 60 FPS)
         if now >= self.next_frame {
-            println!("{:?}", now - self.next_frame);
             self.dev.redraw(&mut self.vm);
             self.next_frame = now + std::time::Duration::from_millis(15);
         }

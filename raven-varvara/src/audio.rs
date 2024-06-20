@@ -337,11 +337,10 @@ impl Audio {
         if self.streams[i].done.swap(false, Ordering::Relaxed) {
             let p = AudioPorts::dev(vm, i);
             let vector = p.vector.get();
-            if vector != 0 {
-                return Some(Event { data: None, vector });
-            }
+            Some(Event { data: None, vector })
+        } else {
+            None
         }
-        None
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {

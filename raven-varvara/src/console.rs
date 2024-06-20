@@ -97,7 +97,7 @@ impl Console {
     ///
     /// Note that this function does not set the type, which should be
     /// configured by calling [`Self::set_type`] before firing the vector.
-    pub fn event(&self, vm: &Uxn, c: u8) -> Event {
+    pub fn update(&self, vm: &Uxn, c: u8) -> Event {
         let p = vm.dev::<ConsolePorts>();
         let vector = p.vector.get();
         Event {
@@ -108,14 +108,6 @@ impl Console {
                 clear: false,
             }),
         }
-    }
-
-    /// Pushes the given character event to the queue
-    ///
-    /// Note that this function does not set the type, which should be
-    /// configured by calling [`Self::set_type`] before firing the vector.
-    pub fn update(&self, vm: &Uxn, c: u8) -> Event {
-        self.event(vm, c)
     }
 
     /// Takes the `stderr` buffer, leaving it empty
