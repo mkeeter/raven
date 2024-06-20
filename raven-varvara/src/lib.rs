@@ -239,16 +239,16 @@ impl Varvara {
 
     /// Press a key on the controller device
     pub fn pressed(&mut self, vm: &mut Uxn, k: Key) {
-        self.controller
-            .pressed(vm, k)
-            .map(|e| self.process_event(vm, e));
+        if let Some(e) = self.controller.pressed(vm, k) {
+            self.process_event(vm, e);
+        }
     }
 
     /// Release a key on the controller device
     pub fn released(&mut self, vm: &mut Uxn, k: Key) {
-        self.controller
-            .released(vm, k)
-            .map(|e| self.process_event(vm, e));
+        if let Some(e) = self.controller.released(vm, k) {
+            self.process_event(vm, e);
+        }
     }
 
     /// Send a character from the console device
@@ -259,15 +259,17 @@ impl Varvara {
 
     /// Updates the mouse state
     pub fn mouse(&mut self, vm: &mut Uxn, m: MouseState) {
-        self.mouse.update(vm, m).map(|e| self.process_event(vm, e));
+        if let Some(e) = self.mouse.update(vm, m) {
+            self.process_event(vm, e);
+        }
     }
 
     /// Processes pending audio events
     pub fn audio(&mut self, vm: &mut Uxn) {
         for i in 0..audio::DEV_COUNT {
-            self.audio
-                .update(vm, i as usize)
-                .map(|e| self.process_event(vm, e));
+            if let Some(e) = self.audio.update(vm, i as usize) {
+                self.process_event(vm, e);
+            }
         }
     }
 

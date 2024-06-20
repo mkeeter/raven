@@ -81,7 +81,7 @@ impl eframe::App for Stage<'_> {
                     }
                     egui::Event::Scroll(s) => {
                         self.scroll.0 += s.x;
-                        self.scroll.1 += s.y;
+                        self.scroll.1 -= s.y;
                     }
                     _ => (),
                 }
@@ -90,13 +90,22 @@ impl eframe::App for Stage<'_> {
             if let Some(p) = ptr.latest_pos() {
                 self.cursor_pos = Some((p.x, p.y));
             }
+
+            let buttons = [
+                egui::PointerButton::Primary,
+                egui::PointerButton::Middle,
+                egui::PointerButton::Secondary,
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(i, b)| (ptr.button_down(b) as u8) << i)
+            .fold(0, |a, b| a | b);
             let m = MouseState {
                 pos: self.cursor_pos.unwrap_or((0.0, 0.0)),
                 scroll: std::mem::take(&mut self.scroll),
-                buttons: 0,
+                buttons,
             };
             self.dev.mouse(&mut self.vm, m);
-            // TODO debug mouse
         });
 
         // Listen for console characters
@@ -106,6 +115,9 @@ impl eframe::App for Stage<'_> {
 
         // Handle audio callback
         self.dev.audio(&mut self.vm);
+
+        // Screen callback (TODO limit to 60 FPS?)
+        self.dev.redraw(&mut self.vm);
 
         let prev_size = self.dev.screen_size();
         let out = self.dev.output(&self.vm);
@@ -146,6 +158,8 @@ impl eframe::App for Stage<'_> {
 
         // Update stdout / stderr / exiting
         out.check().expect("failed to print output?");
+
+        ctx.request_repaint_after(std::time::Duration::from_millis(16));
     }
 }
 
@@ -186,23 +200,6 @@ fn audio_setup(dev: &Varvara) -> (cpal::Device, [cpal::Stream; 4]) {
     });
     (device, streams)
 }
-
-/*
-fn mouse_state(window: &Window) -> MouseState {
-    let pos = window.get_mouse_pos(MouseMode::Clamp).unwrap();
-    let scroll = window.get_scroll_wheel().unwrap_or((0.0, 0.0));
-    let buttons = [MouseButton::Left, MouseButton::Middle, MouseButton::Right]
-        .into_iter()
-        .enumerate()
-        .map(|(i, b)| (window.get_mouse_down(b) as u8) << i)
-        .fold(0, |a, b| a | b);
-    MouseState {
-        pos,
-        scroll,
-        buttons,
-    }
-}
-*/
 
 fn decode_key(k: egui::Key) -> Option<Key> {
     let c = match k {
