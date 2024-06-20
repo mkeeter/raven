@@ -37,7 +37,7 @@ impl AudioPorts {
 
     /// Checks whether the given value is in the audio ports memory space
     pub fn matches(t: u8) -> bool {
-        (Self::BASE..Self::BASE + 0x40).contains(&t)
+        (Self::BASE..Self::BASE + 0x10 * DEV_COUNT as u8).contains(&t)
     }
 
     fn dev<'a>(vm: &'a Uxn, i: usize) -> &'a Self {
@@ -64,12 +64,16 @@ impl AudioPorts {
     }
 }
 
+/// Number of audio devices
+pub const DEV_COUNT: u16 = 4;
+
 /// Expected audio sample rate
 pub const SAMPLE_RATE: u32 = 44100;
 
 /// Expected number of audio channels
 pub const CHANNELS: u16 = 2;
 
+/// Number of samples to use for crossfade
 const CROSSFADE_COUNT: usize = 200;
 
 /// Decoder for the `adsr` port
@@ -313,7 +317,7 @@ impl StreamData {
 }
 
 pub struct Audio {
-    streams: [Stream; 4],
+    streams: [Stream; DEV_COUNT as usize],
 }
 
 impl Audio {
@@ -328,17 +332,16 @@ impl Audio {
         Audio { streams }
     }
 
-    /// Push any relevant "note done" vectors to the event queue
-    pub fn update(&self, vm: &Uxn, queue: &mut Vec<Event>) {
-        for (i, s) in self.streams.iter().enumerate() {
-            if s.done.swap(false, Ordering::Relaxed) {
-                let p = AudioPorts::dev(vm, i);
-                let vector = p.vector.get();
-                if vector != 0 {
-                    queue.push(Event { data: None, vector });
-                }
+    /// Return the "note done" vector if the given channel is done
+    pub fn update(&self, vm: &Uxn, i: usize) -> Option<Event> {
+        if self.streams[i].done.swap(false, Ordering::Relaxed) {
+            let p = AudioPorts::dev(vm, i);
+            let vector = p.vector.get();
+            if vector != 0 {
+                return Some(Event { data: None, vector });
             }
         }
+        None
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {

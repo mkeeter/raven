@@ -59,33 +59,39 @@ impl Controller {
             | self.down.contains(&Key::RightShift)
     }
 
-    /// Send the given key event, appending an event to the queue if needed
-    pub fn pressed(&mut self, vm: &mut Uxn, k: Key, queue: &mut Vec<Event>) {
-        self.down.insert(k);
+    /// Sends a single character event
+    pub fn char(&mut self, vm: &mut Uxn, c: u8) -> Event {
+        let p = vm.dev::<ControllerPorts>();
+        Event {
+            vector: p.vector.get(),
+            data: Some(EventData {
+                addr: ControllerPorts::KEY,
+                value: c,
+                clear: true,
+            }),
+        }
+    }
 
-        let e = match k {
-            Key::Char(c) => {
-                let p = vm.dev::<ControllerPorts>();
-                Some(Event {
-                    vector: p.vector.get(),
-                    data: Some(EventData {
-                        addr: ControllerPorts::KEY,
-                        value: c,
-                        clear: true,
-                    }),
-                })
-            }
-            _ => self.check_buttons(vm),
-        };
-        queue.extend(e);
+    /// Send the given key event, returning an event if needed
+    pub fn pressed(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
+        if let Key::Char(k) = k {
+            Some(self.char(vm, k))
+        } else {
+            self.down.insert(k);
+            self.check_buttons(vm)
+        }
     }
 
     /// Indicate that the given key has been released
     ///
-    /// This may change our button state and push an [`Event`] to the queue
-    pub fn released(&mut self, vm: &mut Uxn, k: Key, queue: &mut Vec<Event>) {
-        self.down.remove(&k);
-        queue.extend(self.check_buttons(vm));
+    /// This may change our button state and return an event
+    pub fn released(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
+        if !matches!(k, Key::Char(..)) {
+            self.down.remove(&k);
+            self.check_buttons(vm)
+        } else {
+            None
+        }
     }
 
     fn check_buttons(&mut self, vm: &mut Uxn) -> Option<Event> {

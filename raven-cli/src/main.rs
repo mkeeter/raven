@@ -46,11 +46,8 @@ fn main() -> Result<()> {
     // Blocking loop, listening to the stdin reader thread
     let rx = varvara::console_worker();
     while let Ok(c) = rx.recv() {
-        let i = varvara::Input {
-            console: Some(c),
-            ..Default::default()
-        };
-        dev.update(&mut vm, i).check()?;
+        dev.console(&mut vm, c);
+        dev.output(&vm).check()?;
     }
 
     Ok(())

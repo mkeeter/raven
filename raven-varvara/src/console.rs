@@ -114,8 +114,8 @@ impl Console {
     ///
     /// Note that this function does not set the type, which should be
     /// configured by calling [`Self::set_type`] before firing the vector.
-    pub fn update(&self, vm: &Uxn, c: u8, queue: &mut Vec<Event>) {
-        queue.push(self.event(vm, c));
+    pub fn update(&self, vm: &Uxn, c: u8) -> Event {
+        self.event(vm, c)
     }
 
     /// Takes the `stderr` buffer, leaving it empty

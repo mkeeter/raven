@@ -43,22 +43,6 @@ struct Event {
     pub vector: u16,
 }
 
-/// Input to [`Varvara::update`], including all incoming events
-#[derive(Default)]
-pub struct Input {
-    /// Current mouse state
-    pub mouse: mouse::MouseState,
-
-    /// Keys pressed
-    pub pressed: Vec<controller::Key>,
-
-    /// Keys released
-    pub released: Vec<controller::Key>,
-
-    /// Incoming console character
-    pub console: Option<u8>,
-}
-
 /// Output from [`Varvara::update`], which may modify the GUI
 pub struct Output<'a> {
     /// Current window size
@@ -122,8 +106,6 @@ pub struct Varvara {
 
     /// Flags indicating if we've already printed a warning about a missing dev
     already_warned: [bool; 16],
-
-    queue: Vec<Event>,
 }
 
 impl Default for Varvara {
@@ -181,7 +163,6 @@ impl Varvara {
             file: file::File::new(),
             controller: controller::Controller::new(),
 
-            queue: vec![],
             already_warned: [false; 16],
         }
     }
@@ -234,9 +215,9 @@ impl Varvara {
     pub fn send_args(&mut self, vm: &mut Uxn, args: &[String]) -> Output {
         for (i, a) in args.iter().enumerate() {
             self.console.set_type(vm, console::Type::Argument);
-            self.queue
-                .extend(a.bytes().map(|c| self.console.event(vm, c)));
-            self.process_events(vm);
+            for c in a.bytes() {
+                self.process_event(vm, self.console.event(vm, c));
+            }
 
             let ty = if i == args.len() - 1 {
                 console::Type::ArgumentEnd
@@ -244,49 +225,63 @@ impl Varvara {
                 console::Type::ArgumentSpacer
             };
             self.console.set_type(vm, ty);
-            self.queue.push(self.console.event(vm, b'\n'));
-            self.process_events(vm);
+            self.process_event(vm, self.console.event(vm, b'\n'));
         }
         self.console.set_type(vm, console::Type::Stdin);
         self.output(vm)
     }
 
-    /// Handles incoming events
-    #[must_use]
-    pub fn update(&mut self, vm: &mut Uxn, e: Input) -> Output {
-        if let Some(c) = e.console {
-            self.console.update(vm, c, &mut self.queue);
-        }
-        self.audio.update(vm, &mut self.queue);
-        self.mouse.update(vm, e.mouse, &mut self.queue);
-        for k in &e.pressed {
-            self.controller.pressed(vm, *k, &mut self.queue);
-        }
-        for k in &e.released {
-            self.controller.released(vm, *k, &mut self.queue);
-        }
-
-        self.process_events(vm);
-        self.output(vm)
+    /// Send a character from the keyboard (controller) device
+    pub fn char(&mut self, vm: &mut Uxn, k: u8) {
+        let e = self.controller.char(vm, k);
+        self.process_event(vm, e);
     }
 
-    fn process_events(&mut self, vm: &mut Uxn) {
-        // Borrow the event queue, so we can reuse the allocation
-        let mut queue = std::mem::take(&mut self.queue);
-        for e in queue.iter() {
-            if let Some(d) = e.data {
-                vm.write_dev_mem(d.addr, d.value);
-            }
-            vm.run(self, e.vector);
-            if let Some(d) = e.data {
-                if d.clear {
-                    vm.write_dev_mem(d.addr, 0);
-                }
+    /// Press a key on the controller device
+    pub fn pressed(&mut self, vm: &mut Uxn, k: Key) {
+        self.controller
+            .pressed(vm, k)
+            .map(|e| self.process_event(vm, e));
+    }
+
+    /// Release a key on the controller device
+    pub fn released(&mut self, vm: &mut Uxn, k: Key) {
+        self.controller
+            .released(vm, k)
+            .map(|e| self.process_event(vm, e));
+    }
+
+    /// Send a character from the console device
+    pub fn console(&mut self, vm: &mut Uxn, c: u8) {
+        let e = self.console.update(vm, c);
+        self.process_event(vm, e);
+    }
+
+    /// Updates the mouse state
+    pub fn mouse(&mut self, vm: &mut Uxn, m: MouseState) {
+        self.mouse.update(vm, m).map(|e| self.process_event(vm, e));
+    }
+
+    /// Processes pending audio events
+    pub fn audio(&mut self, vm: &mut Uxn) {
+        for i in 0..audio::DEV_COUNT {
+            self.audio
+                .update(vm, i as usize)
+                .map(|e| self.process_event(vm, e));
+        }
+    }
+
+    /// Processes a single vector event
+    fn process_event(&mut self, vm: &mut Uxn, e: Event) {
+        if let Some(d) = e.data {
+            vm.write_dev_mem(d.addr, d.value);
+        }
+        vm.run(self, e.vector);
+        if let Some(d) = e.data {
+            if d.clear {
+                vm.write_dev_mem(d.addr, 0);
             }
         }
-        // Replace self.queue, reusing the allocation
-        queue.clear();
-        self.queue = queue;
     }
 
     /// Returns a handle to the given audio stream data
