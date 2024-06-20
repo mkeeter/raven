@@ -26,6 +26,8 @@ struct Stage<'a> {
     vm: Uxn<'a>,
     dev: Varvara,
 
+    next_frame: std::time::Instant,
+
     scroll: (f32, f32),
     cursor_pos: Option<(f32, f32)>,
     console_rx: std::sync::mpsc::Receiver<u8>,
@@ -51,6 +53,8 @@ impl<'a> Stage<'a> {
             vm,
             dev,
 
+            next_frame: std::time::Instant::now(),
+
             scroll: (0.0, 0.0),
             cursor_pos: None,
             console_rx,
@@ -62,6 +66,10 @@ impl<'a> Stage<'a> {
 
 impl eframe::App for Stage<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let dt = std::time::Duration::from_millis(16);
+        let now = std::time::Instant::now();
+        ctx.request_repaint_after(dt);
+
         ctx.input(|i| {
             for e in i.events.iter() {
                 match e {
@@ -116,8 +124,12 @@ impl eframe::App for Stage<'_> {
         // Handle audio callback
         self.dev.audio(&mut self.vm);
 
-        // Screen callback (TODO limit to 60 FPS?)
-        self.dev.redraw(&mut self.vm);
+        // Screen callback (limited to 60 FPS)
+        if now >= self.next_frame {
+            println!("{:?}", now - self.next_frame);
+            self.dev.redraw(&mut self.vm);
+            self.next_frame = now + std::time::Duration::from_millis(15);
+        }
 
         let prev_size = self.dev.screen_size();
         let out = self.dev.output(&self.vm);
@@ -158,8 +170,6 @@ impl eframe::App for Stage<'_> {
 
         // Update stdout / stderr / exiting
         out.check().expect("failed to print output?");
-
-        ctx.request_repaint_after(std::time::Duration::from_millis(16));
     }
 }
 
