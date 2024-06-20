@@ -1,5 +1,5 @@
 use crate::{Event, EventData};
-use std::{io::Read, mem::offset_of, sync::mpsc};
+use std::{io::Read, mem::offset_of};
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 
@@ -44,8 +44,9 @@ impl ConsolePorts {
 }
 
 /// Spawns a worker thread that listens on `stdin` and emits characters
-pub fn worker() -> mpsc::Receiver<u8> {
-    let (tx, rx) = mpsc::channel();
+#[cfg(not(target_arch = "wasm32"))]
+pub fn worker() -> std::sync::mpsc::Receiver<u8> {
+    let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let mut i = std::io::stdin().lock();
         let mut buf = [0u8; 32];

@@ -19,9 +19,11 @@ mod audio;
 
 pub use audio::CHANNELS as AUDIO_CHANNELS;
 pub use audio::SAMPLE_RATE as AUDIO_SAMPLE_RATE;
-pub use console::worker as console_worker;
 pub use controller::Key;
 pub use mouse::MouseState;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use console::worker as console_worker;
 
 use uxn::{Device, Ports, Uxn};
 

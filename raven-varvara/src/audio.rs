@@ -71,7 +71,12 @@ pub const DEV_COUNT: u16 = 4;
 pub const SAMPLE_RATE: u32 = 44100;
 
 /// Expected number of audio channels
+#[cfg(not(target_arch = "wasm32"))]
 pub const CHANNELS: u16 = 2;
+
+/// Expected number of audio channels (WebAssembly)
+#[cfg(target_arch = "wasm32")]
+pub const CHANNELS: u16 = 1;
 
 /// Number of samples to use for crossfade
 const CROSSFADE_COUNT: usize = 200;

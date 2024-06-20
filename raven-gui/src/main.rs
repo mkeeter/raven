@@ -1,21 +1,21 @@
-use std::io::Read;
-use std::path::PathBuf;
-
 use uxn::{Uxn, UxnRam};
 use varvara::{Key, MouseState, Varvara, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 
-use anyhow::{anyhow, Context, Result};
-use clap::Parser;
+use anyhow::Result;
 use cpal::traits::StreamTrait;
 use eframe::egui;
 use log::{info, warn};
 
+#[cfg(not(target_arch = "wasm32"))]
+use clap::Parser;
+
 /// Uxn runner
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
+#[cfg(not(target_arch = "wasm32"))]
 struct Args {
     /// Target file to load
-    rom: PathBuf,
+    rom: std::path::PathBuf,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -26,11 +26,14 @@ struct Stage<'a> {
     vm: Uxn<'a>,
     dev: Varvara,
 
-    next_frame: std::time::Instant,
+    /// Time (in seconds) at which we should draw the next frame
+    next_frame: f64,
+
+    #[cfg(not(target_arch = "wasm32"))]
+    console_rx: std::sync::mpsc::Receiver<u8>,
 
     scroll: (f32, f32),
     cursor_pos: Option<(f32, f32)>,
-    console_rx: std::sync::mpsc::Receiver<u8>,
 
     texture: egui::TextureHandle,
 }
@@ -38,7 +41,6 @@ struct Stage<'a> {
 impl<'a> Stage<'a> {
     fn new(vm: Uxn<'a>, mut dev: Varvara, ctx: &egui::Context) -> Stage<'a> {
         let out = dev.output(&vm);
-        let console_rx = varvara::console_worker();
 
         let size = out.size;
         let image = egui::ColorImage::new(
@@ -53,11 +55,13 @@ impl<'a> Stage<'a> {
             vm,
             dev,
 
-            next_frame: std::time::Instant::now(),
+            next_frame: 0.0,
+
+            #[cfg(not(target_arch = "wasm32"))]
+            console_rx: varvara::console_worker(),
 
             scroll: (0.0, 0.0),
             cursor_pos: None,
-            console_rx,
 
             texture,
         }
@@ -66,11 +70,7 @@ impl<'a> Stage<'a> {
 
 impl eframe::App for Stage<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let dt = std::time::Duration::from_millis(16);
-        let now = std::time::Instant::now();
-        ctx.request_repaint_after(dt);
-
-        ctx.input(|i| {
+        let time = ctx.input(|i| {
             for e in i.events.iter() {
                 match e {
                     egui::Event::Text(s) => {
@@ -126,9 +126,11 @@ impl eframe::App for Stage<'_> {
                 buttons,
             };
             self.dev.mouse(&mut self.vm, m);
+            i.time
         });
 
         // Listen for console characters
+        #[cfg(not(target_arch = "wasm32"))]
         if let Ok(c) = self.console_rx.try_recv() {
             self.dev.console(&mut self.vm, c);
         }
@@ -137,10 +139,13 @@ impl eframe::App for Stage<'_> {
         self.dev.audio(&mut self.vm);
 
         // Screen callback (limited to 60 FPS)
-        if now >= self.next_frame {
+        if time >= self.next_frame {
             self.dev.redraw(&mut self.vm);
-            self.next_frame = now + std::time::Duration::from_millis(15);
+            self.next_frame = time + 0.01666666666;
         }
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(
+            self.next_frame - time,
+        ));
 
         let prev_size = self.dev.screen_size();
         let out = self.dev.output(&self.vm);
@@ -239,7 +244,11 @@ fn decode_key(k: egui::Key) -> Option<Key> {
     Some(c)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> Result<()> {
+    use anyhow::{anyhow, Context};
+    use std::io::Read;
+
     let env = env_logger::Env::default()
         .filter_or("UXN_LOG", "info")
         .write_style_or("UXN_LOG", "always");
@@ -281,4 +290,39 @@ fn main() -> Result<()> {
         Box::new(move |cc| Box::new(Stage::new(vm, dev, &cc.egui_ctx))),
     )
     .map_err(|e| anyhow!("got egui error: {e:?}"))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() -> Result<()> {
+    eframe::WebLogger::init(log::LevelFilter::Debug).ok();
+
+    let rom = vec![]; // TODO
+    let ram = UxnRam::new();
+    let mut vm = Uxn::new(&rom, ram.leak());
+    let mut dev = Varvara::new();
+
+    let _audio = audio_setup(&dev);
+
+    // Run the reset vector
+    vm.run(&mut dev, 0x100);
+
+    dev.output(&vm).check()?;
+
+    let (width, height) = dev.output(&vm).size;
+    let options = eframe::WebOptions {
+        max_size_points: egui::Vec2::new(width as f32, height as f32),
+        ..eframe::WebOptions::default()
+    };
+
+    wasm_bindgen_futures::spawn_local(async {
+        eframe::WebRunner::new()
+            .start(
+                "varvara",
+                options,
+                Box::new(move |cc| Box::new(Stage::new(vm, dev, &cc.egui_ctx))),
+            )
+            .await
+            .expect("failed to start eframe")
+    });
+    Ok(())
 }

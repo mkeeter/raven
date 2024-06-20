@@ -5,11 +5,17 @@ edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
-clap.workspace = true
-cpal.workspace = true
 eframe.workspace = true
-env_logger.workspace = true
 log.workspace = true
 
 uxn = { path = "../raven-uxn", package = "raven-uxn" }
 varvara = { path = "../raven-varvara", package = "raven-varvara" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clap.workspace = true
+cpal.workspace = true
+env_logger.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures.workspace = true
+cpal = { workspace = true, features = ["wasm-bindgen"] }
