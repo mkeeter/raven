@@ -275,18 +275,25 @@ impl StreamData {
                 0.0
             };
 
-            data[i] = d * self.left;
-            data[i + 1] = d * self.right;
+            static_assertions::const_assert!(CHANNELS == 1 || CHANNELS == 2);
+            match CHANNELS {
+                1 => data[i] = d,
+                2 => {
+                    data[i] = d * self.left;
+                    data[i + 1] = d * self.right;
+                }
+                _ => unreachable!(),
+            };
 
             if !self.crossfade.is_empty() {
                 let x = self.crossfade.len() as f32
                     / (CROSSFADE_COUNT as f32 - 1.0);
-                for j in 0..2 {
+                for j in 0..CHANNELS as usize {
                     let v = self.crossfade.pop_front().unwrap();
                     data[i + j] = v * x + data[i + j] * (1.0 - x);
                 }
             }
-            i += 2;
+            i += CHANNELS as usize;
 
             self.pos += self.inc;
             self.megapos += self.inc;
