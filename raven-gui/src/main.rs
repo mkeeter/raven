@@ -79,8 +79,16 @@ impl eframe::App for Stage<'_> {
                         // we do everything through the Key event, with the
                         // exception of quotes (which don't have an associated
                         // key; https://github.com/emilk/egui/pull/4683)
+                        //
+                        // Similarly, the Key event doesn't always decode
+                        // events with Shift and an attached key.  This is all
+                        // terribly messy; my apologies.
+                        const RAW_CHARS: [u8; 16] = [
+                            b'"', b'\'', b'{', b'}', b'_', b')', b'(', b'*',
+                            b'&', b'^', b'%', b'$', b'#', b'@', b'!', b'~',
+                        ];
                         for c in s.bytes() {
-                            if c == b'"' || c == b'\'' {
+                            if RAW_CHARS.contains(&c) {
                                 self.dev.char(&mut self.vm, c);
                             }
                         }
@@ -308,12 +316,12 @@ fn decode_key(k: egui::Key, shift: bool) -> Option<Key> {
         // TODO missing Key::Quote
         (egui::Key::Backtick, false) => Key::Char(b'`'),
         (egui::Key::Backtick, true) => Key::Char(b'~'),
-        (egui::Key::Backslash, false) => Key::Char(b'\\'),
-        (egui::Key::Backslash, true) => Key::Char(b'|'),
+        (egui::Key::Backslash, _) => Key::Char(b'\\'),
+        (egui::Key::Pipe, _) => Key::Char(b'|'),
         (egui::Key::Comma, false) => Key::Char(b','),
         (egui::Key::Comma, true) => Key::Char(b'<'),
-        (egui::Key::Equals, false) => Key::Char(b'='),
-        (egui::Key::Equals, true) => Key::Char(b'+'),
+        (egui::Key::Equals, _) => Key::Char(b'='),
+        (egui::Key::Plus, _) => Key::Char(b'+'),
         (egui::Key::OpenBracket, false) => Key::Char(b'['),
         (egui::Key::OpenBracket, true) => Key::Char(b'{'),
         (egui::Key::Minus, false) => Key::Char(b'-'),
@@ -322,12 +330,13 @@ fn decode_key(k: egui::Key, shift: bool) -> Option<Key> {
         (egui::Key::Period, true) => Key::Char(b'>'),
         (egui::Key::CloseBracket, false) => Key::Char(b']'),
         (egui::Key::CloseBracket, true) => Key::Char(b'}'),
-        (egui::Key::Semicolon, false) => Key::Char(b';'),
-        (egui::Key::Semicolon, true) => Key::Char(b':'),
-        (egui::Key::Slash, false) => Key::Char(b'/'),
-        (egui::Key::Slash, true) => Key::Char(b'?'),
+        (egui::Key::Semicolon, _) => Key::Char(b';'),
+        (egui::Key::Colon, _) => Key::Char(b':'),
+        (egui::Key::Slash, _) => Key::Char(b'/'),
+        (egui::Key::Questionmark, _) => Key::Char(b'?'),
         (egui::Key::Space, _) => Key::Char(b' '),
         (egui::Key::Tab, _) => Key::Char(b'\t'),
+        (egui::Key::Enter, _) => Key::Char(b'\r'),
         _ => return None,
     };
     Some(c)
