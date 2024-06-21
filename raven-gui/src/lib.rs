@@ -1,6 +1,8 @@
 use uxn::Uxn;
 use varvara::{Key, MouseState, Varvara, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 
+use std::sync::{Arc, Mutex};
+
 use cpal::traits::StreamTrait;
 use eframe::egui;
 use log::warn;
@@ -176,7 +178,9 @@ impl eframe::App for Stage<'_> {
     }
 }
 
-pub fn audio_setup(dev: &Varvara) -> (cpal::Device, [cpal::Stream; 4]) {
+pub fn audio_setup(
+    data: [Arc<Mutex<varvara::StreamData>>; 4],
+) -> (cpal::Device, [cpal::Stream; 4]) {
     use cpal::traits::{DeviceTrait, HostTrait};
     let host = cpal::default_host();
     let device = host
@@ -194,8 +198,7 @@ pub fn audio_setup(dev: &Varvara) -> (cpal::Device, [cpal::Stream; 4]) {
         .expect("no supported config?");
     let config = supported_config.config();
 
-    let streams = [0, 1, 2, 3].map(|i| {
-        let d = dev.audio_stream(i);
+    let streams = data.map(|d| {
         let stream = device
             .build_output_stream(
                 &config,

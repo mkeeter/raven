@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     let mut vm = Uxn::new(&rom, ram.leak());
     let mut dev = Varvara::new();
 
-    let _audio = audio_setup(&dev);
+    let _audio = audio_setup(dev.audio_streams());
 
     // Run the reset vector
     let start = std::time::Instant::now();

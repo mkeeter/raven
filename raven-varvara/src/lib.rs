@@ -17,8 +17,10 @@ mod system;
 /// Audio handler implementation
 mod audio;
 
+pub use audio::StreamData;
 pub use audio::CHANNELS as AUDIO_CHANNELS;
 pub use audio::SAMPLE_RATE as AUDIO_SAMPLE_RATE;
+
 pub use controller::Key;
 pub use mouse::MouseState;
 
@@ -294,5 +296,10 @@ impl Varvara {
     /// There are only four audio streams, so this function panics if `i >= 4`
     pub fn audio_stream(&self, i: usize) -> Arc<Mutex<audio::StreamData>> {
         self.audio.stream(i)
+    }
+
+    /// Returns the set of audio stream data
+    pub fn audio_streams(&self) -> [Arc<Mutex<audio::StreamData>>; 4] {
+        [0, 1, 2, 3].map(|i| self.audio_stream(i))
     }
 }

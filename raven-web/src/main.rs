@@ -2,7 +2,11 @@ use uxn::{Uxn, UxnRam};
 use varvara::Varvara;
 
 use anyhow::{anyhow, Result};
-use eframe::{egui, wasm_bindgen::JsCast, web_sys};
+use eframe::{
+    egui,
+    wasm_bindgen::{closure::Closure, JsCast},
+    web_sys,
+};
 
 use log::{error, info};
 use raven_gui::{audio_setup, Stage};
@@ -17,12 +21,10 @@ fn main() {
 fn inner() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
-    let rom = include_bytes!("../../roms/potato.rom");
+    let rom = include_bytes!("../../roms/audio.rom");
     let ram = UxnRam::new();
     let mut vm = Uxn::new(rom, ram.leak());
     let mut dev = Varvara::new();
-
-    let _audio = audio_setup(&dev);
 
     // Run the reset vector
     vm.run(&mut dev, 0x100);
@@ -47,6 +49,17 @@ fn inner() -> Result<()> {
         .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
     div.style()
         .set_css_text(&format!("width: {width}px; height: {height}px"));
+
+    let mut _audio = None;
+    let mut audio_data = Some(dev.audio_streams());
+    let a = Closure::<dyn FnMut()>::new(move || {
+        if let Some(d) = audio_data.take() {
+            info!("setting up audio");
+            _audio = Some(audio_setup(d));
+        }
+    });
+    div.set_onclick(Some(a.as_ref().unchecked_ref()));
+    std::mem::forget(a);
 
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()
