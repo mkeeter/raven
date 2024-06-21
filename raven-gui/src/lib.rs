@@ -69,15 +69,22 @@ impl eframe::App for Stage<'_> {
                 self.dev.redraw(&mut self.vm);
             }
 
+            let shift_held = i.modifiers.shift;
             for e in i.events.iter() {
                 match e {
                     egui::Event::Text(s) => {
+                        // The Text event doesn't handle Ctrl + characters, so
+                        // we do everything through the Key event, with the
+                        // exception of quotes (which don't have an associated
+                        // key; https://github.com/emilk/egui/pull/4683)
                         for c in s.bytes() {
-                            self.dev.char(&mut self.vm, c);
+                            if c == b'"' || c == b'\'' {
+                                self.dev.char(&mut self.vm, c);
+                            }
                         }
                     }
                     egui::Event::Key { key, pressed, .. } => {
-                        if let Some(k) = decode_key(*key) {
+                        if let Some(k) = decode_key(*key, shift_held) {
                             if *pressed {
                                 self.dev.pressed(&mut self.vm, k);
                             } else {
@@ -217,18 +224,108 @@ pub fn audio_setup(
     (device, streams)
 }
 
-fn decode_key(k: egui::Key) -> Option<Key> {
-    let c = match k {
-        egui::Key::ArrowUp => Key::Up,
-        egui::Key::ArrowDown => Key::Down,
-        egui::Key::ArrowLeft => Key::Left,
-        egui::Key::ArrowRight => Key::Right,
-        egui::Key::Home => Key::Home,
-
-        // TODO are these also sent as text events?
-        egui::Key::Tab => Key::Char(b'\t'),
-        egui::Key::Backspace => Key::Char(0x08),
-        egui::Key::Enter => Key::Char(b'\r'),
+fn decode_key(k: egui::Key, shift: bool) -> Option<Key> {
+    let c = match (k, shift) {
+        (egui::Key::ArrowUp, _) => Key::Up,
+        (egui::Key::ArrowDown, _) => Key::Down,
+        (egui::Key::ArrowLeft, _) => Key::Left,
+        (egui::Key::ArrowRight, _) => Key::Right,
+        (egui::Key::Home, _) => Key::Home,
+        (egui::Key::Num0, false) => Key::Char(b'0'),
+        (egui::Key::Num0, true) => Key::Char(b')'),
+        (egui::Key::Num1, false) => Key::Char(b'1'),
+        (egui::Key::Num1, true) => Key::Char(b'!'),
+        (egui::Key::Num2, false) => Key::Char(b'2'),
+        (egui::Key::Num2, true) => Key::Char(b'@'),
+        (egui::Key::Num3, false) => Key::Char(b'3'),
+        (egui::Key::Num3, true) => Key::Char(b'#'),
+        (egui::Key::Num4, false) => Key::Char(b'4'),
+        (egui::Key::Num4, true) => Key::Char(b'$'),
+        (egui::Key::Num5, false) => Key::Char(b'5'),
+        (egui::Key::Num5, true) => Key::Char(b'5'),
+        (egui::Key::Num6, false) => Key::Char(b'6'),
+        (egui::Key::Num6, true) => Key::Char(b'^'),
+        (egui::Key::Num7, false) => Key::Char(b'7'),
+        (egui::Key::Num7, true) => Key::Char(b'&'),
+        (egui::Key::Num8, false) => Key::Char(b'8'),
+        (egui::Key::Num8, true) => Key::Char(b'*'),
+        (egui::Key::Num9, false) => Key::Char(b'9'),
+        (egui::Key::Num9, true) => Key::Char(b'('),
+        (egui::Key::A, false) => Key::Char(b'a'),
+        (egui::Key::A, true) => Key::Char(b'A'),
+        (egui::Key::B, false) => Key::Char(b'b'),
+        (egui::Key::B, true) => Key::Char(b'B'),
+        (egui::Key::C, false) => Key::Char(b'c'),
+        (egui::Key::C, true) => Key::Char(b'C'),
+        (egui::Key::D, false) => Key::Char(b'd'),
+        (egui::Key::D, true) => Key::Char(b'D'),
+        (egui::Key::E, false) => Key::Char(b'e'),
+        (egui::Key::E, true) => Key::Char(b'E'),
+        (egui::Key::F, false) => Key::Char(b'f'),
+        (egui::Key::F, true) => Key::Char(b'F'),
+        (egui::Key::G, false) => Key::Char(b'g'),
+        (egui::Key::G, true) => Key::Char(b'G'),
+        (egui::Key::H, false) => Key::Char(b'h'),
+        (egui::Key::H, true) => Key::Char(b'H'),
+        (egui::Key::I, false) => Key::Char(b'i'),
+        (egui::Key::I, true) => Key::Char(b'I'),
+        (egui::Key::J, false) => Key::Char(b'j'),
+        (egui::Key::J, true) => Key::Char(b'J'),
+        (egui::Key::K, false) => Key::Char(b'k'),
+        (egui::Key::K, true) => Key::Char(b'K'),
+        (egui::Key::L, false) => Key::Char(b'l'),
+        (egui::Key::L, true) => Key::Char(b'L'),
+        (egui::Key::M, false) => Key::Char(b'm'),
+        (egui::Key::M, true) => Key::Char(b'M'),
+        (egui::Key::N, false) => Key::Char(b'n'),
+        (egui::Key::N, true) => Key::Char(b'N'),
+        (egui::Key::O, false) => Key::Char(b'o'),
+        (egui::Key::O, true) => Key::Char(b'O'),
+        (egui::Key::P, false) => Key::Char(b'p'),
+        (egui::Key::P, true) => Key::Char(b'P'),
+        (egui::Key::Q, false) => Key::Char(b'q'),
+        (egui::Key::Q, true) => Key::Char(b'Q'),
+        (egui::Key::R, false) => Key::Char(b'r'),
+        (egui::Key::R, true) => Key::Char(b'R'),
+        (egui::Key::S, false) => Key::Char(b's'),
+        (egui::Key::S, true) => Key::Char(b'S'),
+        (egui::Key::T, false) => Key::Char(b't'),
+        (egui::Key::T, true) => Key::Char(b'T'),
+        (egui::Key::U, false) => Key::Char(b'u'),
+        (egui::Key::U, true) => Key::Char(b'U'),
+        (egui::Key::V, false) => Key::Char(b'v'),
+        (egui::Key::V, true) => Key::Char(b'V'),
+        (egui::Key::W, false) => Key::Char(b'w'),
+        (egui::Key::W, true) => Key::Char(b'W'),
+        (egui::Key::X, false) => Key::Char(b'x'),
+        (egui::Key::X, true) => Key::Char(b'X'),
+        (egui::Key::Y, false) => Key::Char(b'y'),
+        (egui::Key::Y, true) => Key::Char(b'Y'),
+        (egui::Key::Z, false) => Key::Char(b'z'),
+        (egui::Key::Z, true) => Key::Char(b'Z'),
+        // TODO missing Key::Quote
+        (egui::Key::Backtick, false) => Key::Char(b'`'),
+        (egui::Key::Backtick, true) => Key::Char(b'~'),
+        (egui::Key::Backslash, false) => Key::Char(b'\\'),
+        (egui::Key::Backslash, true) => Key::Char(b'|'),
+        (egui::Key::Comma, false) => Key::Char(b','),
+        (egui::Key::Comma, true) => Key::Char(b'<'),
+        (egui::Key::Equals, false) => Key::Char(b'='),
+        (egui::Key::Equals, true) => Key::Char(b'+'),
+        (egui::Key::OpenBracket, false) => Key::Char(b'['),
+        (egui::Key::OpenBracket, true) => Key::Char(b'{'),
+        (egui::Key::Minus, false) => Key::Char(b'-'),
+        (egui::Key::Minus, true) => Key::Char(b'_'),
+        (egui::Key::Period, false) => Key::Char(b'.'),
+        (egui::Key::Period, true) => Key::Char(b'>'),
+        (egui::Key::CloseBracket, false) => Key::Char(b']'),
+        (egui::Key::CloseBracket, true) => Key::Char(b'}'),
+        (egui::Key::Semicolon, false) => Key::Char(b';'),
+        (egui::Key::Semicolon, true) => Key::Char(b':'),
+        (egui::Key::Slash, false) => Key::Char(b'/'),
+        (egui::Key::Slash, true) => Key::Char(b'?'),
+        (egui::Key::Space, _) => Key::Char(b' '),
+        (egui::Key::Tab, _) => Key::Char(b'\t'),
         _ => return None,
     };
     Some(c)
