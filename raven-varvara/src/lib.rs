@@ -188,8 +188,8 @@ impl Varvara {
     ///
     /// This function must be called at 60 Hz
     pub fn redraw(&mut self, vm: &mut Uxn) {
-        let v = self.screen.update(vm);
-        vm.run(self, v)
+        let e = self.screen.update(vm);
+        self.process_event(vm, e);
     }
 
     /// Returns the current output state of the system

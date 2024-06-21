@@ -1,3 +1,4 @@
+use crate::Event;
 use std::mem::offset_of;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
@@ -370,8 +371,9 @@ impl Screen {
     }
 
     /// Called on screen update; returns the screen vector
-    pub fn update(&mut self, vm: &mut Uxn) -> u16 {
+    pub fn update(&mut self, vm: &mut Uxn) -> Event {
         // Nothing to do here, but return the screen vector
-        vm.dev::<ScreenPorts>().vector.get()
+        let vector = vm.dev::<ScreenPorts>().vector.get();
+        Event { data: None, vector }
     }
 }
