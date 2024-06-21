@@ -290,16 +290,8 @@ impl Varvara {
         }
     }
 
-    /// Returns a handle to the given audio stream data
-    ///
-    /// # Panics
-    /// There are only four audio streams, so this function panics if `i >= 4`
-    pub fn audio_stream(&self, i: usize) -> Arc<Mutex<audio::StreamData>> {
-        self.audio.stream(i)
-    }
-
-    /// Returns the set of audio stream data
+    /// Returns the set of audio stream data handles
     pub fn audio_streams(&self) -> [Arc<Mutex<audio::StreamData>>; 4] {
-        [0, 1, 2, 3].map(|i| self.audio_stream(i))
+        [0, 1, 2, 3].map(|i| self.audio.stream(i))
     }
 }

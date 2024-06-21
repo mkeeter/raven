@@ -1654,6 +1654,7 @@ dependencies = [
  "log",
  "raven-uxn",
  "raven-varvara",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -1672,20 +1673,6 @@ dependencies = [
  "raven-uxn",
  "static_assertions",
  "zerocopy",
-]
-
-[[package]]
-name = "raven-web"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cpal",
- "eframe",
- "log",
- "raven-gui",
- "raven-uxn",
- "raven-varvara",
- "wasm-bindgen-futures",
 ]
 
 [[package]]

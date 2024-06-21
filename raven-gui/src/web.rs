@@ -1,27 +1,19 @@
-use uxn::{Uxn, UxnRam};
-use varvara::Varvara;
-
 use anyhow::{anyhow, Result};
 use eframe::{
     egui,
     wasm_bindgen::{closure::Closure, JsCast},
     web_sys,
 };
+use log::info;
 
-use log::{error, info};
-use raven_gui::{audio_setup, Stage};
+use crate::common::{audio_setup, Stage};
+use uxn::{Uxn, UxnRam};
+use varvara::Varvara;
 
-fn main() {
-    match inner() {
-        Ok(()) => info!("finished startup"),
-        Err(e) => error!("startup failed: {e:?}"),
-    }
-}
-
-fn inner() -> Result<()> {
+pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
-    let rom = include_bytes!("../../roms/audio.rom");
+    let rom = include_bytes!("../../roms/potato.rom");
     let ram = UxnRam::new();
     let mut vm = Uxn::new(rom, ram.leak());
     let mut dev = Varvara::new();
@@ -56,6 +48,13 @@ fn inner() -> Result<()> {
         if let Some(d) = audio_data.take() {
             info!("setting up audio");
             _audio = Some(audio_setup(d));
+
+            let div = document
+                .get_element_by_id("audio")
+                .expect("could not get audio warning")
+                .dyn_into::<web_sys::HtmlElement>()
+                .expect("could not cast to HtmlElement");
+            div.style().set_css_text("color: #aaa");
         }
     });
     div.set_onclick(Some(a.as_ref().unchecked_ref()));

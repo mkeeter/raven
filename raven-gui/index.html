@@ -14,19 +14,13 @@
             touch-action: manipulation;
         }
 
-        html,
-        body {
-            overflow: hidden;
-            margin: 0 !important;
-            padding: 0 !important;
-            height: 100%;
-            width: 100%;
-        }
-
         div#box {
             position: relative;
             outline: 1px solid #bbb;
-            margin: 20px;
+        }
+        div {
+            margin-left: 20px;
+            margin-bottom: 10px;
         }
 
         canvas {
@@ -41,8 +35,9 @@
         top of its container; see https://github.com/emilk/egui/discussions/746
     -->
     <div id="box" style="width: 512px; height: 320px">
-        <canvas id="varvara"></canvas>
+        <canvas id="varvara" style="width: 512px; height: 320px"></canvas>
     </div>
+    <div id="audio">(click for audio)</div>
 </body>
 
 </html>

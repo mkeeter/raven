@@ -1,4 +1,4 @@
 /target
 *.s
-raven-web/dist
+raven-gui/dist
 roms
