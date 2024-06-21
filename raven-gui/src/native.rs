@@ -10,7 +10,7 @@ use log::info;
 
 use clap::Parser;
 
-use crate::common::{audio_setup, Stage};
+use crate::{audio_setup, Stage};
 
 /// Uxn runner
 #[derive(Parser)]

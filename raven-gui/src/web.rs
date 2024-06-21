@@ -6,14 +6,14 @@ use eframe::{
 };
 use log::info;
 
-use crate::common::{audio_setup, Stage};
+use crate::{audio_setup, Stage};
 use uxn::{Uxn, UxnRam};
 use varvara::Varvara;
 
 pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
-    let rom = include_bytes!("../../roms/potato.rom");
+    let rom = include_bytes!("../../roms/cccc.rom");
     let ram = UxnRam::new();
     let mut vm = Uxn::new(rom, ram.leak());
     let mut dev = Varvara::new();
