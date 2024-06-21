@@ -59,7 +59,16 @@ impl<'a> Stage<'a> {
 
 impl eframe::App for Stage<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let time = ctx.input(|i| {
+        // Repaint at vsync rate (60 FPS)
+        ctx.request_repaint();
+        ctx.input(|i| {
+            if i.time >= self.next_frame {
+                // Screen callback (limited to 60 FPS).  We want to err on the
+                // side of redrawing early, rather than missing frames.
+                self.next_frame = i.time + 0.015;
+                self.dev.redraw(&mut self.vm);
+            }
+
             for e in i.events.iter() {
                 match e {
                     egui::Event::Text(s) => {
@@ -126,15 +135,6 @@ impl eframe::App for Stage<'_> {
 
         // Handle audio callback
         self.dev.audio(&mut self.vm);
-
-        // Screen callback (limited to 60 FPS)
-        if time >= self.next_frame {
-            self.dev.redraw(&mut self.vm);
-            self.next_frame = time + 0.01666666666;
-        }
-        ctx.request_repaint_after(std::time::Duration::from_secs_f64(
-            self.next_frame - time,
-        ));
 
         let prev_size = self.dev.screen_size();
         let out = self.dev.output(&self.vm);
