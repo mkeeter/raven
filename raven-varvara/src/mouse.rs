@@ -76,27 +76,28 @@ impl Mouse {
             self.pos = state.pos;
         }
 
-        self.scroll.0 += state.scroll.0;
-        self.scroll.1 += state.scroll.1;
+        self.scroll.0 += state.scroll.0 / 5.0;
+        self.scroll.1 += state.scroll.1 / 5.0;
 
         // Send scrolls as one-tick updates on a per-frame basis
-        if self.scroll.0 > 1.0 {
+        if self.scroll.0.abs() > 1.0 {
             changed = true;
-            m.scroll_x.set(1);
-            self.scroll.0 -= 1.0;
-        } else if self.scroll.0 < -1.0 {
-            changed = true;
-            m.scroll_x.set(0xFFFF);
-            self.scroll.0 += 1.0;
+            let amount = self.scroll.0.abs().min(i16::MAX as f32)
+                * self.scroll.0.signum();
+            m.scroll_x.set((amount as i16) as u16);
+            self.scroll.0 -= (amount as i16) as f32;
+        } else {
+            m.scroll_x.set(0);
         }
-        if self.scroll.1 > 1.0 {
+
+        if self.scroll.1.abs() > 1.0 {
             changed = true;
-            m.scroll_y.set(1);
-            self.scroll.1 -= 1.0;
-        } else if self.scroll.1 < -1.0 {
-            changed = true;
-            m.scroll_y.set(0xFFFF);
-            self.scroll.1 += 1.0;
+            let amount = self.scroll.1.abs().min(i16::MAX as f32)
+                * self.scroll.1.signum();
+            m.scroll_y.set((amount as i16) as u16);
+            self.scroll.1 -= (amount as i16) as f32;
+        } else {
+            m.scroll_y.set(0);
         }
 
         if state.buttons != self.buttons {
