@@ -4,7 +4,7 @@ members = [
     "raven-uxn",
     "raven-varvara",
     "raven-cli",
-    "raven-gui",
+    "raven-gui", "raven-web",
 ]
 
 [workspace.dependencies]
