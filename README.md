@@ -63,6 +63,11 @@ is very different from the
 The `key` port **must** be cleared after the vector is called.  Otherwise,
 button handling is broken in some ROMs.
 
+### File
+#### Implementation notes
+The directory output format must be zero-terminated; otherwise, the Potato ROM
+prints junk data left in memory.
+
 ### Datetime
 #### Limitations
 The `IS_DST` bit always returns 0

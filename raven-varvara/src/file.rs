@@ -348,6 +348,8 @@ impl File {
                     // Preload new data into the buffer
                     if n < self.buf.len() && scratch.is_empty() {
                         let Some(next) = dir.next() else {
+                            self.buf[n] = 0;
+                            n += 1;
                             break;
                         };
                         match next {
