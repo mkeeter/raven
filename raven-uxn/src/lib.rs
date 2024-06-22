@@ -27,20 +27,54 @@ pub struct Stack {
     index: u8,
 }
 
+impl Stack {
+    #[cfg(test)]
+    fn vs(&mut self) -> VirtualStack {
+        VirtualStack {
+            data: &mut self.data,
+            index: &mut self.index,
+        }
+    }
+
+    /// Returns the number of items in the stack
+    #[inline]
+    pub fn len(&self) -> u8 {
+        self.index.wrapping_add(1)
+    }
+
+    /// Checks whether the stack is empty
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Sets the number of items in the stack
+    #[inline]
+    pub fn set_len(&mut self, n: u8) {
+        self.index = n.wrapping_sub(1);
+    }
+
+    /// Peeks at a byte from the data stack
+    #[inline]
+    pub fn peek_byte_at(&self, offset: u8) -> u8 {
+        self.data[usize::from(self.index.wrapping_sub(offset))]
+    }
+}
+
 /// Virtual stack, which is aware of `keep` and `short` modes
 ///
 /// This type expects the user to perform all of their `pop()` calls first,
 /// followed by any `push(..)` calls.  `pop()` will either adjust the true index
 /// or a virtual index, depending on whether `keep` is set.
 struct StackView<'a, const FLAGS: u8> {
-    stack: &'a mut Stack,
+    stack: VirtualStack<'a>,
 
     /// Virtual index, used in `keep` mode
     offset: u8,
 }
 
 impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
-    fn new(stack: &'a mut Stack) -> Self {
+    fn new(stack: VirtualStack<'a>) -> Self {
         Self { stack, offset: 0 }
     }
 
@@ -157,11 +191,11 @@ impl From<Value> for u16 {
     }
 }
 
-impl Stack {
+impl<'a> VirtualStack<'a> {
     #[inline]
     fn pop_byte(&mut self) -> u8 {
-        let out = self.data[usize::from(self.index)];
-        self.index = self.index.wrapping_sub(1);
+        let out = self.data[usize::from(*self.index)];
+        *self.index = self.index.wrapping_sub(1);
         out
     }
 
@@ -174,25 +208,25 @@ impl Stack {
 
     #[inline]
     fn push_byte(&mut self, v: u8) {
-        self.index = self.index.wrapping_add(1);
-        self.data[usize::from(self.index)] = v;
+        *self.index = self.index.wrapping_add(1);
+        self.data[usize::from(*self.index)] = v;
     }
 
     #[inline]
     fn emplace_byte(&mut self, v: u8) {
-        self.data[usize::from(self.index)] = v;
+        self.data[usize::from(*self.index)] = v;
     }
 
     #[inline]
     fn emplace_short(&mut self, v: u16) {
         let [lo, hi] = v.to_le_bytes();
         self.data[usize::from(self.index.wrapping_sub(1))] = hi;
-        self.data[usize::from(self.index)] = lo;
+        self.data[usize::from(*self.index)] = lo;
     }
 
     #[inline]
     fn reserve(&mut self, n: u8) {
-        self.index = self.index.wrapping_add(n);
+        *self.index = self.index.wrapping_add(n);
     }
 
     #[inline]
@@ -222,24 +256,6 @@ impl Stack {
         let hi = self.peek_byte_at(offset.wrapping_add(1));
         u16::from_le_bytes([lo, hi])
     }
-
-    /// Returns the number of items in the stack
-    #[inline]
-    pub fn len(&self) -> u8 {
-        self.index.wrapping_add(1)
-    }
-
-    /// Checks whether the stack is empty
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Sets the number of items in the stack
-    #[inline]
-    pub fn set_len(&mut self, n: u8) {
-        self.index = n.wrapping_sub(1);
-    }
 }
 
 /// The virtual machine itself
@@ -254,9 +270,19 @@ pub struct Uxn<'a> {
     ret: Stack,
 }
 
+struct StackOffsets {
+    stack: u8,
+    ret: u8,
+}
+
+struct VirtualStack<'a> {
+    data: &'a mut [u8; 256],
+    index: &'a mut u8,
+}
+
 macro_rules! op_cmp {
-    ($self:ident, $flags:ident, $f:expr) => {{
-        let mut s = $self.stack_view::<{ $flags }>();
+    ($self:ident, $flags:ident, $f:expr, $offsets:ident) => {{
+        let mut s = $self.stack_view::<{ $flags }>($offsets);
         #[allow(clippy::redundant_closure_call)]
         let v = if short($flags) {
             let b = s.pop_short();
@@ -272,8 +298,8 @@ macro_rules! op_cmp {
 }
 
 macro_rules! op_bin {
-    ($self:ident, $flags:ident, $f:expr) => {{
-        let mut s = $self.stack_view::<{ $flags }>();
+    ($self:ident, $flags:ident, $f:expr, $offsets:ident) => {{
+        let mut s = $self.stack_view::<{ $flags }>($offsets);
         #[allow(clippy::redundant_closure_call)]
         if short($flags) {
             let b = s.pop_short();
@@ -347,23 +373,29 @@ impl<'a> Uxn<'a> {
     }
 
     #[inline]
-    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
-        let stack = if ret(FLAGS) {
-            &mut self.ret
+    fn stack_view<'b, const FLAGS: u8>(
+        &'b mut self,
+        offsets: &'b mut StackOffsets,
+    ) -> StackView<'b, FLAGS> {
+        let (data, index) = if ret(FLAGS) {
+            (&mut self.ret.data, &mut offsets.ret)
         } else {
-            &mut self.stack
+            (&mut self.stack.data, &mut offsets.stack)
         };
-        StackView::new(stack)
+        StackView::new(VirtualStack { data, index })
     }
 
     #[inline]
-    fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
-        let stack = if ret(FLAGS) {
-            &mut self.stack
+    fn ret_stack_view<'b, const FLAGS: u8>(
+        &'b mut self,
+        offsets: &'b mut StackOffsets,
+    ) -> StackView<'b, FLAGS> {
+        let (data, index) = if ret(FLAGS) {
+            (&mut self.stack.data, &mut offsets.stack)
         } else {
-            &mut self.ret
+            (&mut self.ret.data, &mut offsets.ret)
         };
-        StackView::new(stack)
+        StackView::new(VirtualStack { data, index })
     }
 
     #[inline]
@@ -470,275 +502,287 @@ impl<'a> Uxn<'a> {
     /// Runs the VM starting at the given address until it terminates
     #[inline]
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) {
+        let mut offsets = StackOffsets {
+            ret: self.ret.index,
+            stack: self.stack.index,
+        };
         loop {
             let op = self.next(&mut pc);
-            let Some(next) = self.op(op, dev, pc) else {
+            let Some(next) = self.op(op, dev, pc, &mut offsets) else {
                 break;
             };
             pc = next;
         }
+        self.ret.index = offsets.ret;
+        self.stack.index = offsets.stack;
     }
 
     /// Executes a single operation
     #[inline]
-    fn op<D: Device>(&mut self, op: u8, dev: &mut D, pc: u16) -> Option<u16> {
+    fn op<D: Device>(
+        &mut self,
+        op: u8,
+        dev: &mut D,
+        pc: u16,
+        offsets: &mut StackOffsets,
+    ) -> Option<u16> {
         match op {
-            0x00 => op::brk(self, dev, pc),
-            0x01 => op::inc::<0b000>(self, dev, pc),
-            0x02 => op::pop::<0b000>(self, dev, pc),
-            0x03 => op::nip::<0b000>(self, dev, pc),
-            0x04 => op::swp::<0b000>(self, dev, pc),
-            0x05 => op::rot::<0b000>(self, dev, pc),
-            0x06 => op::dup::<0b000>(self, dev, pc),
-            0x07 => op::ovr::<0b000>(self, dev, pc),
-            0x08 => op::equ::<0b000>(self, dev, pc),
-            0x09 => op::neq::<0b000>(self, dev, pc),
-            0x0a => op::gth::<0b000>(self, dev, pc),
-            0x0b => op::lth::<0b000>(self, dev, pc),
-            0x0c => op::jmp::<0b000>(self, dev, pc),
-            0x0d => op::jcn::<0b000>(self, dev, pc),
-            0x0e => op::jsr::<0b000>(self, dev, pc),
-            0x0f => op::sth::<0b000>(self, dev, pc),
-            0x10 => op::ldz::<0b000>(self, dev, pc),
-            0x11 => op::stz::<0b000>(self, dev, pc),
-            0x12 => op::ldr::<0b000>(self, dev, pc),
-            0x13 => op::str::<0b000>(self, dev, pc),
-            0x14 => op::lda::<0b000>(self, dev, pc),
-            0x15 => op::sta::<0b000>(self, dev, pc),
-            0x16 => op::dei::<0b000>(self, dev, pc),
-            0x17 => op::deo::<0b000>(self, dev, pc),
-            0x18 => op::add::<0b000>(self, dev, pc),
-            0x19 => op::sub::<0b000>(self, dev, pc),
-            0x1a => op::mul::<0b000>(self, dev, pc),
-            0x1b => op::div::<0b000>(self, dev, pc),
-            0x1c => op::and::<0b000>(self, dev, pc),
-            0x1d => op::ora::<0b000>(self, dev, pc),
-            0x1e => op::eor::<0b000>(self, dev, pc),
-            0x1f => op::sft::<0b000>(self, dev, pc),
-            0x20 => op::jci(self, dev, pc),
-            0x21 => op::inc::<0b001>(self, dev, pc),
-            0x22 => op::pop::<0b001>(self, dev, pc),
-            0x23 => op::nip::<0b001>(self, dev, pc),
-            0x24 => op::swp::<0b001>(self, dev, pc),
-            0x25 => op::rot::<0b001>(self, dev, pc),
-            0x26 => op::dup::<0b001>(self, dev, pc),
-            0x27 => op::ovr::<0b001>(self, dev, pc),
-            0x28 => op::equ::<0b001>(self, dev, pc),
-            0x29 => op::neq::<0b001>(self, dev, pc),
-            0x2a => op::gth::<0b001>(self, dev, pc),
-            0x2b => op::lth::<0b001>(self, dev, pc),
-            0x2c => op::jmp::<0b001>(self, dev, pc),
-            0x2d => op::jcn::<0b001>(self, dev, pc),
-            0x2e => op::jsr::<0b001>(self, dev, pc),
-            0x2f => op::sth::<0b001>(self, dev, pc),
-            0x30 => op::ldz::<0b001>(self, dev, pc),
-            0x31 => op::stz::<0b001>(self, dev, pc),
-            0x32 => op::ldr::<0b001>(self, dev, pc),
-            0x33 => op::str::<0b001>(self, dev, pc),
-            0x34 => op::lda::<0b001>(self, dev, pc),
-            0x35 => op::sta::<0b001>(self, dev, pc),
-            0x36 => op::dei::<0b001>(self, dev, pc),
-            0x37 => op::deo::<0b001>(self, dev, pc),
-            0x38 => op::add::<0b001>(self, dev, pc),
-            0x39 => op::sub::<0b001>(self, dev, pc),
-            0x3a => op::mul::<0b001>(self, dev, pc),
-            0x3b => op::div::<0b001>(self, dev, pc),
-            0x3c => op::and::<0b001>(self, dev, pc),
-            0x3d => op::ora::<0b001>(self, dev, pc),
-            0x3e => op::eor::<0b001>(self, dev, pc),
-            0x3f => op::sft::<0b001>(self, dev, pc),
-            0x40 => op::jmi(self, dev, pc),
-            0x41 => op::inc::<0b010>(self, dev, pc),
-            0x42 => op::pop::<0b010>(self, dev, pc),
-            0x43 => op::nip::<0b010>(self, dev, pc),
-            0x44 => op::swp::<0b010>(self, dev, pc),
-            0x45 => op::rot::<0b010>(self, dev, pc),
-            0x46 => op::dup::<0b010>(self, dev, pc),
-            0x47 => op::ovr::<0b010>(self, dev, pc),
-            0x48 => op::equ::<0b010>(self, dev, pc),
-            0x49 => op::neq::<0b010>(self, dev, pc),
-            0x4a => op::gth::<0b010>(self, dev, pc),
-            0x4b => op::lth::<0b010>(self, dev, pc),
-            0x4c => op::jmp::<0b010>(self, dev, pc),
-            0x4d => op::jcn::<0b010>(self, dev, pc),
-            0x4e => op::jsr::<0b010>(self, dev, pc),
-            0x4f => op::sth::<0b010>(self, dev, pc),
-            0x50 => op::ldz::<0b010>(self, dev, pc),
-            0x51 => op::stz::<0b010>(self, dev, pc),
-            0x52 => op::ldr::<0b010>(self, dev, pc),
-            0x53 => op::str::<0b010>(self, dev, pc),
-            0x54 => op::lda::<0b010>(self, dev, pc),
-            0x55 => op::sta::<0b010>(self, dev, pc),
-            0x56 => op::dei::<0b010>(self, dev, pc),
-            0x57 => op::deo::<0b010>(self, dev, pc),
-            0x58 => op::add::<0b010>(self, dev, pc),
-            0x59 => op::sub::<0b010>(self, dev, pc),
-            0x5a => op::mul::<0b010>(self, dev, pc),
-            0x5b => op::div::<0b010>(self, dev, pc),
-            0x5c => op::and::<0b010>(self, dev, pc),
-            0x5d => op::ora::<0b010>(self, dev, pc),
-            0x5e => op::eor::<0b010>(self, dev, pc),
-            0x5f => op::sft::<0b010>(self, dev, pc),
-            0x60 => op::jsi(self, dev, pc),
-            0x61 => op::inc::<0b011>(self, dev, pc),
-            0x62 => op::pop::<0b011>(self, dev, pc),
-            0x63 => op::nip::<0b011>(self, dev, pc),
-            0x64 => op::swp::<0b011>(self, dev, pc),
-            0x65 => op::rot::<0b011>(self, dev, pc),
-            0x66 => op::dup::<0b011>(self, dev, pc),
-            0x67 => op::ovr::<0b011>(self, dev, pc),
-            0x68 => op::equ::<0b011>(self, dev, pc),
-            0x69 => op::neq::<0b011>(self, dev, pc),
-            0x6a => op::gth::<0b011>(self, dev, pc),
-            0x6b => op::lth::<0b011>(self, dev, pc),
-            0x6c => op::jmp::<0b011>(self, dev, pc),
-            0x6d => op::jcn::<0b011>(self, dev, pc),
-            0x6e => op::jsr::<0b011>(self, dev, pc),
-            0x6f => op::sth::<0b011>(self, dev, pc),
-            0x70 => op::ldz::<0b011>(self, dev, pc),
-            0x71 => op::stz::<0b011>(self, dev, pc),
-            0x72 => op::ldr::<0b011>(self, dev, pc),
-            0x73 => op::str::<0b011>(self, dev, pc),
-            0x74 => op::lda::<0b011>(self, dev, pc),
-            0x75 => op::sta::<0b011>(self, dev, pc),
-            0x76 => op::dei::<0b011>(self, dev, pc),
-            0x77 => op::deo::<0b011>(self, dev, pc),
-            0x78 => op::add::<0b011>(self, dev, pc),
-            0x79 => op::sub::<0b011>(self, dev, pc),
-            0x7a => op::mul::<0b011>(self, dev, pc),
-            0x7b => op::div::<0b011>(self, dev, pc),
-            0x7c => op::and::<0b011>(self, dev, pc),
-            0x7d => op::ora::<0b011>(self, dev, pc),
-            0x7e => op::eor::<0b011>(self, dev, pc),
-            0x7f => op::sft::<0b011>(self, dev, pc),
-            0x80 => op::lit::<0b100>(self, dev, pc),
-            0x81 => op::inc::<0b100>(self, dev, pc),
-            0x82 => op::pop::<0b100>(self, dev, pc),
-            0x83 => op::nip::<0b100>(self, dev, pc),
-            0x84 => op::swp::<0b100>(self, dev, pc),
-            0x85 => op::rot::<0b100>(self, dev, pc),
-            0x86 => op::dup::<0b100>(self, dev, pc),
-            0x87 => op::ovr::<0b100>(self, dev, pc),
-            0x88 => op::equ::<0b100>(self, dev, pc),
-            0x89 => op::neq::<0b100>(self, dev, pc),
-            0x8a => op::gth::<0b100>(self, dev, pc),
-            0x8b => op::lth::<0b100>(self, dev, pc),
-            0x8c => op::jmp::<0b100>(self, dev, pc),
-            0x8d => op::jcn::<0b100>(self, dev, pc),
-            0x8e => op::jsr::<0b100>(self, dev, pc),
-            0x8f => op::sth::<0b100>(self, dev, pc),
-            0x90 => op::ldz::<0b100>(self, dev, pc),
-            0x91 => op::stz::<0b100>(self, dev, pc),
-            0x92 => op::ldr::<0b100>(self, dev, pc),
-            0x93 => op::str::<0b100>(self, dev, pc),
-            0x94 => op::lda::<0b100>(self, dev, pc),
-            0x95 => op::sta::<0b100>(self, dev, pc),
-            0x96 => op::dei::<0b100>(self, dev, pc),
-            0x97 => op::deo::<0b100>(self, dev, pc),
-            0x98 => op::add::<0b100>(self, dev, pc),
-            0x99 => op::sub::<0b100>(self, dev, pc),
-            0x9a => op::mul::<0b100>(self, dev, pc),
-            0x9b => op::div::<0b100>(self, dev, pc),
-            0x9c => op::and::<0b100>(self, dev, pc),
-            0x9d => op::ora::<0b100>(self, dev, pc),
-            0x9e => op::eor::<0b100>(self, dev, pc),
-            0x9f => op::sft::<0b100>(self, dev, pc),
-            0xa0 => op::lit::<0b101>(self, dev, pc),
-            0xa1 => op::inc::<0b101>(self, dev, pc),
-            0xa2 => op::pop::<0b101>(self, dev, pc),
-            0xa3 => op::nip::<0b101>(self, dev, pc),
-            0xa4 => op::swp::<0b101>(self, dev, pc),
-            0xa5 => op::rot::<0b101>(self, dev, pc),
-            0xa6 => op::dup::<0b101>(self, dev, pc),
-            0xa7 => op::ovr::<0b101>(self, dev, pc),
-            0xa8 => op::equ::<0b101>(self, dev, pc),
-            0xa9 => op::neq::<0b101>(self, dev, pc),
-            0xaa => op::gth::<0b101>(self, dev, pc),
-            0xab => op::lth::<0b101>(self, dev, pc),
-            0xac => op::jmp::<0b101>(self, dev, pc),
-            0xad => op::jcn::<0b101>(self, dev, pc),
-            0xae => op::jsr::<0b101>(self, dev, pc),
-            0xaf => op::sth::<0b101>(self, dev, pc),
-            0xb0 => op::ldz::<0b101>(self, dev, pc),
-            0xb1 => op::stz::<0b101>(self, dev, pc),
-            0xb2 => op::ldr::<0b101>(self, dev, pc),
-            0xb3 => op::str::<0b101>(self, dev, pc),
-            0xb4 => op::lda::<0b101>(self, dev, pc),
-            0xb5 => op::sta::<0b101>(self, dev, pc),
-            0xb6 => op::dei::<0b101>(self, dev, pc),
-            0xb7 => op::deo::<0b101>(self, dev, pc),
-            0xb8 => op::add::<0b101>(self, dev, pc),
-            0xb9 => op::sub::<0b101>(self, dev, pc),
-            0xba => op::mul::<0b101>(self, dev, pc),
-            0xbb => op::div::<0b101>(self, dev, pc),
-            0xbc => op::and::<0b101>(self, dev, pc),
-            0xbd => op::ora::<0b101>(self, dev, pc),
-            0xbe => op::eor::<0b101>(self, dev, pc),
-            0xbf => op::sft::<0b101>(self, dev, pc),
-            0xc0 => op::lit::<0b110>(self, dev, pc),
-            0xc1 => op::inc::<0b110>(self, dev, pc),
-            0xc2 => op::pop::<0b110>(self, dev, pc),
-            0xc3 => op::nip::<0b110>(self, dev, pc),
-            0xc4 => op::swp::<0b110>(self, dev, pc),
-            0xc5 => op::rot::<0b110>(self, dev, pc),
-            0xc6 => op::dup::<0b110>(self, dev, pc),
-            0xc7 => op::ovr::<0b110>(self, dev, pc),
-            0xc8 => op::equ::<0b110>(self, dev, pc),
-            0xc9 => op::neq::<0b110>(self, dev, pc),
-            0xca => op::gth::<0b110>(self, dev, pc),
-            0xcb => op::lth::<0b110>(self, dev, pc),
-            0xcc => op::jmp::<0b110>(self, dev, pc),
-            0xcd => op::jcn::<0b110>(self, dev, pc),
-            0xce => op::jsr::<0b110>(self, dev, pc),
-            0xcf => op::sth::<0b110>(self, dev, pc),
-            0xd0 => op::ldz::<0b110>(self, dev, pc),
-            0xd1 => op::stz::<0b110>(self, dev, pc),
-            0xd2 => op::ldr::<0b110>(self, dev, pc),
-            0xd3 => op::str::<0b110>(self, dev, pc),
-            0xd4 => op::lda::<0b110>(self, dev, pc),
-            0xd5 => op::sta::<0b110>(self, dev, pc),
-            0xd6 => op::dei::<0b110>(self, dev, pc),
-            0xd7 => op::deo::<0b110>(self, dev, pc),
-            0xd8 => op::add::<0b110>(self, dev, pc),
-            0xd9 => op::sub::<0b110>(self, dev, pc),
-            0xda => op::mul::<0b110>(self, dev, pc),
-            0xdb => op::div::<0b110>(self, dev, pc),
-            0xdc => op::and::<0b110>(self, dev, pc),
-            0xdd => op::ora::<0b110>(self, dev, pc),
-            0xde => op::eor::<0b110>(self, dev, pc),
-            0xdf => op::sft::<0b110>(self, dev, pc),
-            0xe0 => op::lit::<0b111>(self, dev, pc),
-            0xe1 => op::inc::<0b111>(self, dev, pc),
-            0xe2 => op::pop::<0b111>(self, dev, pc),
-            0xe3 => op::nip::<0b111>(self, dev, pc),
-            0xe4 => op::swp::<0b111>(self, dev, pc),
-            0xe5 => op::rot::<0b111>(self, dev, pc),
-            0xe6 => op::dup::<0b111>(self, dev, pc),
-            0xe7 => op::ovr::<0b111>(self, dev, pc),
-            0xe8 => op::equ::<0b111>(self, dev, pc),
-            0xe9 => op::neq::<0b111>(self, dev, pc),
-            0xea => op::gth::<0b111>(self, dev, pc),
-            0xeb => op::lth::<0b111>(self, dev, pc),
-            0xec => op::jmp::<0b111>(self, dev, pc),
-            0xed => op::jcn::<0b111>(self, dev, pc),
-            0xee => op::jsr::<0b111>(self, dev, pc),
-            0xef => op::sth::<0b111>(self, dev, pc),
-            0xf0 => op::ldz::<0b111>(self, dev, pc),
-            0xf1 => op::stz::<0b111>(self, dev, pc),
-            0xf2 => op::ldr::<0b111>(self, dev, pc),
-            0xf3 => op::str::<0b111>(self, dev, pc),
-            0xf4 => op::lda::<0b111>(self, dev, pc),
-            0xf5 => op::sta::<0b111>(self, dev, pc),
-            0xf6 => op::dei::<0b111>(self, dev, pc),
-            0xf7 => op::deo::<0b111>(self, dev, pc),
-            0xf8 => op::add::<0b111>(self, dev, pc),
-            0xf9 => op::sub::<0b111>(self, dev, pc),
-            0xfa => op::mul::<0b111>(self, dev, pc),
-            0xfb => op::div::<0b111>(self, dev, pc),
-            0xfc => op::and::<0b111>(self, dev, pc),
-            0xfd => op::ora::<0b111>(self, dev, pc),
-            0xfe => op::eor::<0b111>(self, dev, pc),
-            0xff => op::sft::<0b111>(self, dev, pc),
+            0x00 => op::brk(self, dev, pc, offsets),
+            0x01 => op::inc::<0b000>(self, dev, pc, offsets),
+            0x02 => op::pop::<0b000>(self, dev, pc, offsets),
+            0x03 => op::nip::<0b000>(self, dev, pc, offsets),
+            0x04 => op::swp::<0b000>(self, dev, pc, offsets),
+            0x05 => op::rot::<0b000>(self, dev, pc, offsets),
+            0x06 => op::dup::<0b000>(self, dev, pc, offsets),
+            0x07 => op::ovr::<0b000>(self, dev, pc, offsets),
+            0x08 => op::equ::<0b000>(self, dev, pc, offsets),
+            0x09 => op::neq::<0b000>(self, dev, pc, offsets),
+            0x0a => op::gth::<0b000>(self, dev, pc, offsets),
+            0x0b => op::lth::<0b000>(self, dev, pc, offsets),
+            0x0c => op::jmp::<0b000>(self, dev, pc, offsets),
+            0x0d => op::jcn::<0b000>(self, dev, pc, offsets),
+            0x0e => op::jsr::<0b000>(self, dev, pc, offsets),
+            0x0f => op::sth::<0b000>(self, dev, pc, offsets),
+            0x10 => op::ldz::<0b000>(self, dev, pc, offsets),
+            0x11 => op::stz::<0b000>(self, dev, pc, offsets),
+            0x12 => op::ldr::<0b000>(self, dev, pc, offsets),
+            0x13 => op::str::<0b000>(self, dev, pc, offsets),
+            0x14 => op::lda::<0b000>(self, dev, pc, offsets),
+            0x15 => op::sta::<0b000>(self, dev, pc, offsets),
+            0x16 => op::dei::<0b000>(self, dev, pc, offsets),
+            0x17 => op::deo::<0b000>(self, dev, pc, offsets),
+            0x18 => op::add::<0b000>(self, dev, pc, offsets),
+            0x19 => op::sub::<0b000>(self, dev, pc, offsets),
+            0x1a => op::mul::<0b000>(self, dev, pc, offsets),
+            0x1b => op::div::<0b000>(self, dev, pc, offsets),
+            0x1c => op::and::<0b000>(self, dev, pc, offsets),
+            0x1d => op::ora::<0b000>(self, dev, pc, offsets),
+            0x1e => op::eor::<0b000>(self, dev, pc, offsets),
+            0x1f => op::sft::<0b000>(self, dev, pc, offsets),
+            0x20 => op::jci(self, dev, pc, offsets),
+            0x21 => op::inc::<0b001>(self, dev, pc, offsets),
+            0x22 => op::pop::<0b001>(self, dev, pc, offsets),
+            0x23 => op::nip::<0b001>(self, dev, pc, offsets),
+            0x24 => op::swp::<0b001>(self, dev, pc, offsets),
+            0x25 => op::rot::<0b001>(self, dev, pc, offsets),
+            0x26 => op::dup::<0b001>(self, dev, pc, offsets),
+            0x27 => op::ovr::<0b001>(self, dev, pc, offsets),
+            0x28 => op::equ::<0b001>(self, dev, pc, offsets),
+            0x29 => op::neq::<0b001>(self, dev, pc, offsets),
+            0x2a => op::gth::<0b001>(self, dev, pc, offsets),
+            0x2b => op::lth::<0b001>(self, dev, pc, offsets),
+            0x2c => op::jmp::<0b001>(self, dev, pc, offsets),
+            0x2d => op::jcn::<0b001>(self, dev, pc, offsets),
+            0x2e => op::jsr::<0b001>(self, dev, pc, offsets),
+            0x2f => op::sth::<0b001>(self, dev, pc, offsets),
+            0x30 => op::ldz::<0b001>(self, dev, pc, offsets),
+            0x31 => op::stz::<0b001>(self, dev, pc, offsets),
+            0x32 => op::ldr::<0b001>(self, dev, pc, offsets),
+            0x33 => op::str::<0b001>(self, dev, pc, offsets),
+            0x34 => op::lda::<0b001>(self, dev, pc, offsets),
+            0x35 => op::sta::<0b001>(self, dev, pc, offsets),
+            0x36 => op::dei::<0b001>(self, dev, pc, offsets),
+            0x37 => op::deo::<0b001>(self, dev, pc, offsets),
+            0x38 => op::add::<0b001>(self, dev, pc, offsets),
+            0x39 => op::sub::<0b001>(self, dev, pc, offsets),
+            0x3a => op::mul::<0b001>(self, dev, pc, offsets),
+            0x3b => op::div::<0b001>(self, dev, pc, offsets),
+            0x3c => op::and::<0b001>(self, dev, pc, offsets),
+            0x3d => op::ora::<0b001>(self, dev, pc, offsets),
+            0x3e => op::eor::<0b001>(self, dev, pc, offsets),
+            0x3f => op::sft::<0b001>(self, dev, pc, offsets),
+            0x40 => op::jmi(self, dev, pc, offsets),
+            0x41 => op::inc::<0b010>(self, dev, pc, offsets),
+            0x42 => op::pop::<0b010>(self, dev, pc, offsets),
+            0x43 => op::nip::<0b010>(self, dev, pc, offsets),
+            0x44 => op::swp::<0b010>(self, dev, pc, offsets),
+            0x45 => op::rot::<0b010>(self, dev, pc, offsets),
+            0x46 => op::dup::<0b010>(self, dev, pc, offsets),
+            0x47 => op::ovr::<0b010>(self, dev, pc, offsets),
+            0x48 => op::equ::<0b010>(self, dev, pc, offsets),
+            0x49 => op::neq::<0b010>(self, dev, pc, offsets),
+            0x4a => op::gth::<0b010>(self, dev, pc, offsets),
+            0x4b => op::lth::<0b010>(self, dev, pc, offsets),
+            0x4c => op::jmp::<0b010>(self, dev, pc, offsets),
+            0x4d => op::jcn::<0b010>(self, dev, pc, offsets),
+            0x4e => op::jsr::<0b010>(self, dev, pc, offsets),
+            0x4f => op::sth::<0b010>(self, dev, pc, offsets),
+            0x50 => op::ldz::<0b010>(self, dev, pc, offsets),
+            0x51 => op::stz::<0b010>(self, dev, pc, offsets),
+            0x52 => op::ldr::<0b010>(self, dev, pc, offsets),
+            0x53 => op::str::<0b010>(self, dev, pc, offsets),
+            0x54 => op::lda::<0b010>(self, dev, pc, offsets),
+            0x55 => op::sta::<0b010>(self, dev, pc, offsets),
+            0x56 => op::dei::<0b010>(self, dev, pc, offsets),
+            0x57 => op::deo::<0b010>(self, dev, pc, offsets),
+            0x58 => op::add::<0b010>(self, dev, pc, offsets),
+            0x59 => op::sub::<0b010>(self, dev, pc, offsets),
+            0x5a => op::mul::<0b010>(self, dev, pc, offsets),
+            0x5b => op::div::<0b010>(self, dev, pc, offsets),
+            0x5c => op::and::<0b010>(self, dev, pc, offsets),
+            0x5d => op::ora::<0b010>(self, dev, pc, offsets),
+            0x5e => op::eor::<0b010>(self, dev, pc, offsets),
+            0x5f => op::sft::<0b010>(self, dev, pc, offsets),
+            0x60 => op::jsi(self, dev, pc, offsets),
+            0x61 => op::inc::<0b011>(self, dev, pc, offsets),
+            0x62 => op::pop::<0b011>(self, dev, pc, offsets),
+            0x63 => op::nip::<0b011>(self, dev, pc, offsets),
+            0x64 => op::swp::<0b011>(self, dev, pc, offsets),
+            0x65 => op::rot::<0b011>(self, dev, pc, offsets),
+            0x66 => op::dup::<0b011>(self, dev, pc, offsets),
+            0x67 => op::ovr::<0b011>(self, dev, pc, offsets),
+            0x68 => op::equ::<0b011>(self, dev, pc, offsets),
+            0x69 => op::neq::<0b011>(self, dev, pc, offsets),
+            0x6a => op::gth::<0b011>(self, dev, pc, offsets),
+            0x6b => op::lth::<0b011>(self, dev, pc, offsets),
+            0x6c => op::jmp::<0b011>(self, dev, pc, offsets),
+            0x6d => op::jcn::<0b011>(self, dev, pc, offsets),
+            0x6e => op::jsr::<0b011>(self, dev, pc, offsets),
+            0x6f => op::sth::<0b011>(self, dev, pc, offsets),
+            0x70 => op::ldz::<0b011>(self, dev, pc, offsets),
+            0x71 => op::stz::<0b011>(self, dev, pc, offsets),
+            0x72 => op::ldr::<0b011>(self, dev, pc, offsets),
+            0x73 => op::str::<0b011>(self, dev, pc, offsets),
+            0x74 => op::lda::<0b011>(self, dev, pc, offsets),
+            0x75 => op::sta::<0b011>(self, dev, pc, offsets),
+            0x76 => op::dei::<0b011>(self, dev, pc, offsets),
+            0x77 => op::deo::<0b011>(self, dev, pc, offsets),
+            0x78 => op::add::<0b011>(self, dev, pc, offsets),
+            0x79 => op::sub::<0b011>(self, dev, pc, offsets),
+            0x7a => op::mul::<0b011>(self, dev, pc, offsets),
+            0x7b => op::div::<0b011>(self, dev, pc, offsets),
+            0x7c => op::and::<0b011>(self, dev, pc, offsets),
+            0x7d => op::ora::<0b011>(self, dev, pc, offsets),
+            0x7e => op::eor::<0b011>(self, dev, pc, offsets),
+            0x7f => op::sft::<0b011>(self, dev, pc, offsets),
+            0x80 => op::lit::<0b100>(self, dev, pc, offsets),
+            0x81 => op::inc::<0b100>(self, dev, pc, offsets),
+            0x82 => op::pop::<0b100>(self, dev, pc, offsets),
+            0x83 => op::nip::<0b100>(self, dev, pc, offsets),
+            0x84 => op::swp::<0b100>(self, dev, pc, offsets),
+            0x85 => op::rot::<0b100>(self, dev, pc, offsets),
+            0x86 => op::dup::<0b100>(self, dev, pc, offsets),
+            0x87 => op::ovr::<0b100>(self, dev, pc, offsets),
+            0x88 => op::equ::<0b100>(self, dev, pc, offsets),
+            0x89 => op::neq::<0b100>(self, dev, pc, offsets),
+            0x8a => op::gth::<0b100>(self, dev, pc, offsets),
+            0x8b => op::lth::<0b100>(self, dev, pc, offsets),
+            0x8c => op::jmp::<0b100>(self, dev, pc, offsets),
+            0x8d => op::jcn::<0b100>(self, dev, pc, offsets),
+            0x8e => op::jsr::<0b100>(self, dev, pc, offsets),
+            0x8f => op::sth::<0b100>(self, dev, pc, offsets),
+            0x90 => op::ldz::<0b100>(self, dev, pc, offsets),
+            0x91 => op::stz::<0b100>(self, dev, pc, offsets),
+            0x92 => op::ldr::<0b100>(self, dev, pc, offsets),
+            0x93 => op::str::<0b100>(self, dev, pc, offsets),
+            0x94 => op::lda::<0b100>(self, dev, pc, offsets),
+            0x95 => op::sta::<0b100>(self, dev, pc, offsets),
+            0x96 => op::dei::<0b100>(self, dev, pc, offsets),
+            0x97 => op::deo::<0b100>(self, dev, pc, offsets),
+            0x98 => op::add::<0b100>(self, dev, pc, offsets),
+            0x99 => op::sub::<0b100>(self, dev, pc, offsets),
+            0x9a => op::mul::<0b100>(self, dev, pc, offsets),
+            0x9b => op::div::<0b100>(self, dev, pc, offsets),
+            0x9c => op::and::<0b100>(self, dev, pc, offsets),
+            0x9d => op::ora::<0b100>(self, dev, pc, offsets),
+            0x9e => op::eor::<0b100>(self, dev, pc, offsets),
+            0x9f => op::sft::<0b100>(self, dev, pc, offsets),
+            0xa0 => op::lit::<0b101>(self, dev, pc, offsets),
+            0xa1 => op::inc::<0b101>(self, dev, pc, offsets),
+            0xa2 => op::pop::<0b101>(self, dev, pc, offsets),
+            0xa3 => op::nip::<0b101>(self, dev, pc, offsets),
+            0xa4 => op::swp::<0b101>(self, dev, pc, offsets),
+            0xa5 => op::rot::<0b101>(self, dev, pc, offsets),
+            0xa6 => op::dup::<0b101>(self, dev, pc, offsets),
+            0xa7 => op::ovr::<0b101>(self, dev, pc, offsets),
+            0xa8 => op::equ::<0b101>(self, dev, pc, offsets),
+            0xa9 => op::neq::<0b101>(self, dev, pc, offsets),
+            0xaa => op::gth::<0b101>(self, dev, pc, offsets),
+            0xab => op::lth::<0b101>(self, dev, pc, offsets),
+            0xac => op::jmp::<0b101>(self, dev, pc, offsets),
+            0xad => op::jcn::<0b101>(self, dev, pc, offsets),
+            0xae => op::jsr::<0b101>(self, dev, pc, offsets),
+            0xaf => op::sth::<0b101>(self, dev, pc, offsets),
+            0xb0 => op::ldz::<0b101>(self, dev, pc, offsets),
+            0xb1 => op::stz::<0b101>(self, dev, pc, offsets),
+            0xb2 => op::ldr::<0b101>(self, dev, pc, offsets),
+            0xb3 => op::str::<0b101>(self, dev, pc, offsets),
+            0xb4 => op::lda::<0b101>(self, dev, pc, offsets),
+            0xb5 => op::sta::<0b101>(self, dev, pc, offsets),
+            0xb6 => op::dei::<0b101>(self, dev, pc, offsets),
+            0xb7 => op::deo::<0b101>(self, dev, pc, offsets),
+            0xb8 => op::add::<0b101>(self, dev, pc, offsets),
+            0xb9 => op::sub::<0b101>(self, dev, pc, offsets),
+            0xba => op::mul::<0b101>(self, dev, pc, offsets),
+            0xbb => op::div::<0b101>(self, dev, pc, offsets),
+            0xbc => op::and::<0b101>(self, dev, pc, offsets),
+            0xbd => op::ora::<0b101>(self, dev, pc, offsets),
+            0xbe => op::eor::<0b101>(self, dev, pc, offsets),
+            0xbf => op::sft::<0b101>(self, dev, pc, offsets),
+            0xc0 => op::lit::<0b110>(self, dev, pc, offsets),
+            0xc1 => op::inc::<0b110>(self, dev, pc, offsets),
+            0xc2 => op::pop::<0b110>(self, dev, pc, offsets),
+            0xc3 => op::nip::<0b110>(self, dev, pc, offsets),
+            0xc4 => op::swp::<0b110>(self, dev, pc, offsets),
+            0xc5 => op::rot::<0b110>(self, dev, pc, offsets),
+            0xc6 => op::dup::<0b110>(self, dev, pc, offsets),
+            0xc7 => op::ovr::<0b110>(self, dev, pc, offsets),
+            0xc8 => op::equ::<0b110>(self, dev, pc, offsets),
+            0xc9 => op::neq::<0b110>(self, dev, pc, offsets),
+            0xca => op::gth::<0b110>(self, dev, pc, offsets),
+            0xcb => op::lth::<0b110>(self, dev, pc, offsets),
+            0xcc => op::jmp::<0b110>(self, dev, pc, offsets),
+            0xcd => op::jcn::<0b110>(self, dev, pc, offsets),
+            0xce => op::jsr::<0b110>(self, dev, pc, offsets),
+            0xcf => op::sth::<0b110>(self, dev, pc, offsets),
+            0xd0 => op::ldz::<0b110>(self, dev, pc, offsets),
+            0xd1 => op::stz::<0b110>(self, dev, pc, offsets),
+            0xd2 => op::ldr::<0b110>(self, dev, pc, offsets),
+            0xd3 => op::str::<0b110>(self, dev, pc, offsets),
+            0xd4 => op::lda::<0b110>(self, dev, pc, offsets),
+            0xd5 => op::sta::<0b110>(self, dev, pc, offsets),
+            0xd6 => op::dei::<0b110>(self, dev, pc, offsets),
+            0xd7 => op::deo::<0b110>(self, dev, pc, offsets),
+            0xd8 => op::add::<0b110>(self, dev, pc, offsets),
+            0xd9 => op::sub::<0b110>(self, dev, pc, offsets),
+            0xda => op::mul::<0b110>(self, dev, pc, offsets),
+            0xdb => op::div::<0b110>(self, dev, pc, offsets),
+            0xdc => op::and::<0b110>(self, dev, pc, offsets),
+            0xdd => op::ora::<0b110>(self, dev, pc, offsets),
+            0xde => op::eor::<0b110>(self, dev, pc, offsets),
+            0xdf => op::sft::<0b110>(self, dev, pc, offsets),
+            0xe0 => op::lit::<0b111>(self, dev, pc, offsets),
+            0xe1 => op::inc::<0b111>(self, dev, pc, offsets),
+            0xe2 => op::pop::<0b111>(self, dev, pc, offsets),
+            0xe3 => op::nip::<0b111>(self, dev, pc, offsets),
+            0xe4 => op::swp::<0b111>(self, dev, pc, offsets),
+            0xe5 => op::rot::<0b111>(self, dev, pc, offsets),
+            0xe6 => op::dup::<0b111>(self, dev, pc, offsets),
+            0xe7 => op::ovr::<0b111>(self, dev, pc, offsets),
+            0xe8 => op::equ::<0b111>(self, dev, pc, offsets),
+            0xe9 => op::neq::<0b111>(self, dev, pc, offsets),
+            0xea => op::gth::<0b111>(self, dev, pc, offsets),
+            0xeb => op::lth::<0b111>(self, dev, pc, offsets),
+            0xec => op::jmp::<0b111>(self, dev, pc, offsets),
+            0xed => op::jcn::<0b111>(self, dev, pc, offsets),
+            0xee => op::jsr::<0b111>(self, dev, pc, offsets),
+            0xef => op::sth::<0b111>(self, dev, pc, offsets),
+            0xf0 => op::ldz::<0b111>(self, dev, pc, offsets),
+            0xf1 => op::stz::<0b111>(self, dev, pc, offsets),
+            0xf2 => op::ldr::<0b111>(self, dev, pc, offsets),
+            0xf3 => op::str::<0b111>(self, dev, pc, offsets),
+            0xf4 => op::lda::<0b111>(self, dev, pc, offsets),
+            0xf5 => op::sta::<0b111>(self, dev, pc, offsets),
+            0xf6 => op::dei::<0b111>(self, dev, pc, offsets),
+            0xf7 => op::deo::<0b111>(self, dev, pc, offsets),
+            0xf8 => op::add::<0b111>(self, dev, pc, offsets),
+            0xf9 => op::sub::<0b111>(self, dev, pc, offsets),
+            0xfa => op::mul::<0b111>(self, dev, pc, offsets),
+            0xfb => op::div::<0b111>(self, dev, pc, offsets),
+            0xfc => op::and::<0b111>(self, dev, pc, offsets),
+            0xfd => op::ora::<0b111>(self, dev, pc, offsets),
+            0xfe => op::eor::<0b111>(self, dev, pc, offsets),
+            0xff => op::sft::<0b111>(self, dev, pc, offsets),
         }
     }
 }
@@ -765,7 +809,12 @@ mod op {
     ///
     /// Ends the evaluation of the current vector. This opcode has no modes.
     #[inline]
-    pub fn brk(_: &mut Uxn, _: &mut dyn Device, _: u16) -> Option<u16> {
+    pub fn brk(
+        _: &mut Uxn,
+        _: &mut dyn Device,
+        _: u16,
+        _: &mut StackOffsets,
+    ) -> Option<u16> {
         None
     }
 
@@ -779,9 +828,20 @@ mod op {
     /// the `PC` to a relative address at a distance equal to the next short in
     /// memory, otherwise moves `PC+2`. This opcode has no modes.
     #[inline]
-    pub fn jci(vm: &mut Uxn, _: &mut dyn Device, mut pc: u16) -> Option<u16> {
+    pub fn jci(
+        vm: &mut Uxn,
+        _: &mut dyn Device,
+        mut pc: u16,
+        offsets: &mut StackOffsets,
+    ) -> Option<u16> {
         let dt = vm.next2(&mut pc);
-        if vm.stack.pop_byte() != 0 {
+        if (VirtualStack {
+            data: &mut vm.stack.data,
+            index: &mut offsets.stack,
+        })
+        .pop_byte()
+            != 0
+        {
             pc = pc.wrapping_add(dt);
         }
         Some(pc)
@@ -792,7 +852,12 @@ mod op {
     /// JMI  -- Moves the PC to a relative address at a distance equal to the
     /// next short in memory. This opcode has no modes.
     #[inline]
-    pub fn jmi(vm: &mut Uxn, _: &mut dyn Device, mut pc: u16) -> Option<u16> {
+    pub fn jmi(
+        vm: &mut Uxn,
+        _: &mut dyn Device,
+        mut pc: u16,
+        _: &mut StackOffsets,
+    ) -> Option<u16> {
         let dt = vm.next2(&mut pc);
         Some(pc.wrapping_add(dt))
     }
@@ -807,9 +872,18 @@ mod op {
     /// address at a distance equal to the next short in memory. This opcode has
     /// no modes.
     #[inline]
-    pub fn jsi(vm: &mut Uxn, _: &mut dyn Device, mut pc: u16) -> Option<u16> {
+    pub fn jsi(
+        vm: &mut Uxn,
+        _: &mut dyn Device,
+        mut pc: u16,
+        offsets: &mut StackOffsets,
+    ) -> Option<u16> {
         let dt = vm.next2(&mut pc);
-        vm.ret.push(Value::Short(pc));
+        VirtualStack {
+            data: &mut vm.ret.data,
+            index: &mut offsets.ret,
+        }
+        .push(Value::Short(pc));
         Some(pc.wrapping_add(dt))
     }
 
@@ -832,13 +906,14 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         mut pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
         let v = if short(FLAGS) {
             Value::Short(vm.next2(&mut pc))
         } else {
             Value::Byte(vm.next(&mut pc))
         };
-        vm.stack_view::<FLAGS>().push(v);
+        vm.stack_view::<FLAGS>(offsets).push(v);
         Some(pc)
     }
 
@@ -860,8 +935,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let v = s.pop();
         s.push(v.wrapping_add(1));
         Some(pc)
@@ -885,8 +961,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        vm.stack_view::<FLAGS>().pop();
+        vm.stack_view::<FLAGS>(offsets).pop();
         Some(pc)
     }
 
@@ -909,8 +986,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let v = s.pop();
         let _ = s.pop();
         s.push(v);
@@ -936,8 +1014,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let b = s.pop();
         let a = s.pop();
         s.push(b);
@@ -965,8 +1044,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let c = s.pop();
         let b = s.pop();
         let a = s.pop();
@@ -994,8 +1074,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let v = s.pop();
         s.push(v);
         s.push(v);
@@ -1021,8 +1102,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let b = s.pop();
         let a = s.pop();
         s.push(a);
@@ -1051,8 +1133,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_cmp!(vm, FLAGS, |a, b| a == b);
+        op_cmp!(vm, FLAGS, |a, b| a == b, offsets);
         Some(pc)
     }
 
@@ -1076,8 +1159,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_cmp!(vm, FLAGS, |a, b| a != b);
+        op_cmp!(vm, FLAGS, |a, b| a != b, offsets);
         Some(pc)
     }
 
@@ -1101,8 +1185,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_cmp!(vm, FLAGS, |a, b| a > b);
+        op_cmp!(vm, FLAGS, |a, b| a > b, offsets);
         Some(pc)
     }
 
@@ -1126,8 +1211,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_cmp!(vm, FLAGS, |a, b| a < b);
+        op_cmp!(vm, FLAGS, |a, b| a < b, offsets);
         Some(pc)
     }
 
@@ -1148,8 +1234,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         Some(jump_offset(pc, s.pop()))
     }
 
@@ -1172,8 +1259,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let dst = s.pop();
         let cond = s.pop_byte();
         Some(if cond != 0 { jump_offset(pc, dst) } else { pc })
@@ -1198,9 +1286,14 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        vm.ret.push(Value::Short(pc));
-        let mut s = vm.stack_view::<FLAGS>();
+        VirtualStack {
+            data: &mut vm.ret.data,
+            index: &mut offsets.ret,
+        }
+        .push(Value::Short(pc));
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         Some(jump_offset(pc, s.pop()))
     }
 
@@ -1223,9 +1316,10 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let v = vm.stack_view::<FLAGS>().pop();
-        vm.ret_stack_view::<FLAGS>().push(v);
+        let v = vm.stack_view::<FLAGS>(offsets).pop();
+        vm.ret_stack_view::<FLAGS>(offsets).push(v);
         Some(pc)
     }
 
@@ -1245,10 +1339,11 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let addr = vm.stack_view::<FLAGS>().pop_byte();
+        let addr = vm.stack_view::<FLAGS>(offsets).pop_byte();
         let v = vm.ram_read::<FLAGS>(u16::from(addr));
-        vm.stack_view::<FLAGS>().push(v);
+        vm.stack_view::<FLAGS>(offsets).push(v);
         Some(pc)
     }
 
@@ -1267,8 +1362,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let addr = s.pop_byte();
         let v = s.pop();
         vm.ram_write(u16::from(addr), v);
@@ -1292,11 +1388,12 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let offset = vm.stack_view::<FLAGS>().pop_byte() as i8;
+        let offset = vm.stack_view::<FLAGS>(offsets).pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
         let v = vm.ram_read::<FLAGS>(addr);
-        vm.stack_view::<FLAGS>().push(v);
+        vm.stack_view::<FLAGS>(offsets).push(v);
         Some(pc)
     }
 
@@ -1317,8 +1414,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let offset = s.pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
         let v = s.pop();
@@ -1342,10 +1440,11 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let addr = vm.stack_view::<FLAGS>().pop_short();
+        let addr = vm.stack_view::<FLAGS>(offsets).pop_short();
         let v = vm.ram_read::<FLAGS>(addr);
-        vm.stack_view::<FLAGS>().push(v);
+        vm.stack_view::<FLAGS>(offsets).push(v);
         Some(pc)
     }
 
@@ -1365,8 +1464,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let addr = s.pop_short();
         let v = s.pop();
         vm.ram_write(addr, v);
@@ -1386,8 +1486,9 @@ mod op {
         vm: &mut Uxn,
         dev: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let i = s.pop_byte();
 
         // For compatibility with the C implementation, we'll
@@ -1397,18 +1498,36 @@ mod op {
         // which affects the behavior of `System.rst/wst`
         let v = if short(FLAGS) {
             s.reserve(2);
+
+            vm.stack.index = offsets.stack;
+            vm.ret.index = offsets.ret;
             dev.dei(vm, i);
+            offsets.stack = vm.stack.index;
+            offsets.ret = vm.ret.index;
+
             let hi = vm.dev[usize::from(i)];
             let j = i.wrapping_add(1);
+
+            vm.stack.index = offsets.stack;
+            vm.ret.index = offsets.ret;
             dev.dei(vm, j);
+            offsets.stack = vm.stack.index;
+            offsets.ret = vm.ret.index;
+
             let lo = vm.dev[usize::from(j)];
             Value::Short(u16::from_le_bytes([lo, hi]))
         } else {
             s.reserve(1);
+
+            vm.stack.index = offsets.stack;
+            vm.ret.index = offsets.ret;
             dev.dei(vm, i);
+            offsets.stack = vm.stack.index;
+            offsets.ret = vm.ret.index;
+
             Value::Byte(vm.dev[usize::from(i)])
         };
-        vm.stack_view::<FLAGS>().emplace(v);
+        vm.stack_view::<FLAGS>(offsets).emplace(v);
         Some(pc)
     }
 
@@ -1425,8 +1544,9 @@ mod op {
         vm: &mut Uxn,
         dev: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let i = s.pop_byte();
         let mut run = true;
         match s.pop() {
@@ -1467,8 +1587,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_bin!(vm, FLAGS, |a, b| a.wrapping_add(b));
+        op_bin!(vm, FLAGS, |a, b| a.wrapping_add(b), offsets);
         Some(pc)
     }
 
@@ -1485,8 +1606,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_bin!(vm, FLAGS, |a, b| a.wrapping_sub(b));
+        op_bin!(vm, FLAGS, |a, b| a.wrapping_sub(b), offsets);
         Some(pc)
     }
 
@@ -1503,8 +1625,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_bin!(vm, FLAGS, |a, b| a.wrapping_mul(b));
+        op_bin!(vm, FLAGS, |a, b| a.wrapping_mul(b), offsets);
         Some(pc)
     }
 
@@ -1528,8 +1651,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_bin!(vm, FLAGS, |a, b| if b != 0 { a / b } else { 0 });
+        op_bin!(vm, FLAGS, |a, b| if b != 0 { a / b } else { 0 }, offsets);
         Some(pc)
     }
 
@@ -1546,8 +1670,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_bin!(vm, FLAGS, |a, b| a & b);
+        op_bin!(vm, FLAGS, |a, b| a & b, offsets);
         Some(pc)
     }
 
@@ -1562,8 +1687,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_bin!(vm, FLAGS, |a, b| a | b);
+        op_bin!(vm, FLAGS, |a, b| a | b, offsets);
         Some(pc)
     }
 
@@ -1580,8 +1706,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        op_bin!(vm, FLAGS, |a, b| a ^ b);
+        op_bin!(vm, FLAGS, |a, b| a ^ b, offsets);
         Some(pc)
     }
 
@@ -1607,8 +1734,9 @@ mod op {
         vm: &mut Uxn,
         _: &mut dyn Device,
         pc: u16,
+        offsets: &mut StackOffsets,
     ) -> Option<u16> {
-        let mut s = vm.stack_view::<FLAGS>();
+        let mut s = vm.stack_view::<FLAGS>(offsets);
         let shift = s.pop_byte();
         let shr = u32::from(shift & 0xF);
         let shl = u32::from(shift >> 4);
@@ -1770,11 +1898,11 @@ mod test {
                 match s.len() {
                     2 => {
                         let v = u8::from_str_radix(s, 16).unwrap();
-                        vm.stack.push_byte(v);
+                        vm.stack.vs().push_byte(v);
                     }
                     4 => {
                         let v = u16::from_str_radix(s, 16).unwrap();
-                        vm.stack.push_short(v);
+                        vm.stack.vs().push_short(v);
                     }
                     _ => panic!("invalid length for literal: {i:?}"),
                 }
@@ -1788,10 +1916,16 @@ mod test {
                         expected.push(u8::from_str_radix(s, 16).unwrap());
                     }
                 }
-                vm.op(op.unwrap(), &mut dev, 0);
+                let mut offsets = StackOffsets {
+                    ret: vm.ret.index,
+                    stack: vm.stack.index,
+                };
+                vm.op(op.unwrap(), &mut dev, 0, &mut offsets);
+                vm.ret.index = offsets.ret;
+                vm.stack.index = offsets.stack;
                 let mut actual = vec![];
                 while vm.stack.index != u8::MAX {
-                    actual.push(vm.stack.pop_byte());
+                    actual.push(vm.stack.vs().pop_byte());
                 }
                 actual.reverse();
                 if actual != expected {
