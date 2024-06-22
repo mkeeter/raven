@@ -31,7 +31,7 @@ to a register machine – it's very few possibilities!
 tight loop that dispatches based on opcode.  _Everything_ is inlined, so
 `Uxn::run` ends up being a single gigantic (11.4 KiB) function; this sounds like
 a lot, but it's only an average of 11 instructions per opcode.  Pervasive
-inlining means that all of our important data – stack pointers, offsets, etc –
+inlining means that many important values – stack pointers, offsets, etc –
 can be kept in registers, making the evaluation loop very efficient.
 
 The assembly is also hand-inspected for inefficiency and panics; `Uxn::run`
