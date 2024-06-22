@@ -115,7 +115,7 @@ impl File {
 
     /// Decodes a port address into an `(index, offset)` tuple
     fn decode_target(target: u8) -> (usize, u8) {
-        let i = (target - FilePorts::BASE) as usize / DEV_SIZE;
+        let i = usize::from(target - FilePorts::BASE) / DEV_SIZE;
         (i, target & 0xF)
     }
 
@@ -235,13 +235,13 @@ impl File {
             }
         }
 
-        self.buf.resize(ports.length.get() as usize, 0u8);
+        self.buf.resize(usize::from(ports.length.get()), 0u8);
         let Some(Handle::Write { path, file }) = self.f.as_mut() else {
             unreachable!();
         };
 
         // Copy data out of the VM
-        self.buf.resize(ports.length.get() as usize, 0u8);
+        self.buf.resize(usize::from(ports.length.get()), 0u8);
         let mut addr = ports.write.get();
         for b in self.buf.iter_mut() {
             *b = vm.ram_read_byte(addr);
@@ -324,7 +324,7 @@ impl File {
         }
 
         let ports = FilePorts::dev_mut(vm, index);
-        self.buf.resize(ports.length.get() as usize, 0u8);
+        self.buf.resize(usize::from(ports.length.get()), 0u8);
         let n = match self.f.as_mut().unwrap() {
             Handle::Write { .. } => unreachable!(),
             Handle::File { path, file } => match file.read(&mut self.buf) {

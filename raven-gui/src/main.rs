@@ -35,7 +35,7 @@ impl<'a> Stage<'a> {
 
         let size = out.size;
         let image = egui::ColorImage::new(
-            [size.0 as usize, size.1 as usize],
+            [usize::from(size.0), usize::from(size.1)],
             egui::Color32::BLACK,
         );
 
@@ -211,7 +211,7 @@ pub fn audio_setup(
         .find_map(|c| {
             c.try_with_sample_rate(cpal::SampleRate(AUDIO_SAMPLE_RATE))
         })
-        .filter(|c| c.channels() == AUDIO_CHANNELS)
+        .filter(|c| usize::from(c.channels()) == AUDIO_CHANNELS)
         .expect("no supported config?");
     let config = supported_config.config();
 

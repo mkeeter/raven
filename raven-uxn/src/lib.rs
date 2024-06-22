@@ -267,7 +267,7 @@ macro_rules! op_cmp {
             let a = s.pop_byte();
             ($f)(a, b)
         };
-        s.push_byte(v as u8);
+        s.push_byte(u8::from(v));
     }};
 }
 
@@ -387,14 +387,14 @@ impl<'a> Uxn<'a> {
     #[inline]
     pub fn dev_at<D: Ports>(&self, pos: u8) -> &D {
         Self::check_dev_size::<D>();
-        D::ref_from(&self.dev[pos as usize..][..DEV_SIZE]).unwrap()
+        D::ref_from(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
     }
 
     /// Returns a reference to a device located at `pos`
     #[inline]
     pub fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
         Self::check_dev_size::<D>();
-        D::mut_from(&mut self.dev[pos as usize..][..DEV_SIZE]).unwrap()
+        D::mut_from(&mut self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
     }
 
     /// Returns a mutable reference to the given [`Ports`] object
@@ -424,13 +424,13 @@ impl<'a> Uxn<'a> {
     /// Reads a byte from RAM
     #[inline]
     pub fn ram_read_byte(&self, addr: u16) -> u8 {
-        self.ram[addr as usize]
+        self.ram[usize::from(addr)]
     }
 
     /// Writes a byte to RAM
     #[inline]
     pub fn ram_write_byte(&mut self, addr: u16, v: u8) {
-        self.ram[addr as usize] = v;
+        self.ram[usize::from(addr)] = v;
     }
 
     /// Reads a word from RAM
@@ -438,8 +438,8 @@ impl<'a> Uxn<'a> {
     /// If the address is at the top of RAM, the second byte will wrap to 0
     #[inline]
     pub fn ram_read_word(&self, addr: u16) -> u16 {
-        let hi = self.ram[addr as usize];
-        let lo = self.ram[addr.wrapping_add(1) as usize];
+        let hi = self.ram[usize::from(addr)];
+        let lo = self.ram[usize::from(addr.wrapping_add(1))];
         u16::from_le_bytes([lo, hi])
     }
 
@@ -1398,15 +1398,15 @@ mod op {
         let v = if short(FLAGS) {
             s.reserve(2);
             dev.dei(vm, i);
-            let hi = vm.dev[i as usize];
+            let hi = vm.dev[usize::from(i)];
             let j = i.wrapping_add(1);
             dev.dei(vm, j);
-            let lo = vm.dev[j as usize];
+            let lo = vm.dev[usize::from(j)];
             Value::Short(u16::from_le_bytes([lo, hi]))
         } else {
             s.reserve(1);
             dev.dei(vm, i);
-            Value::Byte(vm.dev[i as usize])
+            Value::Byte(vm.dev[usize::from(i)])
         };
         vm.stack_view::<FLAGS>().emplace(v);
         Some(pc)
@@ -1433,13 +1433,13 @@ mod op {
             Value::Short(v) => {
                 let [lo, hi] = v.to_le_bytes();
                 let j = i.wrapping_add(1);
-                vm.dev[i as usize] = hi;
+                vm.dev[usize::from(i)] = hi;
                 run &= dev.deo(vm, i);
-                vm.dev[j as usize] = lo;
+                vm.dev[usize::from(j)] = lo;
                 run &= dev.deo(vm, j);
             }
             Value::Byte(v) => {
-                vm.dev[i as usize] = v;
+                vm.dev[usize::from(i)] = v;
                 run &= dev.deo(vm, i);
             }
         }
@@ -1713,8 +1713,9 @@ mod test {
             s.strip_suffix('k').map(|s| (s, true)).unwrap_or((s, false));
         let (s, short) =
             s.strip_suffix('2').map(|s| (s, true)).unwrap_or((s, false));
-        let mode =
-            ((keep as u8) << 7) | ((ret as u8) << 6) | ((short as u8) << 5);
+        let mode = (u8::from(keep) << 7)
+            | (u8::from(ret) << 6)
+            | (u8::from(short) << 5);
         let out = match s {
             "BRK" => 0x00,
             "JCI" => 0x20,

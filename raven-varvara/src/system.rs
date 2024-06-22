@@ -62,9 +62,9 @@ impl SystemPorts {
     /// Looks up the color for the given index
     pub fn color(&self, i: u8) -> u32 {
         let i = 3 - i;
-        let r = (self.red.get() >> (i * 4)) as u32 & 0xF;
-        let g = (self.green.get() >> (i * 4)) as u32 & 0xF;
-        let b = (self.blue.get() >> (i * 4)) as u32 & 0xF;
+        let r = u32::from(self.red.get() >> (i * 4)) & 0xF;
+        let g = u32::from(self.green.get() >> (i * 4)) & 0xF;
+        let b = u32::from(self.blue.get() >> (i * 4)) & 0xF;
         let color = 0x0F000000 | (r << 16) | (g << 8) | b;
         color | (color << 4)
     }
@@ -101,9 +101,9 @@ impl System {
                         for i in 0..f.length.get() {
                             let ram = match bank {
                                 0 => vm.ram_mut(),
-                                b => &mut self.banks[b as usize - 1],
+                                b => &mut self.banks[usize::from(b) - 1],
                             };
-                            ram[addr.wrapping_add(i) as usize] = f.value;
+                            ram[usize::from(addr.wrapping_add(i))] = f.value;
                         }
                     }
                     expansion::CPYL | expansion::CPYR => {
@@ -128,16 +128,16 @@ impl System {
                             let src_addr = offset(i, c.src_addr);
                             let src = match c.src_bank.get() {
                                 0 => vm.ram(),
-                                b => &self.banks[b as usize - 1],
+                                b => &self.banks[usize::from(b) - 1],
                             };
-                            let v = src[src_addr as usize];
+                            let v = src[usize::from(src_addr)];
 
                             let dst_addr = offset(i, c.dst_addr);
                             let dst = match c.dst_bank.get() {
                                 0 => vm.ram_mut(),
-                                b => &mut self.banks[b as usize - 1],
+                                b => &mut self.banks[usize::from(b) - 1],
                             };
-                            dst[dst_addr as usize] = v;
+                            dst[usize::from(dst_addr)] = v;
                         }
                     }
                     _ => panic!("invalid expansion opcode {op}"),

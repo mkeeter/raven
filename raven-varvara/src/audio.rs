@@ -37,7 +37,7 @@ impl AudioPorts {
 
     /// Checks whether the given value is in the audio ports memory space
     pub fn matches(t: u8) -> bool {
-        (Self::BASE..Self::BASE + 0x10 * DEV_COUNT as u8).contains(&t)
+        (Self::BASE..Self::BASE + 0x10 * DEV_COUNT).contains(&t)
     }
 
     fn dev<'a>(vm: &'a Uxn, i: usize) -> &'a Self {
@@ -58,25 +58,25 @@ impl AudioPorts {
         } else {
             let len = self.length.get();
             let pitch = self.pitch.note();
-            let scale = TUNING[pitch as usize] / TUNING[0x28];
+            let scale = TUNING[usize::from(pitch)] / TUNING[0x28];
             len as f32 / (scale * 44.1)
         }
     }
 }
 
 /// Number of audio devices
-pub const DEV_COUNT: u16 = 4;
+pub const DEV_COUNT: u8 = 4;
 
 /// Expected audio sample rate
 pub const SAMPLE_RATE: u32 = 44100;
 
 /// Expected number of audio channels
 #[cfg(not(target_arch = "wasm32"))]
-pub const CHANNELS: u16 = 2;
+pub const CHANNELS: usize = 2;
 
 /// Expected number of audio channels (WebAssembly)
 #[cfg(target_arch = "wasm32")]
-pub const CHANNELS: u16 = 1;
+pub const CHANNELS: usize = 1;
 
 /// Number of samples to use for crossfade
 const CROSSFADE_COUNT: usize = 200;
@@ -288,12 +288,12 @@ impl StreamData {
             if !self.crossfade.is_empty() {
                 let x = self.crossfade.len() as f32
                     / (CROSSFADE_COUNT as f32 - 1.0);
-                for j in 0..CHANNELS as usize {
+                for j in 0..CHANNELS {
                     let v = self.crossfade.pop_front().unwrap();
                     data[i + j] = v * x + data[i + j] * (1.0 - x);
                 }
             }
-            i += CHANNELS as usize;
+            i += CHANNELS;
 
             self.pos += self.inc;
             self.megapos += self.inc;

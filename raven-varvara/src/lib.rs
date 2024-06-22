@@ -178,9 +178,9 @@ impl Varvara {
 
     /// Checks whether the SHIFT key is currently down
     fn warn_missing(&mut self, t: u8) {
-        if !self.already_warned[(t >> 4) as usize] {
+        if !self.already_warned[usize::from(t >> 4)] {
             warn!("unimplemented device {t:#02x}");
-            self.already_warned[(t >> 4) as usize] = true;
+            self.already_warned[usize::from(t >> 4)] = true;
         }
     }
 
@@ -267,7 +267,7 @@ impl Varvara {
     /// Processes pending audio events
     pub fn audio(&mut self, vm: &mut Uxn) {
         for i in 0..audio::DEV_COUNT {
-            if let Some(e) = self.audio.update(vm, i as usize) {
+            if let Some(e) = self.audio.update(vm, usize::from(i)) {
                 self.process_event(vm, e);
             }
         }
