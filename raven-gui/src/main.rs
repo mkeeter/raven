@@ -64,10 +64,10 @@ impl eframe::App for Stage<'_> {
         // Repaint at vsync rate (60 FPS)
         ctx.request_repaint();
         ctx.input(|i| {
-            if i.time >= self.next_frame {
+            while i.time >= self.next_frame {
                 // Screen callback (limited to 60 FPS).  We want to err on the
                 // side of redrawing early, rather than missing frames.
-                self.next_frame = i.time + 0.015;
+                self.next_frame += 0.0166667;
                 self.dev.redraw(&mut self.vm);
             }
 
