@@ -100,7 +100,6 @@ impl eframe::App for Stage<'_> {
                         ..
                     } => {
                         if let Some(k) = decode_key(*key, shift_held) {
-                            println!("{k:?}, {repeat}");
                             if *pressed {
                                 self.dev.pressed(&mut self.vm, k, *repeat);
                             } else {
