@@ -1622,14 +1622,14 @@ mod op {
 pub trait Device {
     /// Performs the `DEI` operation for the given target
     ///
-    /// The output byte (if any) must be written to `vm.dev[target]`, and can be
-    /// read after this function returns.
+    /// This function must write its output byte to `vm.dev[target]`; the CPU
+    /// evaluation loop will then copy this value to the stack.
     fn dei(&mut self, vm: &mut Uxn, target: u8);
 
     /// Performs the `DEO` operation on the given target
     ///
-    /// The input byte (if any) will be read from `vm.dev[target]`, and must be
-    /// stored before this function is called.
+    /// The input byte will be written to `vm.dev[target]` before this function
+    /// is called, and can be read by the function.
     ///
     /// Returns `true` if the CPU should keep running, `false` if it should
     /// exit.
