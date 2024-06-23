@@ -305,6 +305,15 @@ impl<'a> Uxn<'a> {
         out
     }
 
+    /// Resets the system, loading a new ROM
+    pub fn reset(&mut self, rom: &[u8]) {
+        self.dev.fill(0);
+        self.ram.fill(0);
+        self.stack = Stack::default();
+        self.ret = Stack::default();
+        self.ram[0x100..][..rom.len()].copy_from_slice(rom);
+    }
+
     /// Reads a byte from RAM at the program counter
     #[inline]
     fn next(&mut self, pc: &mut u16) -> u8 {

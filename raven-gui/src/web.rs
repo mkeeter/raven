@@ -5,6 +5,7 @@ use eframe::{
     web_sys,
 };
 use log::info;
+use std::sync::mpsc;
 
 use crate::{audio_setup, Stage};
 use uxn::{Uxn, UxnRam};
@@ -60,12 +61,15 @@ pub fn run() -> Result<()> {
     div.set_onclick(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
+    let (tx, rx) = mpsc::channel();
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()
             .start(
                 "varvara",
                 options,
-                Box::new(move |cc| Box::new(Stage::new(vm, dev, &cc.egui_ctx))),
+                Box::new(move |cc| {
+                    Box::new(Stage::new(vm, dev, &cc.egui_ctx, rx))
+                }),
             )
             .await
             .expect("failed to start eframe")

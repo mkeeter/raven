@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context};
-use std::io::Read;
+use std::{io::Read, sync::mpsc};
 
 use uxn::{Uxn, UxnRam};
 use varvara::Varvara;
@@ -60,10 +60,11 @@ pub fn run() -> Result<()> {
         ..Default::default()
     };
 
+    let (tx, rx) = mpsc::channel();
     eframe::run_native(
         "Varvara",
         options,
-        Box::new(move |cc| Box::new(Stage::new(vm, dev, &cc.egui_ctx))),
+        Box::new(move |cc| Box::new(Stage::new(vm, dev, rx, &cc.egui_ctx))),
     )
     .map_err(|e| anyhow!("got egui error: {e:?}"))
 }

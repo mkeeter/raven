@@ -3,7 +3,7 @@ use log::{error, info};
 use uxn::Uxn;
 use varvara::{Key, MouseState, Varvara, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 
 use cpal::traits::StreamTrait;
 use eframe::egui;
@@ -23,12 +23,16 @@ pub struct Stage<'a> {
     cursor_pos: Option<(f32, f32)>,
 
     texture: egui::TextureHandle,
+
+    /// Event injector
+    rx: mpsc::Receiver<egui::Event>,
 }
 
 impl<'a> Stage<'a> {
     pub fn new(
         vm: Uxn<'a>,
         mut dev: Varvara,
+        rx: mpsc::Receiver<egui::Event>,
         ctx: &egui::Context,
     ) -> Stage<'a> {
         let out = dev.output(&vm);
@@ -50,6 +54,7 @@ impl<'a> Stage<'a> {
 
             #[cfg(not(target_arch = "wasm32"))]
             console_rx: varvara::console_worker(),
+            rx,
 
             scroll: (0.0, 0.0),
             cursor_pos: None,
@@ -197,6 +202,35 @@ impl eframe::App for Stage<'_> {
 
         // Update stdout / stderr / exiting
         out.check().expect("failed to print output?");
+    }
+
+    fn raw_input_hook(
+        &mut self,
+        _ctx: &egui::Context,
+        raw_input: &mut egui::RawInput,
+    ) {
+        if raw_input.dropped_files.len() == 1 {
+            let target = &raw_input.dropped_files[0];
+            let changed = if let Some(path) = &target.path {
+                let data = std::fs::read(path).expect("failed to read file");
+                info!("loading {} bytes from {path:?}", data.len());
+                self.vm.reset(&data);
+                true
+            } else if let Some(data) = &target.bytes {
+                self.vm.reset(data);
+                true
+            } else {
+                false
+            };
+            if changed {
+                self.dev = Varvara::new();
+                self.vm.run(&mut self.dev, 0x100);
+                self.dev.output(&self.vm).check().unwrap();
+            }
+        }
+        while let Ok(e) = self.rx.try_recv() {
+            raw_input.events.push(e);
+        }
     }
 }
 
