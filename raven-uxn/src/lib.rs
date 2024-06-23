@@ -28,14 +28,6 @@ pub struct Stack {
 }
 
 impl Stack {
-    #[cfg(test)]
-    fn vs(&mut self) -> VirtualStack {
-        VirtualStack {
-            data: &mut self.data,
-            index: &mut self.index,
-        }
-    }
-
     /// Returns the number of items in the stack
     #[inline]
     pub fn len(&self) -> u8 {
@@ -270,12 +262,18 @@ pub struct Uxn<'a> {
     ret: Stack,
 }
 
+/// Helper `struct` to store stack pointers during evaluation
 #[derive(Copy, Clone)]
 struct StackOffsets {
     stack: u8,
     ret: u8,
 }
 
+/// Reference to stack data and index
+///
+/// This is philosophically equivalent to a [`Stack`], but is used in places
+/// where we want the compiler to pack the `index` into a register; see the
+/// comment in [`Uxn::run`].
 struct VirtualStack<'a> {
     data: &'a mut [u8; 256],
     index: &'a mut u8,
@@ -515,6 +513,15 @@ impl<'a> Uxn<'a> {
     /// Runs the VM starting at the given address until it terminates
     #[inline]
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) {
+        // This is subtle: if we keep the stack index values in
+        // `self.stack.index` / `self.ret.index`, then modifying them requires a
+        // load / store operation.
+        //
+        // Instead, we can create local variables which are borrowed by a
+        // `VirtualStack`; the compiler is then smart enough to keep them in
+        // registers.  We copy them back into `self.*.index` at the end of
+        // the function, or before doing a `dei` / `deo` operation (which
+        // expects the `Uxn` to be coherent).
         let mut offsets = self.offsets();
         loop {
             let op = self.next(&mut pc);
@@ -1553,13 +1560,18 @@ mod op {
                 let [lo, hi] = v.to_le_bytes();
                 let j = i.wrapping_add(1);
                 vm.dev[usize::from(i)] = hi;
+
+                vm.set_offsets(*offsets);
                 run &= dev.deo(vm, i);
                 vm.dev[usize::from(j)] = lo;
                 run &= dev.deo(vm, j);
+                *offsets = vm.offsets();
             }
             Value::Byte(v) => {
                 vm.dev[usize::from(i)] = v;
+                vm.set_offsets(*offsets);
                 run &= dev.deo(vm, i);
+                *offsets = vm.offsets();
             }
         }
         if run {
@@ -1894,14 +1906,18 @@ mod test {
         let mut dev = EmptyDevice;
         while let Some(i) = iter.next() {
             if let Some(s) = i.strip_prefix('#') {
+                let mut vs = VirtualStack {
+                    data: &mut vm.stack.data,
+                    index: &mut vm.stack.index,
+                };
                 match s.len() {
                     2 => {
                         let v = u8::from_str_radix(s, 16).unwrap();
-                        vm.stack.vs().push_byte(v);
+                        vs.push_byte(v);
                     }
                     4 => {
                         let v = u16::from_str_radix(s, 16).unwrap();
-                        vm.stack.vs().push_short(v);
+                        vs.push_short(v);
                     }
                     _ => panic!("invalid length for literal: {i:?}"),
                 }
@@ -1923,8 +1939,12 @@ mod test {
                 vm.ret.index = offsets.ret;
                 vm.stack.index = offsets.stack;
                 let mut actual = vec![];
-                while vm.stack.index != u8::MAX {
-                    actual.push(vm.stack.vs().pop_byte());
+                let mut vs = VirtualStack {
+                    data: &mut vm.stack.data,
+                    index: &mut vm.stack.index,
+                };
+                while *vs.index != u8::MAX {
+                    actual.push(vs.pop_byte());
                 }
                 actual.reverse();
                 if actual != expected {
