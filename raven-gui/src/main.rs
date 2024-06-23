@@ -93,10 +93,16 @@ impl eframe::App for Stage<'_> {
                             }
                         }
                     }
-                    egui::Event::Key { key, pressed, .. } => {
+                    egui::Event::Key {
+                        key,
+                        pressed,
+                        repeat,
+                        ..
+                    } => {
                         if let Some(k) = decode_key(*key, shift_held) {
+                            println!("{k:?}, {repeat}");
                             if *pressed {
-                                self.dev.pressed(&mut self.vm, k);
+                                self.dev.pressed(&mut self.vm, k, *repeat);
                             } else {
                                 self.dev.released(&mut self.vm, k);
                             }
@@ -115,7 +121,7 @@ impl eframe::App for Stage<'_> {
                 (i.modifiers.shift, Key::Shift),
             ] {
                 if b {
-                    self.dev.pressed(&mut self.vm, k)
+                    self.dev.pressed(&mut self.vm, k, false)
                 } else {
                     self.dev.released(&mut self.vm, k)
                 }

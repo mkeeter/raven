@@ -65,12 +65,17 @@ impl Controller {
     }
 
     /// Send the given key event, returning an event if needed
-    pub fn pressed(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
+    pub fn pressed(
+        &mut self,
+        vm: &mut Uxn,
+        k: Key,
+        repeat: bool,
+    ) -> Option<Event> {
         if let Key::Char(k) = k {
             Some(self.char(vm, k))
         } else {
             self.down.insert(k);
-            self.check_buttons(vm)
+            self.check_buttons(vm, repeat)
         }
     }
 
@@ -80,13 +85,13 @@ impl Controller {
     pub fn released(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
         if !matches!(k, Key::Char(..)) {
             self.down.remove(&k);
-            self.check_buttons(vm)
+            self.check_buttons(vm, false)
         } else {
             None
         }
     }
 
-    fn check_buttons(&mut self, vm: &mut Uxn) -> Option<Event> {
+    fn check_buttons(&mut self, vm: &mut Uxn, repeat: bool) -> Option<Event> {
         let mut buttons = 0;
         for (i, k) in [
             Key::Ctrl,
@@ -108,7 +113,7 @@ impl Controller {
 
         // We'll return this event in case we don't have a keypress event;
         // otherwise, the keypress event will call the vector (at least once)
-        if buttons != self.buttons {
+        if buttons != self.buttons || repeat {
             let p = vm.dev_mut::<ControllerPorts>();
             self.buttons = buttons;
             p.button = buttons;

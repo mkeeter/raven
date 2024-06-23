@@ -238,8 +238,8 @@ impl Varvara {
     }
 
     /// Press a key on the controller device
-    pub fn pressed(&mut self, vm: &mut Uxn, k: Key) {
-        if let Some(e) = self.controller.pressed(vm, k) {
+    pub fn pressed(&mut self, vm: &mut Uxn, k: Key, repeat: bool) {
+        if let Some(e) = self.controller.pressed(vm, k, repeat) {
             self.process_event(vm, e);
         }
     }
