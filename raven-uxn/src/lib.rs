@@ -270,6 +270,7 @@ pub struct Uxn<'a> {
     ret: Stack,
 }
 
+#[derive(Copy, Clone)]
 struct StackOffsets {
     stack: u8,
     ret: u8,
@@ -329,6 +330,18 @@ impl<'a> Uxn<'a> {
         };
         out.ram[0x100..][..rom.len()].copy_from_slice(rom);
         out
+    }
+
+    fn offsets(&self) -> StackOffsets {
+        StackOffsets {
+            stack: self.stack.index,
+            ret: self.ret.index,
+        }
+    }
+
+    fn set_offsets(&mut self, o: StackOffsets) {
+        self.stack.index = o.stack;
+        self.ret.index = o.ret;
     }
 
     /// Reads a byte from RAM at the program counter
@@ -502,10 +515,7 @@ impl<'a> Uxn<'a> {
     /// Runs the VM starting at the given address until it terminates
     #[inline]
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) {
-        let mut offsets = StackOffsets {
-            ret: self.ret.index,
-            stack: self.stack.index,
-        };
+        let mut offsets = self.offsets();
         loop {
             let op = self.next(&mut pc);
             let Some(next) = self.op(op, dev, pc, &mut offsets) else {
@@ -513,8 +523,7 @@ impl<'a> Uxn<'a> {
             };
             pc = next;
         }
-        self.ret.index = offsets.ret;
-        self.stack.index = offsets.stack;
+        self.set_offsets(offsets);
     }
 
     /// Executes a single operation
@@ -1499,31 +1508,21 @@ mod op {
         let v = if short(FLAGS) {
             s.reserve(2);
 
-            vm.stack.index = offsets.stack;
-            vm.ret.index = offsets.ret;
+            vm.set_offsets(*offsets);
             dev.dei(vm, i);
-            offsets.stack = vm.stack.index;
-            offsets.ret = vm.ret.index;
-
             let hi = vm.dev[usize::from(i)];
             let j = i.wrapping_add(1);
-
-            vm.stack.index = offsets.stack;
-            vm.ret.index = offsets.ret;
             dev.dei(vm, j);
-            offsets.stack = vm.stack.index;
-            offsets.ret = vm.ret.index;
+            *offsets = vm.offsets();
 
             let lo = vm.dev[usize::from(j)];
             Value::Short(u16::from_le_bytes([lo, hi]))
         } else {
             s.reserve(1);
 
-            vm.stack.index = offsets.stack;
-            vm.ret.index = offsets.ret;
+            vm.set_offsets(*offsets);
             dev.dei(vm, i);
-            offsets.stack = vm.stack.index;
-            offsets.ret = vm.ret.index;
+            *offsets = vm.offsets();
 
             Value::Byte(vm.dev[usize::from(i)])
         };
