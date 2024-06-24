@@ -18,3 +18,4 @@ log = "0.4.21"
 static_assertions = "1.1.0"
 wasm-bindgen-futures = "0.4"
 zerocopy = { version = "0.7.34", features = ["derive"] }
+web-sys = { version = "*", features = ["HtmlSelectElement", "HtmlOptionElement"] }

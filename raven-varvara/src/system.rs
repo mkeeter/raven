@@ -77,7 +77,7 @@ mod expansion {
 }
 
 impl System {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let banks = [(); 15].map(|_| Box::new([0u8; 65536]));
         Self { banks, exit: None }
     }

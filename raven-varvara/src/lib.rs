@@ -155,20 +155,33 @@ impl Device for Varvara {
 impl Varvara {
     /// Builds a new instance of the Varvara peripherals
     pub fn new() -> Self {
-        const WIDTH: u16 = 512;
-        const HEIGHT: u16 = 320;
         Self {
             console: console::Console::new(),
-            system: system::System::default(),
+            system: system::System::new(),
             datetime: datetime::Datetime,
             audio: audio::Audio::new(),
-            screen: screen::Screen::new(WIDTH, HEIGHT),
+            screen: screen::Screen::new(),
             mouse: mouse::Mouse::new(),
             file: file::File::new(),
             controller: controller::Controller::new(),
 
             already_warned: [false; 16],
         }
+    }
+
+    /// Resets the CPU
+    ///
+    /// Note that the audio stream handles are unchanged, so any audio worker
+    /// threads can continue to run.
+    pub fn reset(&mut self) {
+        self.system = system::System::new();
+        self.console = console::Console::new();
+        self.audio.reset();
+        self.screen = screen::Screen::new();
+        self.mouse = mouse::Mouse::new();
+        self.file = file::File::new();
+        self.controller = controller::Controller::new();
+        self.already_warned.fill(false);
     }
 
     /// Returns the current screen size

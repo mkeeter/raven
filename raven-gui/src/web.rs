@@ -4,7 +4,7 @@ use eframe::{
     wasm_bindgen::{closure::Closure, JsCast},
     web_sys,
 };
-use log::info;
+use log::{info, warn};
 use std::sync::mpsc;
 
 use crate::{audio_setup, Event, Stage};
@@ -15,7 +15,8 @@ pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
     let ram = UxnRam::new();
-    let mut vm = Uxn::new(&[], ram.leak());
+    let rom = include_bytes!("../../../uxn/audio.rom");
+    let mut vm = Uxn::new(rom, ram.leak());
     let mut dev = Varvara::new();
 
     // Run the reset vector
@@ -42,6 +43,60 @@ pub fn run() -> Result<()> {
     div.style()
         .set_css_text(&format!("width: {width}px; height: {height}px"));
 
+    let sel = document
+        .get_element_by_id("example-selector")
+        .ok_or_else(|| anyhow!("could not find example-selector"))?
+        .dyn_into::<web_sys::Node>()
+        .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
+
+    const ROMS: [(&'static str, &'static [u8]); 6] = [
+        ("controller", include_bytes!("../../roms/controller.rom")),
+        ("screen", include_bytes!("../../roms/screen.rom")),
+        ("drool", include_bytes!("../../roms/drool.rom")),
+        ("audio", include_bytes!("../../roms/audio.rom")),
+        ("mandelbrot", include_bytes!("../../roms/mandelbrot.rom")),
+        ("bunnymark", include_bytes!("../../roms/bunnymark.rom")),
+    ];
+    for (r, _) in &ROMS {
+        let opt = document
+            .create_element("option")
+            .map_err(|e| anyhow!("could not create option: {e:?}"))?
+            .dyn_into::<web_sys::HtmlOptionElement>()
+            .map_err(|e| {
+                anyhow!("could not convert example-selector: {e:?}")
+            })?;
+        opt.set_text_content(Some(r));
+        sel.append_child(&opt.get_root_node())
+            .map_err(|e| anyhow!("could not append node: {e:?}"))?;
+    }
+
+    let (tx, rx) = mpsc::channel();
+    let sel = document
+        .get_element_by_id("example-selector")
+        .ok_or_else(|| anyhow!("could not find example-selector"))?
+        .dyn_into::<web_sys::HtmlSelectElement>()
+        .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
+
+    let a = Closure::<dyn FnMut()>::new(move || match sel.selected_index() {
+        0 => (),
+        i => {
+            if let Some((_, r)) = ROMS.get(i as usize - 1) {
+                if tx.send(Event::LoadRom(r.to_vec())).is_err() {
+                    warn!("error loading rom");
+                }
+            } else {
+                warn!("invalid selection: {i}");
+            }
+        }
+    });
+    let sel = document
+        .get_element_by_id("example-selector")
+        .ok_or_else(|| anyhow!("could not find example-selector"))?
+        .dyn_into::<web_sys::HtmlSelectElement>()
+        .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
+    sel.set_onchange(Some(a.as_ref().unchecked_ref()));
+    std::mem::forget(a);
+
     let mut _audio = None;
     let mut audio_data = Some(dev.audio_streams());
     let a = Closure::<dyn FnMut()>::new(move || {
@@ -60,7 +115,6 @@ pub fn run() -> Result<()> {
     div.set_onclick(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
-    let (tx, rx) = mpsc::channel();
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()
             .start(
@@ -73,9 +127,6 @@ pub fn run() -> Result<()> {
             .await
             .expect("failed to start eframe")
     });
-
-    let rom = include_bytes!("../../../uxn/controller.rom");
-    tx.send(Event::LoadRom(rom.to_vec())).unwrap();
 
     Ok(())
 }

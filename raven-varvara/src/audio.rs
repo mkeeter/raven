@@ -344,6 +344,13 @@ impl Audio {
         Audio { streams }
     }
 
+    pub fn reset(&mut self) {
+        for s in &self.streams {
+            *s.data.lock().unwrap() = StreamData::default();
+            s.done.store(false, Ordering::Relaxed);
+        }
+    }
+
     /// Return the "note done" vector if the given channel is done
     pub fn update(&self, vm: &Uxn, i: usize) -> Option<Event> {
         if self.streams[i].done.swap(false, Ordering::Relaxed) {

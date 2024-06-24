@@ -71,7 +71,7 @@ impl<'a> Stage<'a> {
 
     fn load_rom(&mut self, data: &[u8]) {
         self.vm.reset(data);
-        self.dev = Varvara::new();
+        self.dev.reset();
         self.vm.run(&mut self.dev, 0x100);
         self.dev.output(&self.vm).check().unwrap();
     }

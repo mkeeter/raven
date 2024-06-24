@@ -1655,6 +1655,7 @@ dependencies = [
  "raven-uxn",
  "raven-varvara",
  "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

@@ -142,15 +142,17 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new(width: u16, height: u16) -> Self {
-        let size = width as usize * height as usize;
+    pub fn new() -> Self {
+        const WIDTH: u16 = 512;
+        const HEIGHT: u16 = 320;
+        let size = WIDTH as usize * WIDTH as usize;
         let buffer = vec![0; size * 4];
         let pixels = vec![ScreenPixel::default(); size];
         Self {
             buffer,
             pixels,
-            width,
-            height,
+            width: WIDTH,
+            height: HEIGHT,
             changed: true,
         }
     }
