@@ -9,6 +9,12 @@ use cpal::traits::StreamTrait;
 use eframe::egui;
 use log::warn;
 
+/// Injected events from the [`Stage::rx`] queue
+#[derive(Debug)]
+pub enum Event {
+    LoadRom(Vec<u8>),
+}
+
 pub struct Stage<'a> {
     vm: Uxn<'a>,
     dev: Varvara,
@@ -25,14 +31,14 @@ pub struct Stage<'a> {
     texture: egui::TextureHandle,
 
     /// Event injector
-    rx: mpsc::Receiver<egui::Event>,
+    rx: mpsc::Receiver<Event>,
 }
 
 impl<'a> Stage<'a> {
     pub fn new(
         vm: Uxn<'a>,
         mut dev: Varvara,
-        rx: mpsc::Receiver<egui::Event>,
+        rx: mpsc::Receiver<Event>,
         ctx: &egui::Context,
     ) -> Stage<'a> {
         let out = dev.output(&vm);
@@ -62,10 +68,25 @@ impl<'a> Stage<'a> {
             texture,
         }
     }
+
+    fn load_rom(&mut self, data: &[u8]) {
+        self.vm.reset(data);
+        self.dev = Varvara::new();
+        self.vm.run(&mut self.dev, 0x100);
+        self.dev.output(&self.vm).check().unwrap();
+    }
 }
 
 impl eframe::App for Stage<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        while let Ok(e) = self.rx.try_recv() {
+            match e {
+                Event::LoadRom(data) => {
+                    self.load_rom(&data);
+                }
+            }
+        }
+
         // Repaint at vsync rate (60 FPS)
         ctx.request_repaint();
         ctx.input(|i| {
@@ -211,25 +232,13 @@ impl eframe::App for Stage<'_> {
     ) {
         if raw_input.dropped_files.len() == 1 {
             let target = &raw_input.dropped_files[0];
-            let changed = if let Some(path) = &target.path {
+            if let Some(path) = &target.path {
                 let data = std::fs::read(path).expect("failed to read file");
                 info!("loading {} bytes from {path:?}", data.len());
-                self.vm.reset(&data);
-                true
+                self.load_rom(&data);
             } else if let Some(data) = &target.bytes {
-                self.vm.reset(data);
-                true
-            } else {
-                false
-            };
-            if changed {
-                self.dev = Varvara::new();
-                self.vm.run(&mut self.dev, 0x100);
-                self.dev.output(&self.vm).check().unwrap();
+                self.load_rom(data);
             }
-        }
-        while let Ok(e) = self.rx.try_recv() {
-            raw_input.events.push(e);
         }
     }
 }

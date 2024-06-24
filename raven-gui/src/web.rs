@@ -7,16 +7,15 @@ use eframe::{
 use log::info;
 use std::sync::mpsc;
 
-use crate::{audio_setup, Stage};
+use crate::{audio_setup, Event, Stage};
 use uxn::{Uxn, UxnRam};
 use varvara::Varvara;
 
 pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
-    let rom = include_bytes!("../../roms/cccc.rom");
     let ram = UxnRam::new();
-    let mut vm = Uxn::new(rom, ram.leak());
+    let mut vm = Uxn::new(&[], ram.leak());
     let mut dev = Varvara::new();
 
     // Run the reset vector
@@ -68,11 +67,15 @@ pub fn run() -> Result<()> {
                 "varvara",
                 options,
                 Box::new(move |cc| {
-                    Box::new(Stage::new(vm, dev, &cc.egui_ctx, rx))
+                    Box::new(Stage::new(vm, dev, rx, &cc.egui_ctx))
                 }),
             )
             .await
             .expect("failed to start eframe")
     });
+
+    let rom = include_bytes!("../../../uxn/controller.rom");
+    tx.send(Event::LoadRom(rom.to_vec())).unwrap();
+
     Ok(())
 }
