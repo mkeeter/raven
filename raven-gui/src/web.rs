@@ -49,15 +49,16 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::Node>()
         .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
 
-    const ROMS: [(&'static str, &'static [u8]); 6] = [
+    const ROMS: &[(&'static str, &'static [u8])] = &[
         ("controller", include_bytes!("../../roms/controller.rom")),
         ("screen", include_bytes!("../../roms/screen.rom")),
         ("drool", include_bytes!("../../roms/drool.rom")),
         ("audio", include_bytes!("../../roms/audio.rom")),
         ("mandelbrot", include_bytes!("../../roms/mandelbrot.rom")),
         ("bunnymark", include_bytes!("../../roms/bunnymark.rom")),
+        ("piano", include_bytes!("../../roms/piano.rom")),
     ];
-    for (r, _) in &ROMS {
+    for (r, _) in ROMS {
         let opt = document
             .create_element("option")
             .map_err(|e| anyhow!("could not create option: {e:?}"))?
