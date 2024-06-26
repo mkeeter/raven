@@ -33,7 +33,7 @@ impl AudioPorts {
     const PITCH: u8 = offset_of!(Self, pitch) as u8;
     const POSITION_H: u8 = offset_of!(Self, position) as u8;
     const POSITION_L: u8 = Self::POSITION_H + 1;
-    const VOLUME: u8 = offset_of!(Self, volume) as u8;
+    const OUTPUT: u8 = offset_of!(Self, output) as u8;
 
     /// Checks whether the given value is in the audio ports memory space
     pub fn matches(t: u8) -> bool {
@@ -445,9 +445,9 @@ impl Audio {
             AudioPorts::POSITION_L => {
                 // We assume POSITION_H is read first, so this is already loaded
             }
-            AudioPorts::VOLUME => {
+            AudioPorts::OUTPUT => {
                 let vol = self.streams[i].data.lock().unwrap().vol * 255.0;
-                p.volume = Volume(vol as u8);
+                p.output = vol as u8;
             }
             _ => (),
         }
