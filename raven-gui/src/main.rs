@@ -1,13 +1,12 @@
-use log::{error, info};
-
 use uxn::Uxn;
 use varvara::{Key, MouseState, Varvara, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 
 use std::sync::{mpsc, Arc, Mutex};
 
+use anyhow::Result;
 use cpal::traits::StreamTrait;
 use eframe::egui;
-use log::warn;
+use log::{error, info};
 
 /// Injected events from the [`Stage::rx`] queue
 #[derive(Debug)]
@@ -22,6 +21,9 @@ pub struct Stage<'a> {
     /// Time (in seconds) at which we should draw the next frame
     next_frame: f64,
 
+    /// Forces a window resize when set
+    needs_resize: bool,
+
     #[cfg(not(target_arch = "wasm32"))]
     console_rx: std::sync::mpsc::Receiver<u8>,
 
@@ -32,6 +34,9 @@ pub struct Stage<'a> {
 
     /// Event injector
     rx: mpsc::Receiver<Event>,
+
+    /// Callback when the size is changed by the ROM
+    resized: Option<Box<dyn FnMut(u16, u16)>>,
 }
 
 impl<'a> Stage<'a> {
@@ -57,10 +62,12 @@ impl<'a> Stage<'a> {
             dev,
 
             next_frame: 0.0,
+            needs_resize: true,
 
             #[cfg(not(target_arch = "wasm32"))]
             console_rx: varvara::console_worker(),
             rx,
+            resized: None,
 
             scroll: (0.0, 0.0),
             cursor_pos: None,
@@ -69,11 +76,19 @@ impl<'a> Stage<'a> {
         }
     }
 
-    fn load_rom(&mut self, data: &[u8]) {
+    /// Sets a callback that is triggered when the screen is resized
+    pub fn set_resize_callback(&mut self, f: Box<dyn FnMut(u16, u16)>) {
+        self.resized = Some(f);
+    }
+
+    fn load_rom(&mut self, data: &[u8]) -> Result<()> {
         self.vm.reset(data);
         self.dev.reset();
         self.vm.run(&mut self.dev, 0x100);
-        self.dev.output(&self.vm).check().unwrap();
+        self.needs_resize = true;
+        let out = self.dev.output(&self.vm);
+        out.check()?;
+        Ok(())
     }
 }
 
@@ -82,7 +97,9 @@ impl eframe::App for Stage<'_> {
         while let Ok(e) = self.rx.try_recv() {
             match e {
                 Event::LoadRom(data) => {
-                    self.load_rom(&data);
+                    if let Err(e) = self.load_rom(&data) {
+                        error!("could not load rom: {e:?}");
+                    }
                 }
             }
         }
@@ -191,8 +208,14 @@ impl eframe::App for Stage<'_> {
         if out.hide_mouse {
             ctx.set_cursor_icon(egui::CursorIcon::None);
         }
-        if prev_size != out.size {
-            warn!("can't programmatically resize window");
+        if std::mem::take(&mut self.needs_resize) || prev_size != out.size {
+            info!("resizing window to {:?}", out.size);
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
+                egui::Vec2::new(out.size.0 as f32, out.size.1 as f32),
+            ));
+            if let Some(f) = self.resized.as_mut() {
+                f(out.size.0, out.size.1);
+            }
         }
 
         // TODO reduce allocation here?
@@ -232,12 +255,17 @@ impl eframe::App for Stage<'_> {
     ) {
         if raw_input.dropped_files.len() == 1 {
             let target = &raw_input.dropped_files[0];
-            if let Some(path) = &target.path {
+            let r = if let Some(path) = &target.path {
                 let data = std::fs::read(path).expect("failed to read file");
                 info!("loading {} bytes from {path:?}", data.len());
-                self.load_rom(&data);
+                self.load_rom(&data)
             } else if let Some(data) = &target.bytes {
-                self.load_rom(data);
+                self.load_rom(data)
+            } else {
+                return;
+            };
+            if let Err(e) = r {
+                error!("could not load ROM: {e:?}");
             }
         }
     }

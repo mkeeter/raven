@@ -115,13 +115,20 @@ pub fn run() -> Result<()> {
     div.set_onclick(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
+    let resize_closure = Box::new(move |width: u16, height: u16| {
+        div.style()
+            .set_css_text(&format!("width: {width}px; height: {height}px"));
+    });
+
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()
             .start(
                 "varvara",
                 options,
                 Box::new(move |cc| {
-                    Box::new(Stage::new(vm, dev, rx, &cc.egui_ctx))
+                    let mut s = Box::new(Stage::new(vm, dev, rx, &cc.egui_ctx));
+                    s.set_resize_callback(resize_closure);
+                    s
                 }),
             )
             .await

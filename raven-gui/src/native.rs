@@ -6,7 +6,7 @@ use varvara::Varvara;
 
 use anyhow::Result;
 use eframe::egui;
-use log::info;
+use log::{info, warn};
 
 use clap::Parser;
 
@@ -60,7 +60,7 @@ pub fn run() -> Result<()> {
         ..Default::default()
     };
 
-    let (tx, rx) = mpsc::channel();
+    let (_tx, rx) = mpsc::channel();
     eframe::run_native(
         "Varvara",
         options,
