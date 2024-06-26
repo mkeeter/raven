@@ -15,7 +15,7 @@ pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
     let ram = UxnRam::new();
-    let rom = include_bytes!("../../../uxn/audio.rom");
+    let rom = include_bytes!("../../roms/controller.rom");
     let mut vm = Uxn::new(rom, ram.leak());
     let mut dev = Varvara::new();
 
