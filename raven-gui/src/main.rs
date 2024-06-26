@@ -114,6 +114,23 @@ impl eframe::App for Stage<'_> {
                 self.dev.redraw(&mut self.vm);
             }
 
+            if i.raw.dropped_files.len() == 1 {
+                let target = &i.raw.dropped_files[0];
+                let r = if let Some(path) = &target.path {
+                    let data =
+                        std::fs::read(path).expect("failed to read file");
+                    info!("loading {} bytes from {path:?}", data.len());
+                    self.load_rom(&data)
+                } else if let Some(data) = &target.bytes {
+                    self.load_rom(data)
+                } else {
+                    Ok(())
+                };
+                if let Err(e) = r {
+                    error!("could not load ROM: {e:?}");
+                }
+            }
+
             let shift_held = i.modifiers.shift;
             for e in i.events.iter() {
                 match e {
@@ -246,28 +263,6 @@ impl eframe::App for Stage<'_> {
 
         // Update stdout / stderr / exiting
         out.check().expect("failed to print output?");
-    }
-
-    fn raw_input_hook(
-        &mut self,
-        _ctx: &egui::Context,
-        raw_input: &mut egui::RawInput,
-    ) {
-        if raw_input.dropped_files.len() == 1 {
-            let target = &raw_input.dropped_files[0];
-            let r = if let Some(path) = &target.path {
-                let data = std::fs::read(path).expect("failed to read file");
-                info!("loading {} bytes from {path:?}", data.len());
-                self.load_rom(&data)
-            } else if let Some(data) = &target.bytes {
-                self.load_rom(data)
-            } else {
-                return;
-            };
-            if let Err(e) = r {
-                error!("could not load ROM: {e:?}");
-            }
-        }
     }
 }
 
