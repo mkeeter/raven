@@ -6,7 +6,7 @@ use varvara::Varvara;
 
 use anyhow::Result;
 use eframe::egui;
-use log::{info, warn};
+use log::info;
 
 use clap::Parser;
 

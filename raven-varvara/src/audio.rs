@@ -344,6 +344,7 @@ impl Audio {
         Audio { streams }
     }
 
+    /// Resets the audio stream data, preserving the same allocation
     pub fn reset(&mut self) {
         for s in &self.streams {
             *s.data.lock().unwrap() = StreamData::default();
