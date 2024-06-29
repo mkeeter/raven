@@ -8,15 +8,15 @@ use log::{info, warn};
 use std::sync::mpsc;
 
 use crate::{audio_setup, Event, Stage};
-use uxn::{Uxn, UxnVm, VmRam};
+use uxn::{Backend, Uxn, UxnRam};
 use varvara::Varvara;
 
 pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
-    let ram = VmRam::new();
+    let ram = UxnRam::new();
     let rom = include_bytes!("../../roms/controller.rom");
-    let mut vm = UxnVm::new(rom, ram.leak());
+    let mut vm = Uxn::new(rom, ram.leak(), Backend::Interpreter);
     let mut dev = Varvara::new();
 
     // Run the reset vector

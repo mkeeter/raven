@@ -8,4 +8,5 @@ zerocopy.workspace = true
 
 [features]
 alloc = []
-default = ["alloc"]
+default = ["alloc", "jit"]
+jit = []

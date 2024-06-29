@@ -1,8 +1,9 @@
 //! Uxn virtual machine
 #![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
+#![cfg_attr(not(feature = "jit"), forbid(unsafe_code))]
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(feature = "jit")]
 mod jit;
 
 const fn keep(flags: u8) -> bool {
@@ -34,6 +35,8 @@ pub struct Stack {
 pub enum Backend {
     /// Use a bytecode interpreter
     Interpreter,
+
+    #[cfg(feature = "jit")]
     /// Use hand-written threaded assembly
     Jit,
 }
@@ -416,6 +419,7 @@ impl<'a> Uxn<'a> {
                 }
                 pc
             }
+            #[cfg(feature = "jit")]
             Backend::Jit => jit::entry(self, dev, pc),
         }
     }
