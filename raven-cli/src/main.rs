@@ -42,6 +42,10 @@ fn main() -> Result<()> {
         &rom,
         &mut ram,
         if args.jit {
+            #[cfg(not(target_arch = "aarch64"))]
+            anyhow::bail!("no JIT compiler implemented for this arch");
+
+            #[cfg(target_arch = "aarch64")]
             Backend::Jit
         } else {
             Backend::Interpreter
