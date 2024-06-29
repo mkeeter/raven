@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use uxn::{JitRam, Uxn, UxnJit, UxnVm, VmRam};
+use uxn::{Backend, Uxn, UxnRam};
 use varvara::Varvara;
 
 use anyhow::{Context, Result};
@@ -24,27 +24,6 @@ struct Args {
     args: Vec<String>,
 }
 
-fn run<U: Uxn>(mut vm: U, args: &[String]) -> Result<()> {
-    let mut dev = Varvara::new();
-
-    // Run the reset vector
-    let start = std::time::Instant::now();
-    vm.run(&mut dev, 0x100);
-    info!("startup complete in {:?}", start.elapsed());
-
-    dev.output(&vm).check()?;
-    dev.send_args(&mut vm, args).check()?;
-
-    // Blocking loop, listening to the stdin reader thread
-    let rx = varvara::console_worker();
-    while let Ok(c) = rx.recv() {
-        dev.console(&mut vm, c);
-        dev.output(&vm).check()?;
-    }
-
-    Ok(())
-}
-
 fn main() -> Result<()> {
     let env = env_logger::Env::default()
         .filter_or("UXN_LOG", "info")
@@ -58,13 +37,32 @@ fn main() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
-    if args.jit {
-        let mut ram = JitRam::new();
-        let vm = UxnJit::new(&rom, &mut ram);
-        run(vm, &args.args)
-    } else {
-        let mut ram = VmRam::new();
-        let vm = UxnVm::new(&rom, &mut ram);
-        run(vm, &args.args)
+    let mut ram = UxnRam::new();
+    let mut vm = Uxn::new(
+        &rom,
+        &mut ram,
+        if args.jit {
+            Backend::Jit
+        } else {
+            Backend::Interpreter
+        },
+    );
+    let mut dev = Varvara::new();
+
+    // Run the reset vector
+    let start = std::time::Instant::now();
+    vm.run(&mut dev, 0x100);
+    info!("startup complete in {:?}", start.elapsed());
+
+    dev.output(&vm).check()?;
+    dev.send_args(&mut vm, &args.args).check()?;
+
+    // Blocking loop, listening to the stdin reader thread
+    let rx = varvara::console_worker();
+    while let Ok(c) = rx.recv() {
+        dev.console(&mut vm, c);
+        dev.output(&vm).check()?;
     }
+
+    Ok(())
 }

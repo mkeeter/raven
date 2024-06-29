@@ -71,7 +71,7 @@ impl Console {
         }
     }
 
-    pub fn deo<U: Uxn>(&mut self, vm: &mut U, target: u8) {
+    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<ConsolePorts>();
         match target {
             ConsolePorts::WRITE => {
@@ -90,7 +90,7 @@ impl Console {
     /// Sets the current character type
     ///
     /// This should be called before sending a console event
-    pub fn set_type<U: Uxn>(&mut self, vm: &mut U, ty: Type) {
+    pub fn set_type(&mut self, vm: &mut Uxn, ty: Type) {
         let p = vm.dev_mut::<ConsolePorts>();
         p.type_ = ty as u8;
     }
@@ -99,7 +99,7 @@ impl Console {
     ///
     /// Note that this function does not set the type, which should be
     /// configured by calling [`Self::set_type`] before firing the vector.
-    pub fn update<U: Uxn>(&self, vm: &U, c: u8) -> Event {
+    pub fn update(&self, vm: &Uxn, c: u8) -> Event {
         let p = vm.dev::<ConsolePorts>();
         let vector = p.vector.get();
         Event {

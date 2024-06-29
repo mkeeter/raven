@@ -82,7 +82,7 @@ impl System {
         Self { banks, exit: None }
     }
 
-    pub fn deo<U: Uxn>(&mut self, vm: &mut U, target: u8) {
+    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<SystemPorts>();
         match target {
             SystemPorts::EXPANSION => {
@@ -181,7 +181,7 @@ impl System {
         }
     }
 
-    pub fn dei<U: Uxn>(&mut self, vm: &mut U, target: u8) {
+    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
         match target & 0x0F {
             SystemPorts::WST => {
                 let wst = vm.stack().len();

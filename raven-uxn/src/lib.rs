@@ -4,9 +4,6 @@
 #[cfg(target_arch = "aarch64")]
 mod jit;
 
-#[cfg(target_arch = "aarch64")]
-pub use jit::UxnJit;
-
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
 }
@@ -29,6 +26,15 @@ pub struct Stack {
     ///
     /// If the buffer is empty or full, it points to `u8::MAX`.
     index: u8,
+}
+
+/// Uxn evaluation backend
+#[derive(Copy, Clone, Debug)]
+pub enum Backend {
+    /// Use a bytecode interpreter
+    Interpreter,
+    /// Use hand-written threaded assembly
+    Jit,
 }
 
 /// Virtual stack, which is aware of `keep` and `short` modes
@@ -247,7 +253,7 @@ impl Stack {
 }
 
 /// The virtual machine itself
-pub struct UxnVm<'a> {
+pub struct Uxn<'a> {
     /// Device memory
     dev: [u8; 256],
     /// 64 KiB of VM memory
@@ -256,6 +262,9 @@ pub struct UxnVm<'a> {
     stack: Stack,
     /// 256-byte return stack
     ret: Stack,
+
+    /// Preferred evaluation backend
+    backend: Backend,
 }
 
 macro_rules! op_cmp {
@@ -293,17 +302,22 @@ macro_rules! op_bin {
     }};
 }
 
-impl<'a> UxnVm<'a> {
+impl<'a> Uxn<'a> {
     /// Build a new `Uxn`, loading the given ROM at the start address
     ///
     /// # Panics
     /// If `rom` cannot fit in memory
-    pub fn new<'b>(rom: &'b [u8], ram: &'a mut [u8; 65536]) -> Self {
+    pub fn new<'b>(
+        rom: &'b [u8],
+        ram: &'a mut [u8; 65536],
+        backend: Backend,
+    ) -> Self {
         let out = Self {
             dev: [0u8; 256],
             ram,
             stack: Stack::default(),
             ret: Stack::default(),
+            backend,
         };
         out.ram[0x100..][..rom.len()].copy_from_slice(rom);
         out
@@ -339,6 +353,7 @@ impl<'a> UxnVm<'a> {
         }
     }
 
+    #[inline]
     fn ram_read<const FLAGS: u8>(&self, addr: u16) -> Value {
         if short(FLAGS) {
             let hi = self.ram[usize::from(addr)];
@@ -380,14 +395,116 @@ impl<'a> UxnVm<'a> {
         u16::from_le_bytes([lo, hi])
     }
 
+    /// Writes to the given address in device memory
+    #[inline]
+    pub fn write_dev_mem(&mut self, addr: u8, value: u8) {
+        self.dev[usize::from(addr)] = value;
+    }
+
+    /// Runs the VM starting at the given address until it terminates
+    #[inline]
+    pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) -> u16 {
+        match self.backend {
+            Backend::Interpreter => {
+                loop {
+                    let op = self.next(&mut pc);
+                    let Some(next) = self.op(op, dev, pc) else {
+                        break;
+                    };
+                    pc = next;
+                }
+                pc
+            }
+            Backend::Jit => jit::entry(self, dev, pc),
+        }
+    }
+
+    /// Converts raw ports memory into a [`Ports`] object
+    #[inline]
+    pub fn dev<D: Ports>(&self) -> &D {
+        self.dev_at(D::BASE)
+    }
+
+    /// Returns a reference to a device located at `pos`
+    #[inline]
+    pub fn dev_at<D: Ports>(&self, pos: u8) -> &D {
+        Self::check_dev_size::<D>();
+        D::ref_from(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
+    }
+
+    /// Returns a reference to a device located at `pos`
+    #[inline]
+    pub fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
+        Self::check_dev_size::<D>();
+        D::mut_from(&mut self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
+    }
+
+    /// Returns a mutable reference to the given [`Ports`] object
+    #[inline]
+    pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
+        self.dev_mut_at(D::BASE)
+    }
+
+    /// Reads a byte from RAM
+    #[inline]
+    pub fn ram_read_byte(&self, addr: u16) -> u8 {
+        self.ram[usize::from(addr)]
+    }
+
+    /// Writes a byte to RAM
+    #[inline]
+    pub fn ram_write_byte(&mut self, addr: u16, v: u8) {
+        self.ram[usize::from(addr)] = v;
+    }
+
+    /// Shared borrow of the working stack
+    #[inline]
+    pub fn stack(&self) -> &Stack {
+        &self.stack
+    }
+
+    /// Mutable borrow of the working stack
+    #[inline]
+    pub fn stack_mut(&mut self) -> &mut Stack {
+        &mut self.stack
+    }
+
+    /// Shared borrow of the return stack
+    #[inline]
+    pub fn ret(&self) -> &Stack {
+        &self.ret
+    }
+
+    /// Mutable borrow of the return stack
+    #[inline]
+    pub fn ret_mut(&mut self) -> &mut Stack {
+        &mut self.ret
+    }
+
+    /// Resets system memory and loads the given ROM
+    pub fn reset(&mut self, rom: &[u8]) {
+        self.dev.fill(0);
+        self.ram.fill(0);
+        self.stack = Stack::default();
+        self.ret = Stack::default();
+        self.ram[0x100..][..rom.len()].copy_from_slice(rom);
+    }
+
+    /// Asserts that the given [`Ports`] object is of size [`DEV_SIZE`]
+    #[inline]
+    fn check_dev_size<D: Ports>() {
+        struct AssertDevSize<D>(D);
+        impl<D> AssertDevSize<D> {
+            const ASSERT: () = if core::mem::size_of::<D>() != DEV_SIZE {
+                panic!("dev must be 16 bytes");
+            };
+        }
+        AssertDevSize::<D>::ASSERT
+    }
+
     /// Executes a single operation
     #[inline]
-    fn op<D: Device<Self>>(
-        &mut self,
-        op: u8,
-        dev: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    fn op<D: Device>(&mut self, op: u8, dev: &mut D, pc: u16) -> Option<u16> {
         match op {
             0x00 => self.brk(dev, pc),
             0x01 => self.inc::<0b000, D>(dev, pc),
@@ -411,8 +528,8 @@ impl<'a> UxnVm<'a> {
             0x13 => self.str::<0b000, D>(dev, pc),
             0x14 => self.lda::<0b000, D>(dev, pc),
             0x15 => self.sta::<0b000, D>(dev, pc),
-            0x16 => self.dei::<0b000, D>(dev, pc),
-            0x17 => self.deo::<0b000, D>(dev, pc),
+            0x16 => self.dei::<0b000>(dev, pc),
+            0x17 => self.deo::<0b000>(dev, pc),
             0x18 => self.add::<0b000, D>(dev, pc),
             0x19 => self.sub::<0b000, D>(dev, pc),
             0x1a => self.mul::<0b000, D>(dev, pc),
@@ -443,8 +560,8 @@ impl<'a> UxnVm<'a> {
             0x33 => self.str::<0b001, D>(dev, pc),
             0x34 => self.lda::<0b001, D>(dev, pc),
             0x35 => self.sta::<0b001, D>(dev, pc),
-            0x36 => self.dei::<0b001, D>(dev, pc),
-            0x37 => self.deo::<0b001, D>(dev, pc),
+            0x36 => self.dei::<0b001>(dev, pc),
+            0x37 => self.deo::<0b001>(dev, pc),
             0x38 => self.add::<0b001, D>(dev, pc),
             0x39 => self.sub::<0b001, D>(dev, pc),
             0x3a => self.mul::<0b001, D>(dev, pc),
@@ -475,8 +592,8 @@ impl<'a> UxnVm<'a> {
             0x53 => self.str::<0b010, D>(dev, pc),
             0x54 => self.lda::<0b010, D>(dev, pc),
             0x55 => self.sta::<0b010, D>(dev, pc),
-            0x56 => self.dei::<0b010, D>(dev, pc),
-            0x57 => self.deo::<0b010, D>(dev, pc),
+            0x56 => self.dei::<0b010>(dev, pc),
+            0x57 => self.deo::<0b010>(dev, pc),
             0x58 => self.add::<0b010, D>(dev, pc),
             0x59 => self.sub::<0b010, D>(dev, pc),
             0x5a => self.mul::<0b010, D>(dev, pc),
@@ -507,8 +624,8 @@ impl<'a> UxnVm<'a> {
             0x73 => self.str::<0b011, D>(dev, pc),
             0x74 => self.lda::<0b011, D>(dev, pc),
             0x75 => self.sta::<0b011, D>(dev, pc),
-            0x76 => self.dei::<0b011, D>(dev, pc),
-            0x77 => self.deo::<0b011, D>(dev, pc),
+            0x76 => self.dei::<0b011>(dev, pc),
+            0x77 => self.deo::<0b011>(dev, pc),
             0x78 => self.add::<0b011, D>(dev, pc),
             0x79 => self.sub::<0b011, D>(dev, pc),
             0x7a => self.mul::<0b011, D>(dev, pc),
@@ -539,8 +656,8 @@ impl<'a> UxnVm<'a> {
             0x93 => self.str::<0b100, D>(dev, pc),
             0x94 => self.lda::<0b100, D>(dev, pc),
             0x95 => self.sta::<0b100, D>(dev, pc),
-            0x96 => self.dei::<0b100, D>(dev, pc),
-            0x97 => self.deo::<0b100, D>(dev, pc),
+            0x96 => self.dei::<0b100>(dev, pc),
+            0x97 => self.deo::<0b100>(dev, pc),
             0x98 => self.add::<0b100, D>(dev, pc),
             0x99 => self.sub::<0b100, D>(dev, pc),
             0x9a => self.mul::<0b100, D>(dev, pc),
@@ -571,8 +688,8 @@ impl<'a> UxnVm<'a> {
             0xb3 => self.str::<0b101, D>(dev, pc),
             0xb4 => self.lda::<0b101, D>(dev, pc),
             0xb5 => self.sta::<0b101, D>(dev, pc),
-            0xb6 => self.dei::<0b101, D>(dev, pc),
-            0xb7 => self.deo::<0b101, D>(dev, pc),
+            0xb6 => self.dei::<0b101>(dev, pc),
+            0xb7 => self.deo::<0b101>(dev, pc),
             0xb8 => self.add::<0b101, D>(dev, pc),
             0xb9 => self.sub::<0b101, D>(dev, pc),
             0xba => self.mul::<0b101, D>(dev, pc),
@@ -603,8 +720,8 @@ impl<'a> UxnVm<'a> {
             0xd3 => self.str::<0b110, D>(dev, pc),
             0xd4 => self.lda::<0b110, D>(dev, pc),
             0xd5 => self.sta::<0b110, D>(dev, pc),
-            0xd6 => self.dei::<0b110, D>(dev, pc),
-            0xd7 => self.deo::<0b110, D>(dev, pc),
+            0xd6 => self.dei::<0b110>(dev, pc),
+            0xd7 => self.deo::<0b110>(dev, pc),
             0xd8 => self.add::<0b110, D>(dev, pc),
             0xd9 => self.sub::<0b110, D>(dev, pc),
             0xda => self.mul::<0b110, D>(dev, pc),
@@ -635,8 +752,8 @@ impl<'a> UxnVm<'a> {
             0xf3 => self.str::<0b111, D>(dev, pc),
             0xf4 => self.lda::<0b111, D>(dev, pc),
             0xf5 => self.sta::<0b111, D>(dev, pc),
-            0xf6 => self.dei::<0b111, D>(dev, pc),
-            0xf7 => self.deo::<0b111, D>(dev, pc),
+            0xf6 => self.dei::<0b111>(dev, pc),
+            0xf7 => self.deo::<0b111>(dev, pc),
             0xf8 => self.add::<0b111, D>(dev, pc),
             0xf9 => self.sub::<0b111, D>(dev, pc),
             0xfa => self.mul::<0b111, D>(dev, pc),
@@ -667,7 +784,7 @@ impl<'a> UxnVm<'a> {
     ///
     /// Ends the evaluation of the current vector. This opcode has no modes.
     #[inline]
-    pub fn brk<D: Device<Self>>(&mut self, _: &mut D, _: u16) -> Option<u16> {
+    pub fn brk<D: Device>(&mut self, _: &mut D, _: u16) -> Option<u16> {
         None
     }
 
@@ -681,11 +798,7 @@ impl<'a> UxnVm<'a> {
     /// the `PC` to a relative address at a distance equal to the next short in
     /// memory, otherwise moves `PC+2`. This opcode has no modes.
     #[inline]
-    pub fn jci<D: Device<Self>>(
-        &mut self,
-        _: &mut D,
-        mut pc: u16,
-    ) -> Option<u16> {
+    pub fn jci<D: Device>(&mut self, _: &mut D, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
         if self.stack.pop_byte() != 0 {
             pc = pc.wrapping_add(dt);
@@ -698,11 +811,7 @@ impl<'a> UxnVm<'a> {
     /// JMI  -- Moves the PC to a relative address at a distance equal to the
     /// next short in memory. This opcode has no modes.
     #[inline]
-    pub fn jmi<D: Device<Self>>(
-        &mut self,
-        _: &mut D,
-        mut pc: u16,
-    ) -> Option<u16> {
+    pub fn jmi<D: Device>(&mut self, _: &mut D, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
         Some(pc.wrapping_add(dt))
     }
@@ -717,11 +826,7 @@ impl<'a> UxnVm<'a> {
     /// address at a distance equal to the next short in memory. This opcode has
     /// no modes.
     #[inline]
-    pub fn jsi<D: Device<Self>>(
-        &mut self,
-        _: &mut D,
-        mut pc: u16,
-    ) -> Option<u16> {
+    pub fn jsi<D: Device>(&mut self, _: &mut D, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
         self.ret.push(Value::Short(pc));
         Some(pc.wrapping_add(dt))
@@ -742,7 +847,7 @@ impl<'a> UxnVm<'a> {
     /// LIT2 abcd       ( ab cd )
     /// ```
     #[inline]
-    pub fn lit<const FLAGS: u8, D: Device<Self>>(
+    pub fn lit<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         mut pc: u16,
@@ -770,7 +875,7 @@ impl<'a> UxnVm<'a> {
     /// #0001 INC2k     ( 00 01 00 02 )
     /// ```
     #[inline]
-    pub fn inc<const FLAGS: u8, D: Device<Self>>(
+    pub fn inc<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -795,7 +900,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 POP2k  ( 12 34 )
     /// ```
     #[inline]
-    pub fn pop<const FLAGS: u8, D: Device<Self>>(
+    pub fn pop<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -819,7 +924,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 #5678 NIP2k  ( 12 34 56 78 56 78 )
     /// ```
     #[inline]
-    pub fn nip<const FLAGS: u8, D: Device<Self>>(
+    pub fn nip<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -846,7 +951,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 #5678 SWP2k  ( 12 34 56 78 56 78 12 34 )
     /// ```
     #[inline]
-    pub fn swp<const FLAGS: u8, D: Device<Self>>(
+    pub fn swp<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -875,7 +980,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 #5678 #9abc ROT2k  ( 12 34 56 78 9a bc 56 78 9a bc 12 34 )
     /// ```
     #[inline]
-    pub fn rot<const FLAGS: u8, D: Device<Self>>(
+    pub fn rot<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -904,7 +1009,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 DUP2  ( 12 34 12 34 )
     /// ```
     #[inline]
-    pub fn dup<const FLAGS: u8, D: Device<Self>>(
+    pub fn dup<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -931,7 +1036,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 #5678 OVR2k  ( 12 34 56 78 12 34 56 78 12 34 )
     /// ```
     #[inline]
-    pub fn ovr<const FLAGS: u8, D: Device<Self>>(
+    pub fn ovr<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -961,7 +1066,7 @@ impl<'a> UxnVm<'a> {
     /// #abcd #abcd EQU2k  ( ab cd ab cd 01 )
     /// ```
     #[inline]
-    pub fn equ<const FLAGS: u8, D: Device<Self>>(
+    pub fn equ<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -986,7 +1091,7 @@ impl<'a> UxnVm<'a> {
     /// #abcd #abcd NEQ2k  ( ab cd ab cd 00 )
     /// ```
     #[inline]
-    pub fn neq<const FLAGS: u8, D: Device<Self>>(
+    pub fn neq<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1011,7 +1116,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 #3456 GTH2k  ( 12 34 34 56 00 )
     /// ```
     #[inline]
-    pub fn gth<const FLAGS: u8, D: Device<Self>>(
+    pub fn gth<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1036,7 +1141,7 @@ impl<'a> UxnVm<'a> {
     /// #0001 #0000 LTH2k  ( 00 01 00 00 00 )
     /// ```
     #[inline]
-    pub fn lth<const FLAGS: u8, D: Device<Self>>(
+    pub fn lth<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1058,7 +1163,7 @@ impl<'a> UxnVm<'a> {
     /// ,&skip-rel JMP BRK &skip-rel #01  ( 01 )
     /// ```
     #[inline]
-    pub fn jmp<const FLAGS: u8, D: Device<Self>>(
+    pub fn jmp<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1082,7 +1187,7 @@ impl<'a> UxnVm<'a> {
     /// #abcd #00 ,&fail JCN SWP &fail POP  ( cd )
     /// ```
     #[inline]
-    pub fn jcn<const FLAGS: u8, D: Device<Self>>(
+    pub fn jcn<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1112,7 +1217,7 @@ impl<'a> UxnVm<'a> {
     /// ,&get JSR #01 BRK &get #02 JMP2r  ( 02 01 )
     /// ```
     #[inline]
-    pub fn jsr<const FLAGS: u8, D: Device<Self>>(
+    pub fn jsr<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1137,7 +1242,7 @@ impl<'a> UxnVm<'a> {
     /// LITr 34 STHr  ( 34 )
     /// ```
     #[inline]
-    pub fn sth<const FLAGS: u8, D: Device<Self>>(
+    pub fn sth<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1159,7 +1264,7 @@ impl<'a> UxnVm<'a> {
     /// |00 @cell $2 |0100 .cell LDZ ( 00 )
     /// ```
     #[inline]
-    pub fn ldz<const FLAGS: u8, D: Device<Self>>(
+    pub fn ldz<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1181,7 +1286,7 @@ impl<'a> UxnVm<'a> {
     /// |00 @cell $2 |0100 #abcd .cell STZ2  { ab cd }
     /// ```
     #[inline]
-    pub fn stz<const FLAGS: u8, D: Device<Self>>(
+    pub fn stz<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1206,7 +1311,7 @@ impl<'a> UxnVm<'a> {
     /// ,cell LDR2 BRK @cell abcd  ( ab cd )
     /// ```
     #[inline]
-    pub fn ldr<const FLAGS: u8, D: Device<Self>>(
+    pub fn ldr<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1231,7 +1336,7 @@ impl<'a> UxnVm<'a> {
     /// #1234 ,cell STR2 BRK @cell $2  ( )
     /// ```
     #[inline]
-    pub fn str<const FLAGS: u8, D: Device<Self>>(
+    pub fn str<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1256,7 +1361,7 @@ impl<'a> UxnVm<'a> {
     /// ;cell LDA BRK @cell abcd ( ab )
     /// ```
     #[inline]
-    pub fn lda<const FLAGS: u8, D: Device<Self>>(
+    pub fn lda<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1279,7 +1384,7 @@ impl<'a> UxnVm<'a> {
     /// #abcd ;cell STA BRK @cell $1 ( ab )
     /// ```
     #[inline]
-    pub fn sta<const FLAGS: u8, D: Device<Self>>(
+    pub fn sta<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1300,9 +1405,9 @@ impl<'a> UxnVm<'a> {
     /// Pushes a value from the device page, to the top of the stack. The target
     /// device might capture the reading to trigger an I/O event.
     #[inline]
-    pub fn dei<const FLAGS: u8, D: Device<Self>>(
+    pub fn dei<const FLAGS: u8>(
         &mut self,
-        dev: &mut D,
+        dev: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
@@ -1339,9 +1444,9 @@ impl<'a> UxnVm<'a> {
     /// Writes a value to the device page. The target device might capture the
     /// writing to trigger an I/O event.
     #[inline]
-    pub fn deo<const FLAGS: u8, D: Device<Self>>(
+    pub fn deo<const FLAGS: u8>(
         &mut self,
-        dev: &mut D,
+        dev: &mut dyn Device,
         pc: u16,
     ) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
@@ -1381,7 +1486,7 @@ impl<'a> UxnVm<'a> {
     /// #0001 #0002 ADD2  ( 00 03 )
     /// ```
     #[inline]
-    pub fn add<const FLAGS: u8, D: Device<Self>>(
+    pub fn add<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1399,7 +1504,7 @@ impl<'a> UxnVm<'a> {
     /// Pushes the difference of the first value minus the second, to the top of
     /// the stack.
     #[inline]
-    pub fn sub<const FLAGS: u8, D: Device<Self>>(
+    pub fn sub<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1417,7 +1522,7 @@ impl<'a> UxnVm<'a> {
     /// Pushes the product of the first and second values at the top of the
     /// stack.
     #[inline]
-    pub fn mul<const FLAGS: u8, D: Device<Self>>(
+    pub fn mul<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1442,7 +1547,7 @@ impl<'a> UxnVm<'a> {
     /// #0010 #0000 DIV2  ( 00 00 )
     /// ```
     #[inline]
-    pub fn div<const FLAGS: u8, D: Device<Self>>(
+    pub fn div<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1460,7 +1565,7 @@ impl<'a> UxnVm<'a> {
     /// Pushes the result of the bitwise operation `AND`, to the top of the
     /// stack.
     #[inline]
-    pub fn and<const FLAGS: u8, D: Device<Self>>(
+    pub fn and<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1476,7 +1581,7 @@ impl<'a> UxnVm<'a> {
     /// ```
     /// Pushes the result of the bitwise operation `OR`, to the top of the stack.
     #[inline]
-    pub fn ora<const FLAGS: u8, D: Device<Self>>(
+    pub fn ora<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1494,7 +1599,7 @@ impl<'a> UxnVm<'a> {
     /// Pushes the result of the bitwise operation `XOR`, to the top of the
     /// stack.
     #[inline]
-    pub fn eor<const FLAGS: u8, D: Device<Self>>(
+    pub fn eor<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1521,7 +1626,7 @@ impl<'a> UxnVm<'a> {
     /// #1248 #34 SFT2k    ( 12 48 34 09 20 )
     /// ```
     #[inline]
-    pub fn sft<const FLAGS: u8, D: Device<Self>>(
+    pub fn sft<const FLAGS: u8, D: Device>(
         &mut self,
         _: &mut D,
         pc: u16,
@@ -1534,148 +1639,6 @@ impl<'a> UxnVm<'a> {
         s.push(v.wrapping_shr(shr).wrapping_shl(shl));
         Some(pc)
     }
-}
-
-impl<'a> Uxn for UxnVm<'a> {
-    #[inline]
-    fn write_dev_mem(&mut self, addr: u8, value: u8) {
-        self.dev[usize::from(addr)] = value;
-    }
-
-    #[inline]
-    fn run<D: Device<Self>>(&mut self, dev: &mut D, mut pc: u16) -> u16 {
-        loop {
-            let op = self.next(&mut pc);
-            let Some(next) = self.op(op, dev, pc) else {
-                break;
-            };
-            pc = next;
-        }
-
-        pc
-    }
-
-    #[inline]
-    fn dev<D: Ports>(&self) -> &D {
-        self.dev_at(D::BASE)
-    }
-
-    #[inline]
-    fn dev_at<D: Ports>(&self, pos: u8) -> &D {
-        check_dev_size::<D>();
-        D::ref_from(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
-    }
-
-    #[inline]
-    fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
-        check_dev_size::<D>();
-        D::mut_from(&mut self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
-    }
-
-    #[inline]
-    fn dev_mut<D: Ports>(&mut self) -> &mut D {
-        self.dev_mut_at(D::BASE)
-    }
-
-    /// Reads a byte from RAM
-    #[inline]
-    fn ram_read_byte(&self, addr: u16) -> u8 {
-        self.ram[usize::from(addr)]
-    }
-
-    /// Writes a byte to RAM
-    #[inline]
-    fn ram_write_byte(&mut self, addr: u16, v: u8) {
-        self.ram[usize::from(addr)] = v;
-    }
-
-    /// Shared borrow of the working stack
-    #[inline]
-    fn stack(&self) -> &Stack {
-        &self.stack
-    }
-
-    /// Mutable borrow of the working stack
-    #[inline]
-    fn stack_mut(&mut self) -> &mut Stack {
-        &mut self.stack
-    }
-
-    /// Shared borrow of the return stack
-    #[inline]
-    fn ret(&self) -> &Stack {
-        &self.ret
-    }
-
-    /// Mutable borrow of the return stack
-    #[inline]
-    fn ret_mut(&mut self) -> &mut Stack {
-        &mut self.ret
-    }
-
-    fn reset(&mut self, rom: &[u8]) {
-        self.dev.fill(0);
-        self.ram.fill(0);
-        self.stack = Stack::default();
-        self.ret = Stack::default();
-        self.ram[0x100..][..rom.len()].copy_from_slice(rom);
-    }
-}
-
-/// Trait for a Uxn CPU
-pub trait Uxn {
-    /// Resets the system, loading a new ROM
-    fn reset(&mut self, rom: &[u8]);
-
-    /// Writes to the given address in device memory
-    fn write_dev_mem(&mut self, addr: u8, value: u8);
-
-    /// Runs the VM starting at the given address until it terminates
-    fn run<D: Device<Self>>(&mut self, dev: &mut D, pc: u16) -> u16
-    where
-        Self: Sized;
-
-    /// Converts raw ports memory into a [`Ports`] object
-    fn dev<D: Ports>(&self) -> &D;
-
-    /// Returns a reference to a device located at `pos`
-    fn dev_at<D: Ports>(&self, pos: u8) -> &D;
-
-    /// Returns a reference to a device located at `pos`
-    fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D;
-
-    /// Returns a mutable reference to the given [`Ports`] object
-    fn dev_mut<D: Ports>(&mut self) -> &mut D;
-
-    /// Reads a byte from RAM
-    fn ram_read_byte(&self, addr: u16) -> u8;
-
-    /// Writes a byte to RAM
-    fn ram_write_byte(&mut self, addr: u16, v: u8);
-
-    /// Shared borrow of the working stack
-    fn stack(&self) -> &Stack;
-
-    /// Mutable borrow of the working stack
-    fn stack_mut(&mut self) -> &mut Stack;
-
-    /// Shared borrow of the return stack
-    fn ret(&self) -> &Stack;
-
-    /// Mutable borrow of the return stack
-    fn ret_mut(&mut self) -> &mut Stack;
-}
-
-/// Asserts that the given [`Ports`] object is of size [`DEV_SIZE`]
-#[inline]
-pub(crate) fn check_dev_size<D: Ports>() {
-    struct AssertDevSize<D>(D);
-    impl<D> AssertDevSize<D> {
-        const ASSERT: () = if core::mem::size_of::<D>() != DEV_SIZE {
-            panic!("dev must be 16 bytes");
-        };
-    }
-    AssertDevSize::<D>::ASSERT
 }
 
 #[allow(dead_code, non_upper_case_globals)]
@@ -1974,19 +1937,12 @@ mod op {
 }
 
 /// Trait for a Uxn-compatible device
-///
-/// Implementors of this trait should use a blanked implementation, e.g.
-/// ```no_compile
-/// impl<U: Uxn> Device<U> for MyDeviceType {
-///     // ...
-/// }
-/// ```
-pub trait Device<U> {
+pub trait Device {
     /// Performs the `DEI` operation for the given target
     ///
     /// This function must write its output byte to `vm.dev[target]`; the CPU
     /// evaluation loop will then copy this value to the stack.
-    fn dei(&mut self, vm: &mut U, target: u8);
+    fn dei(&mut self, vm: &mut Uxn, target: u8);
 
     /// Performs the `DEO` operation on the given target
     ///
@@ -1996,7 +1952,7 @@ pub trait Device<U> {
     /// Returns `true` if the CPU should keep running, `false` if it should
     /// exit.
     #[must_use]
-    fn deo(&mut self, vm: &mut U, target: u8) -> bool;
+    fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool;
 }
 
 /// Trait for a type which can be cast to a device ports `struct`
@@ -2009,11 +1965,11 @@ pub trait Ports:
 
 /// Device which does nothing
 pub struct EmptyDevice;
-impl<U> Device<U> for EmptyDevice {
-    fn dei(&mut self, _vm: &mut U, _target: u8) {
+impl Device for EmptyDevice {
+    fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
         // nothing to do here
     }
-    fn deo(&mut self, _vm: &mut U, _target: u8) -> bool {
+    fn deo(&mut self, _vm: &mut Uxn, _target: u8) -> bool {
         // nothing to do here, keep running
         true
     }
@@ -2027,12 +1983,12 @@ mod ram {
     /// Helper type for building a RAM array of the appropriate size
     ///
     /// This is only available if the `"alloc"` feature is enabled
-    pub struct VmRam(Box<[u8; 65536]>);
+    pub struct UxnRam(Box<[u8; 65536]>);
 
-    impl VmRam {
+    impl UxnRam {
         /// Builds a new zero-initialized RAM
         pub fn new() -> Self {
-            VmRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
+            UxnRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
         }
 
         /// Leaks memory, setting it to a static lifetime
@@ -2041,19 +1997,19 @@ mod ram {
         }
     }
 
-    impl Default for VmRam {
+    impl Default for UxnRam {
         fn default() -> Self {
             Self::new()
         }
     }
 
-    impl core::ops::Deref for VmRam {
+    impl core::ops::Deref for UxnRam {
         type Target = [u8; 65536];
         fn deref(&self) -> &Self::Target {
             &self.0
         }
     }
-    impl core::ops::DerefMut for VmRam {
+    impl core::ops::DerefMut for UxnRam {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
@@ -2061,10 +2017,7 @@ mod ram {
 }
 
 #[cfg(feature = "alloc")]
-pub use ram::VmRam;
-
-#[cfg(feature = "alloc")]
-pub use jit::JitRam;
+pub use ram::UxnRam;
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
@@ -2125,8 +2078,8 @@ mod test {
     }
 
     fn parse_and_test(s: &str) {
-        let mut ram = VmRam::new();
-        let mut vm = UxnVm::new(&[], &mut ram);
+        let mut ram = UxnRam::new();
+        let mut vm = Uxn::new(&[], &mut ram, Backend::Interpreter);
         let mut iter = s.split_whitespace();
         let mut op = None;
         let mut dev = EmptyDevice;

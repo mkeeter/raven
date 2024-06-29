@@ -1,292 +1,47 @@
-use crate::{
-    check_dev_size, ret, short, Device, Ports, Stack, StackView, Uxn, Value,
-    DEV_SIZE,
-};
+use crate::{Device, Uxn};
 
 #[cfg(target_arch = "aarch64")]
 mod aarch64;
-
-/// The virtual machine itself
-pub struct UxnJit<'a> {
-    /// Device memory
-    dev: [u8; 256],
-    /// 64 KiB of VM memory
-    ram: &'a mut [u8; 65536],
-    /// 256-byte data stack
-    stack: Stack,
-    /// 256-byte return stack
-    ret: Stack,
-}
-
-impl<'a> UxnJit<'a> {
-    #[inline]
-    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
-        let stack = if ret(FLAGS) {
-            &mut self.ret
-        } else {
-            &mut self.stack
-        };
-        StackView::new(stack)
-    }
-
-    /// Build a new `Uxn`, loading the given ROM at the start address
-    ///
-    /// # Panics
-    /// If `rom` cannot fit in memory
-    pub fn new<'b>(rom: &'b [u8], ram: &'a mut [u8; 65536]) -> Self {
-        let out = Self {
-            dev: [0u8; 256],
-            ram,
-            stack: Stack::default(),
-            ret: Stack::default(),
-        };
-        out.ram[0x100..][..rom.len()].copy_from_slice(rom);
-        out
-    }
-
-    /// See [`UxnVm::dei`](crate::UxnVm::dei)
-    #[inline]
-    fn dei<const FLAGS: u8>(
-        &mut self,
-        dev: &mut dyn Device<Self>,
-        pc: u16,
-    ) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
-        let i = s.pop_byte();
-        let v = if short(FLAGS) {
-            s.reserve(2);
-            dev.dei(self, i);
-            let hi = self.dev[usize::from(i)];
-            let j = i.wrapping_add(1);
-            dev.dei(self, j);
-            let lo = self.dev[usize::from(j)];
-            Value::Short(u16::from_le_bytes([lo, hi]))
-        } else {
-            s.reserve(1);
-            dev.dei(self, i);
-            Value::Byte(self.dev[usize::from(i)])
-        };
-        self.stack_view::<FLAGS>().emplace(v);
-        Some(pc)
-    }
-
-    /// See [`UxnVm::deo`](crate::UxnVm::deo)
-    #[inline]
-    fn deo<const FLAGS: u8>(
-        &mut self,
-        dev: &mut dyn Device<Self>,
-        pc: u16,
-    ) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
-        let i = s.pop_byte();
-        let mut run = true;
-        match s.pop() {
-            Value::Short(v) => {
-                let [lo, hi] = v.to_le_bytes();
-                let j = i.wrapping_add(1);
-                self.dev[usize::from(i)] = hi;
-                run &= dev.deo(self, i);
-                self.dev[usize::from(j)] = lo;
-                run &= dev.deo(self, j);
-            }
-            Value::Byte(v) => {
-                self.dev[usize::from(i)] = v;
-                run &= dev.deo(self, i);
-            }
-        }
-        if run {
-            Some(pc)
-        } else {
-            None
-        }
-    }
-}
-
-impl<'a> Uxn for UxnJit<'a> {
-    #[inline]
-    fn write_dev_mem(&mut self, addr: u8, value: u8) {
-        self.dev[usize::from(addr)] = value;
-    }
-
-    #[inline]
-    fn run<D: Device<Self>>(&mut self, dev: &mut D, pc: u16) -> u16 {
-        entry(self, dev, pc)
-    }
-
-    #[inline]
-    fn dev<D: Ports>(&self) -> &D {
-        self.dev_at(D::BASE)
-    }
-
-    #[inline]
-    fn dev_at<D: Ports>(&self, pos: u8) -> &D {
-        check_dev_size::<D>();
-        D::ref_from(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
-    }
-
-    #[inline]
-    fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
-        check_dev_size::<D>();
-        D::mut_from(&mut self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
-    }
-
-    #[inline]
-    fn dev_mut<D: Ports>(&mut self) -> &mut D {
-        self.dev_mut_at(D::BASE)
-    }
-
-    /// Reads a byte from RAM
-    #[inline]
-    fn ram_read_byte(&self, addr: u16) -> u8 {
-        self.ram[usize::from(addr)]
-    }
-
-    /// Writes a byte to RAM
-    #[inline]
-    fn ram_write_byte(&mut self, addr: u16, v: u8) {
-        self.ram[usize::from(addr)] = v;
-    }
-
-    /// Shared borrow of the working stack
-    #[inline]
-    fn stack(&self) -> &Stack {
-        &self.stack
-    }
-
-    /// Mutable borrow of the working stack
-    #[inline]
-    fn stack_mut(&mut self) -> &mut Stack {
-        &mut self.stack
-    }
-
-    /// Shared borrow of the return stack
-    #[inline]
-    fn ret(&self) -> &Stack {
-        &self.ret
-    }
-
-    /// Mutable borrow of the return stack
-    #[inline]
-    fn ret_mut(&mut self) -> &mut Stack {
-        &mut self.ret
-    }
-
-    fn reset(&mut self, rom: &[u8]) {
-        self.dev.fill(0);
-        self.ram.fill(0);
-        self.stack = Stack::default();
-        self.ret = Stack::default();
-        self.ram[0x100..][..rom.len()].copy_from_slice(rom);
-    }
-}
-
-#[cfg(feature = "alloc")]
-mod ram {
-    extern crate alloc;
-    use alloc::boxed::Box;
-
-    /// Helper type for building a RAM array of the appropriate size
-    ///
-    /// This is only available if the `"alloc"` feature is enabled
-    pub struct JitRam(Box<[u8; 65536]>);
-
-    impl JitRam {
-        /// Builds a new zero-initialized RAM
-        pub fn new() -> Self {
-            JitRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
-        }
-
-        /// Leaks memory, setting it to a static lifetime
-        pub fn leak(self) -> &'static mut [u8; 65536] {
-            Box::leak(self.0)
-        }
-    }
-
-    impl Default for JitRam {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl core::ops::Deref for JitRam {
-        type Target = [u8; 65536];
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-    impl core::ops::DerefMut for JitRam {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
-        }
-    }
-}
-
-#[cfg(feature = "alloc")]
-pub use ram::JitRam;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Stubs for DEO calls
 
 #[no_mangle]
-extern "C" fn deo_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b000>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_2_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b001>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_r_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b010>(dev.0, 0).is_some()
 }
 #[no_mangle]
-extern "C" fn deo_2r_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b011>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_k_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b100>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_2k_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b101>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_kr_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b110>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_2kr_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b111>(dev.0, 0).is_some()
 }
 
@@ -294,65 +49,41 @@ extern "C" fn deo_2kr_entry<'a>(
 // Stubs for DEI calls
 
 #[no_mangle]
-extern "C" fn dei_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b000>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_2_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b001>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_r_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b010>(dev.0, 0).is_some()
 }
 #[no_mangle]
-extern "C" fn dei_2r_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b011>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_k_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b100>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_2k_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b101>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_kr_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b110>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_2kr_entry<'a>(
-    vm: &mut UxnJit<'a>,
-    dev: &mut DeviceHandle<'_, 'a>,
-) -> bool {
+extern "C" fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b111>(dev.0, 0).is_some()
 }
 
@@ -369,9 +100,9 @@ pub(crate) struct EntryHandle {
     dev: *mut std::ffi::c_void, // *DeviceHandle
 }
 
-struct DeviceHandle<'a, 'b>(&'a mut dyn Device<UxnJit<'b>>);
+struct DeviceHandle<'a>(&'a mut dyn Device);
 
-pub fn entry(vm: &mut UxnJit, dev: &mut dyn Device<UxnJit>, pc: u16) -> u16 {
+pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     let mut h = DeviceHandle(dev);
     let mut e = EntryHandle {
         stack_data: vm.stack.data.as_mut_ptr(),
@@ -907,8 +638,7 @@ const JUMP_TABLE: [unsafe extern "C" fn(); 256] = [
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
-    use super::{JitRam, UxnJit};
-    use crate::{op::*, EmptyDevice, Uxn, UxnVm, VmRam};
+    use crate::{op::*, Backend, EmptyDevice, Uxn, UxnRam};
 
     fn run_and_compare(cmd: &[u8]) {
         run_and_compare_all(cmd, false, false);
@@ -979,16 +709,16 @@ mod test {
         }
 
         let mut dev = EmptyDevice;
-        let mut ram_jit = JitRam::new();
-        let mut ram_emu = VmRam::new();
+        let mut ram_jit = UxnRam::new();
+        let mut ram_emu = UxnRam::new();
         if fill_ram {
             for i in 0..ram_jit.len() {
                 ram_jit[i] = i as u8;
                 ram_emu[i] = i as u8;
             }
         }
-        let mut vm_jit = UxnJit::new(&cmd, &mut ram_jit);
-        let mut vm_emu = UxnVm::new(&cmd, &mut ram_emu);
+        let mut vm_jit = Uxn::new(&cmd, &mut ram_jit, Backend::Jit);
+        let mut vm_emu = Uxn::new(&cmd, &mut ram_emu, Backend::Interpreter);
 
         let pc_jit = vm_jit.run(&mut dev, 0x100);
         let pc_emu = vm_emu.run(&mut dev, 0x100);
