@@ -1,4 +1,5 @@
 //! Uxn virtual machine
+#![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
 
 #[cfg(target_arch = "aarch64")]
@@ -1978,7 +1979,7 @@ impl Device for EmptyDevice {
 #[cfg(feature = "alloc")]
 mod ram {
     extern crate alloc;
-    use alloc::boxed::Box;
+    use alloc::{boxed::Box, vec};
 
     /// Helper type for building a RAM array of the appropriate size
     ///
@@ -2019,7 +2020,7 @@ mod ram {
 #[cfg(feature = "alloc")]
 pub use ram::UxnRam;
 
-#[cfg(all(feature = "alloc", test))]
+#[cfg(test)]
 mod test {
     use super::*;
 

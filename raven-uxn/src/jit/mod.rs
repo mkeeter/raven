@@ -3,6 +3,9 @@ use crate::{Device, Uxn};
 #[cfg(target_arch = "aarch64")]
 mod aarch64;
 
+#[cfg(not(target_arch = "aarch64"))]
+compile_error!("no JIT implemented for this platform");
+
 ////////////////////////////////////////////////////////////////////////////////
 // Stubs for DEO calls
 
@@ -96,8 +99,8 @@ pub(crate) struct EntryHandle {
     ret_data: *mut u8,
     ret_index: *mut u8,
     ram: *mut u8,
-    vm: *mut std::ffi::c_void,  // *Uxn
-    dev: *mut std::ffi::c_void, // *DeviceHandle
+    vm: *mut core::ffi::c_void,  // *Uxn
+    dev: *mut core::ffi::c_void, // *DeviceHandle
 }
 
 struct DeviceHandle<'a>(&'a mut dyn Device);
@@ -636,7 +639,7 @@ const JUMP_TABLE: [unsafe extern "C" fn(); 256] = [
     (SFT2kr as unsafe extern "C" fn()),
 ];
 
-#[cfg(all(feature = "alloc", test))]
+#[cfg(test)]
 mod test {
     use crate::{op::*, Backend, EmptyDevice, Uxn, UxnRam};
 
