@@ -82,7 +82,7 @@ impl System {
         Self { banks, exit: None }
     }
 
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo<U: Uxn>(&mut self, vm: &mut U, target: u8) {
         let v = vm.dev::<SystemPorts>();
         match target {
             SystemPorts::EXPANSION => {
@@ -99,11 +99,13 @@ impl System {
                         let bank = f.bank.get();
                         let addr = f.addr.get();
                         for i in 0..f.length.get() {
-                            let ram = match bank {
-                                0 => vm.ram_mut(),
-                                b => &mut self.banks[usize::from(b) - 1],
-                            };
-                            ram[usize::from(addr.wrapping_add(i))] = f.value;
+                            let j = addr.wrapping_add(i);
+                            if bank == 0 {
+                                vm.ram_write_byte(j, f.value);
+                            } else {
+                                let b = usize::from(bank) - 1;
+                                self.banks[b][usize::from(j)] = f.value
+                            }
                         }
                     }
                     expansion::CPYL | expansion::CPYR => {
@@ -126,18 +128,22 @@ impl System {
 
                         for i in 0..c.length.get() {
                             let src_addr = offset(i, c.src_addr);
-                            let src = match c.src_bank.get() {
-                                0 => vm.ram(),
-                                b => &self.banks[usize::from(b) - 1],
+                            let b = c.src_bank.get();
+                            let v = if b == 0 {
+                                vm.ram_read_byte(src_addr)
+                            } else {
+                                self.banks[usize::from(b) - 1]
+                                    [usize::from(src_addr)]
                             };
-                            let v = src[usize::from(src_addr)];
 
                             let dst_addr = offset(i, c.dst_addr);
-                            let dst = match c.dst_bank.get() {
-                                0 => vm.ram_mut(),
-                                b => &mut self.banks[usize::from(b) - 1],
+                            let b = c.dst_bank.get();
+                            if b == 0 {
+                                vm.ram_write_byte(dst_addr, v);
+                            } else {
+                                self.banks[usize::from(b) - 1]
+                                    [usize::from(dst_addr)] = v;
                             };
-                            dst[usize::from(dst_addr)] = v;
                         }
                     }
                     _ => panic!("invalid expansion opcode {op}"),
@@ -175,7 +181,7 @@ impl System {
         }
     }
 
-    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn dei<U: Uxn>(&mut self, vm: &mut U, target: u8) {
         match target & 0x0F {
             SystemPorts::WST => {
                 let wst = vm.stack().len();

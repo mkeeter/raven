@@ -65,7 +65,11 @@ impl Mouse {
     }
 
     /// Updates the internal mouse state, pushing an event if it has changed
-    pub fn update(&mut self, vm: &mut Uxn, state: MouseState) -> Option<Event> {
+    pub fn update<U: Uxn>(
+        &mut self,
+        vm: &mut U,
+        state: MouseState,
+    ) -> Option<Event> {
         let mut changed = false;
         let m = vm.dev_mut::<MousePorts>();
 

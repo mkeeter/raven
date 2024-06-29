@@ -29,7 +29,7 @@ impl FilePorts {
     /// Gets the filename from the memory address
     ///
     /// Logs an error and returns `None` if anything goes wrong
-    fn filename(&self, vm: &Uxn) -> Option<String> {
+    fn filename<U: Uxn>(&self, vm: &U) -> Option<String> {
         // TODO return a slice here instead?
         let mut addr = self.name.get();
         let mut out = vec![];
@@ -52,12 +52,12 @@ impl FilePorts {
         (Self::BASE..Self::BASE + 0x20).contains(&t)
     }
 
-    fn dev<'a>(vm: &'a Uxn, i: usize) -> &'a Self {
+    fn dev<'a, U: Uxn>(vm: &'a U, i: usize) -> &'a Self {
         let pos = Self::BASE + (i * DEV_SIZE) as u8;
         vm.dev_at(pos)
     }
 
-    fn dev_mut<'a>(vm: &'a mut Uxn, i: usize) -> &'a mut Self {
+    fn dev_mut<'a, U: Uxn>(vm: &'a mut U, i: usize) -> &'a mut Self {
         let pos = Self::BASE + (i * DEV_SIZE) as u8;
         vm.dev_mut_at(pos)
     }
@@ -119,7 +119,7 @@ impl File {
         (i, target & 0xF)
     }
 
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo<U: Uxn>(&mut self, vm: &mut U, target: u8) {
         let (i, target) = Self::decode_target(target);
         match target {
             FilePorts::DELETE => self.delete(vm, i),
@@ -168,7 +168,7 @@ impl File {
         true
     }
 
-    fn delete(&mut self, vm: &mut Uxn, index: usize) {
+    fn delete<U: Uxn>(&mut self, vm: &mut U, index: usize) {
         // Close the file, if it happens to be open
         self.f = None;
 
@@ -188,7 +188,7 @@ impl File {
         };
     }
 
-    fn write(&mut self, vm: &mut Uxn, index: usize) {
+    fn write<U: Uxn>(&mut self, vm: &mut U, index: usize) {
         // Clear the success flag
         let ports = FilePorts::dev_mut(vm, index);
         ports.success.set(0);
@@ -263,7 +263,7 @@ impl File {
         ports.success.set(n as u16);
     }
 
-    fn read(&mut self, vm: &mut Uxn, index: usize) {
+    fn read<U: Uxn>(&mut self, vm: &mut U, index: usize) {
         // Clear the success flag
         let ports = FilePorts::dev_mut(vm, index);
         ports.success.set(0);

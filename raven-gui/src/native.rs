@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use std::{io::Read, sync::mpsc};
 
-use uxn::{Uxn, UxnRam};
+use uxn::{Uxn, UxnRam, UxnVm};
 use varvara::Varvara;
 
 use anyhow::Result;
@@ -38,7 +38,7 @@ pub fn run() -> Result<()> {
     f.read_to_end(&mut rom).context("failed to read file")?;
 
     let ram = UxnRam::new();
-    let mut vm = Uxn::new(&rom, ram.leak());
+    let mut vm = UxnVm::new(&rom, ram.leak());
     let mut dev = Varvara::new();
 
     let _audio = audio_setup(dev.audio_streams());

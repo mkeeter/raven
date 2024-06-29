@@ -118,8 +118,8 @@ impl Default for Varvara {
     }
 }
 
-impl Device for Varvara {
-    fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool {
+impl<U: Uxn> Device<U> for Varvara {
+    fn deo(&mut self, vm: &mut U, target: u8) -> bool {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.deo(vm, target),
             console::ConsolePorts::BASE => self.console.deo(vm, target),
@@ -135,7 +135,7 @@ impl Device for Varvara {
         }
         !self.system.should_exit()
     }
-    fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    fn dei(&mut self, vm: &mut U, target: u8) {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.dei(vm, target),
             console::ConsolePorts::BASE => self.console.dei(vm, target),
@@ -200,7 +200,7 @@ impl Varvara {
     /// Calls the screen vector
     ///
     /// This function must be called at 60 Hz
-    pub fn redraw(&mut self, vm: &mut Uxn) {
+    pub fn redraw<U: Uxn>(&mut self, vm: &mut U) {
         let e = self.screen.update(vm);
         self.process_event(vm, e);
     }
@@ -210,7 +210,7 @@ impl Varvara {
     /// This is not idempotent; the output is taken from various accumulators
     /// and will be empty if this is called multiple times.
     #[must_use]
-    pub fn output(&mut self, vm: &Uxn) -> Output {
+    pub fn output<U: Uxn>(&mut self, vm: &U) -> Output {
         Output {
             size: self.screen.size(),
             frame: self.screen.frame(vm),
@@ -225,7 +225,7 @@ impl Varvara {
     ///
     /// Leaves the console type set to `stdin`, and returns the current output
     /// state of the system
-    pub fn send_args(&mut self, vm: &mut Uxn, args: &[String]) -> Output {
+    pub fn send_args<U: Uxn>(&mut self, vm: &mut U, args: &[String]) -> Output {
         for (i, a) in args.iter().enumerate() {
             self.console.set_type(vm, console::Type::Argument);
             for c in a.bytes() {
@@ -245,40 +245,40 @@ impl Varvara {
     }
 
     /// Send a character from the keyboard (controller) device
-    pub fn char(&mut self, vm: &mut Uxn, k: u8) {
+    pub fn char<U: Uxn>(&mut self, vm: &mut U, k: u8) {
         let e = self.controller.char(vm, k);
         self.process_event(vm, e);
     }
 
     /// Press a key on the controller device
-    pub fn pressed(&mut self, vm: &mut Uxn, k: Key, repeat: bool) {
+    pub fn pressed<U: Uxn>(&mut self, vm: &mut U, k: Key, repeat: bool) {
         if let Some(e) = self.controller.pressed(vm, k, repeat) {
             self.process_event(vm, e);
         }
     }
 
     /// Release a key on the controller device
-    pub fn released(&mut self, vm: &mut Uxn, k: Key) {
+    pub fn released<U: Uxn>(&mut self, vm: &mut U, k: Key) {
         if let Some(e) = self.controller.released(vm, k) {
             self.process_event(vm, e);
         }
     }
 
     /// Send a character from the console device
-    pub fn console(&mut self, vm: &mut Uxn, c: u8) {
+    pub fn console<U: Uxn>(&mut self, vm: &mut U, c: u8) {
         let e = self.console.update(vm, c);
         self.process_event(vm, e);
     }
 
     /// Updates the mouse state
-    pub fn mouse(&mut self, vm: &mut Uxn, m: MouseState) {
+    pub fn mouse<U: Uxn>(&mut self, vm: &mut U, m: MouseState) {
         if let Some(e) = self.mouse.update(vm, m) {
             self.process_event(vm, e);
         }
     }
 
     /// Processes pending audio events
-    pub fn audio(&mut self, vm: &mut Uxn) {
+    pub fn audio<U: Uxn>(&mut self, vm: &mut U) {
         for i in 0..audio::DEV_COUNT {
             if let Some(e) = self.audio.update(vm, usize::from(i)) {
                 self.process_event(vm, e);
@@ -289,7 +289,7 @@ impl Varvara {
     /// Processes a single vector event
     ///
     /// Events with an unassigned vector (i.e. 0) are ignored
-    fn process_event(&mut self, vm: &mut Uxn, e: Event) {
+    fn process_event<U: Uxn>(&mut self, vm: &mut U, e: Event) {
         if e.vector != 0 {
             if let Some(d) = e.data {
                 vm.write_dev_mem(d.addr, d.value);

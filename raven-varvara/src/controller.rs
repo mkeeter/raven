@@ -52,7 +52,7 @@ impl Controller {
     }
 
     /// Sends a single character event
-    pub fn char(&mut self, vm: &mut Uxn, c: u8) -> Event {
+    pub fn char<U: Uxn>(&mut self, vm: &mut U, c: u8) -> Event {
         let p = vm.dev::<ControllerPorts>();
         Event {
             vector: p.vector.get(),
@@ -65,9 +65,9 @@ impl Controller {
     }
 
     /// Send the given key event, returning an event if needed
-    pub fn pressed(
+    pub fn pressed<U: Uxn>(
         &mut self,
-        vm: &mut Uxn,
+        vm: &mut U,
         k: Key,
         repeat: bool,
     ) -> Option<Event> {
@@ -82,7 +82,7 @@ impl Controller {
     /// Indicate that the given key has been released
     ///
     /// This may change our button state and return an event
-    pub fn released(&mut self, vm: &mut Uxn, k: Key) -> Option<Event> {
+    pub fn released<U: Uxn>(&mut self, vm: &mut U, k: Key) -> Option<Event> {
         if !matches!(k, Key::Char(..)) {
             self.down.remove(&k);
             self.check_buttons(vm, false)
@@ -91,7 +91,11 @@ impl Controller {
         }
     }
 
-    fn check_buttons(&mut self, vm: &mut Uxn, repeat: bool) -> Option<Event> {
+    fn check_buttons<U: Uxn>(
+        &mut self,
+        vm: &mut U,
+        repeat: bool,
+    ) -> Option<Event> {
         let mut buttons = 0;
         for (i, k) in [
             Key::Ctrl,

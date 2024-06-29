@@ -14,8 +14,8 @@ pub enum Event {
     LoadRom(Vec<u8>),
 }
 
-pub struct Stage<'a> {
-    vm: Uxn<'a>,
+pub struct Stage<U> {
+    vm: U,
     dev: Varvara,
 
     /// Time (in seconds) at which we should draw the next frame
@@ -39,13 +39,13 @@ pub struct Stage<'a> {
     resized: Option<Box<dyn FnMut(u16, u16)>>,
 }
 
-impl<'a> Stage<'a> {
+impl<U: Uxn> Stage<U> {
     pub fn new(
-        vm: Uxn<'a>,
+        vm: U,
         mut dev: Varvara,
         rx: mpsc::Receiver<Event>,
         ctx: &egui::Context,
-    ) -> Stage<'a> {
+    ) -> Self {
         let out = dev.output(&vm);
 
         let size = out.size;
@@ -92,7 +92,7 @@ impl<'a> Stage<'a> {
     }
 }
 
-impl eframe::App for Stage<'_> {
+impl<U: Uxn> eframe::App for Stage<U> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         while let Ok(e) = self.rx.try_recv() {
             match e {

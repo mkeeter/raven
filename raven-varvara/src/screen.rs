@@ -176,7 +176,7 @@ impl Screen {
     }
 
     /// Gets the current frame, returning a `(buffer, width, height)` tuple
-    pub fn frame(&mut self, vm: &Uxn) -> &[u8] {
+    pub fn frame<U: Uxn>(&mut self, vm: &U) -> &[u8] {
         if std::mem::take(&mut self.changed) {
             let sys = vm.dev::<crate::system::SystemPorts>();
             let colors = [0, 1, 2, 3].map(|i| sys.color(i));
@@ -204,7 +204,7 @@ impl Screen {
     }
 
     /// Executes the `pixel` operation
-    fn pixel(&mut self, vm: &mut Uxn) {
+    fn pixel<U: Uxn>(&mut self, vm: &mut U) {
         let v = vm.dev::<ScreenPorts>();
         let p = v.pixel;
         let auto = v.auto;
@@ -232,7 +232,7 @@ impl Screen {
         }
     }
 
-    fn sprite(&mut self, vm: &mut Uxn) {
+    fn sprite<U: Uxn>(&mut self, vm: &mut U) {
         let v = vm.dev::<ScreenPorts>();
         let s = v.sprite;
 
@@ -336,7 +336,7 @@ impl Screen {
     }
 
     /// Executes a DEO command against the screen
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo<U: Uxn>(&mut self, vm: &mut U, target: u8) {
         let v = vm.dev::<ScreenPorts>();
         self.changed = true;
         match target {
@@ -359,7 +359,7 @@ impl Screen {
     }
 
     /// Executes a DEI command against the screen
-    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn dei<U: Uxn>(&mut self, vm: &mut U, target: u8) {
         let v = vm.dev_mut::<ScreenPorts>();
         match target {
             ScreenPorts::WIDTH_R => {
@@ -373,7 +373,7 @@ impl Screen {
     }
 
     /// Called on screen update; returns the screen vector
-    pub fn update(&mut self, vm: &mut Uxn) -> Event {
+    pub fn update<U: Uxn>(&mut self, vm: &mut U) -> Event {
         // Nothing to do here, but return the screen vector
         let vector = vm.dev::<ScreenPorts>().vector.get();
         Event { data: None, vector }

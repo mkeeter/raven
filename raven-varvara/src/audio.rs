@@ -40,12 +40,12 @@ impl AudioPorts {
         (Self::BASE..Self::BASE + 0x10 * DEV_COUNT).contains(&t)
     }
 
-    fn dev<'a>(vm: &'a Uxn, i: usize) -> &'a Self {
+    fn dev<'a, U: Uxn>(vm: &'a U, i: usize) -> &'a Self {
         let pos = Self::BASE + (i * DEV_SIZE) as u8;
         vm.dev_at(pos)
     }
 
-    fn dev_mut<'a>(vm: &'a mut Uxn, i: usize) -> &'a mut Self {
+    fn dev_mut<'a, U: Uxn>(vm: &'a mut U, i: usize) -> &'a mut Self {
         let pos = Self::BASE + (i * DEV_SIZE) as u8;
         vm.dev_mut_at(pos)
     }
@@ -353,7 +353,7 @@ impl Audio {
     }
 
     /// Return the "note done" vector if the given channel is done
-    pub fn update(&self, vm: &Uxn, i: usize) -> Option<Event> {
+    pub fn update<U: Uxn>(&self, vm: &U, i: usize) -> Option<Event> {
         if self.streams[i].done.swap(false, Ordering::Relaxed) {
             let p = AudioPorts::dev(vm, i);
             let vector = p.vector.get();
@@ -363,7 +363,7 @@ impl Audio {
         }
     }
 
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo<U: Uxn>(&mut self, vm: &mut U, target: u8) {
         let (i, target) = Self::decode_target(target);
         if target == AudioPorts::PITCH {
             let p = AudioPorts::dev(vm, i);
@@ -431,7 +431,7 @@ impl Audio {
         }
     }
 
-    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn dei<U: Uxn>(&mut self, vm: &mut U, target: u8) {
         let (i, target) = Self::decode_target(target);
         let p = AudioPorts::dev_mut(vm, i);
 
