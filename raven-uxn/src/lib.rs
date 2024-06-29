@@ -4,6 +4,9 @@
 #[cfg(target_arch = "aarch64")]
 mod jit;
 
+#[cfg(target_arch = "aarch64")]
+pub use jit::UxnJit;
+
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
 }
@@ -2024,12 +2027,12 @@ mod ram {
     /// Helper type for building a RAM array of the appropriate size
     ///
     /// This is only available if the `"alloc"` feature is enabled
-    pub struct UxnRam(Box<[u8; 65536]>);
+    pub struct VmRam(Box<[u8; 65536]>);
 
-    impl UxnRam {
+    impl VmRam {
         /// Builds a new zero-initialized RAM
         pub fn new() -> Self {
-            UxnRam(Box::new([0u8; 65536]))
+            VmRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
         }
 
         /// Leaks memory, setting it to a static lifetime
@@ -2038,19 +2041,19 @@ mod ram {
         }
     }
 
-    impl Default for UxnRam {
+    impl Default for VmRam {
         fn default() -> Self {
             Self::new()
         }
     }
 
-    impl core::ops::Deref for UxnRam {
+    impl core::ops::Deref for VmRam {
         type Target = [u8; 65536];
         fn deref(&self) -> &Self::Target {
             &self.0
         }
     }
-    impl core::ops::DerefMut for UxnRam {
+    impl core::ops::DerefMut for VmRam {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
@@ -2058,7 +2061,10 @@ mod ram {
 }
 
 #[cfg(feature = "alloc")]
-pub use ram::UxnRam;
+pub use ram::VmRam;
+
+#[cfg(feature = "alloc")]
+pub use jit::JitRam;
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
@@ -2119,7 +2125,7 @@ mod test {
     }
 
     fn parse_and_test(s: &str) {
-        let mut ram = UxnRam::new();
+        let mut ram = VmRam::new();
         let mut vm = UxnVm::new(&[], &mut ram);
         let mut iter = s.split_whitespace();
         let mut op = None;

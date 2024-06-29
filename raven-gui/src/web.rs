@@ -8,13 +8,13 @@ use log::{info, warn};
 use std::sync::mpsc;
 
 use crate::{audio_setup, Event, Stage};
-use uxn::{Uxn, UxnRam, UxnVm};
+use uxn::{Uxn, UxnVm, VmRam};
 use varvara::Varvara;
 
 pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
-    let ram = UxnRam::new();
+    let ram = VmRam::new();
     let rom = include_bytes!("../../roms/controller.rom");
     let mut vm = UxnVm::new(rom, ram.leak());
     let mut dev = Varvara::new();

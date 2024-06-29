@@ -44,20 +44,15 @@ impl<'a> UxnJit<'a> {
         out
     }
 
+    /// See [`UxnVm::dei`](crate::UxnVm::dei)
     #[inline]
-    pub fn dei<const FLAGS: u8>(
+    fn dei<const FLAGS: u8>(
         &mut self,
         dev: &mut dyn Device<Self>,
         pc: u16,
     ) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let i = s.pop_byte();
-
-        // For compatibility with the C implementation, we'll
-        // pre-emtively push a dummy value here, then use `emplace` to
-        // replace it afterwards.  This is because the C implementation
-        // `uxn.c` reserves stack space before calling `emu_deo/dei`,
-        // which affects the behavior of `System.rst/wst`
         let v = if short(FLAGS) {
             s.reserve(2);
             dev.dei(self, i);
@@ -75,16 +70,9 @@ impl<'a> UxnJit<'a> {
         Some(pc)
     }
 
-    /// Device Output
-    ///
-    /// ```text
-    /// DEO val device8 --
-    /// ```
-    ///
-    /// Writes a value to the device page. The target device might capture the
-    /// writing to trigger an I/O event.
+    /// See [`UxnVm::deo`](crate::UxnVm::deo)
     #[inline]
-    pub fn deo<const FLAGS: u8>(
+    fn deo<const FLAGS: u8>(
         &mut self,
         dev: &mut dyn Device<Self>,
         pc: u16,
@@ -191,6 +179,50 @@ impl<'a> Uxn for UxnJit<'a> {
         self.ram[0x100..][..rom.len()].copy_from_slice(rom);
     }
 }
+
+#[cfg(feature = "alloc")]
+mod ram {
+    extern crate alloc;
+    use alloc::boxed::Box;
+
+    /// Helper type for building a RAM array of the appropriate size
+    ///
+    /// This is only available if the `"alloc"` feature is enabled
+    pub struct JitRam(Box<[u8; 65536]>);
+
+    impl JitRam {
+        /// Builds a new zero-initialized RAM
+        pub fn new() -> Self {
+            JitRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
+        }
+
+        /// Leaks memory, setting it to a static lifetime
+        pub fn leak(self) -> &'static mut [u8; 65536] {
+            Box::leak(self.0)
+        }
+    }
+
+    impl Default for JitRam {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl core::ops::Deref for JitRam {
+        type Target = [u8; 65536];
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl core::ops::DerefMut for JitRam {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+pub use ram::JitRam;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Stubs for DEO calls
@@ -875,8 +907,8 @@ const JUMP_TABLE: [unsafe extern "C" fn(); 256] = [
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
-    use super::UxnJit;
-    use crate::{op::*, EmptyDevice, Uxn, UxnRam, UxnVm};
+    use super::{JitRam, UxnJit};
+    use crate::{op::*, EmptyDevice, Uxn, UxnVm, VmRam};
 
     fn run_and_compare(cmd: &[u8]) {
         run_and_compare_all(cmd, false, false);
@@ -947,8 +979,8 @@ mod test {
         }
 
         let mut dev = EmptyDevice;
-        let mut ram_jit = UxnRam::new();
-        let mut ram_emu = UxnRam::new();
+        let mut ram_jit = JitRam::new();
+        let mut ram_emu = VmRam::new();
         if fill_ram {
             for i in 0..ram_jit.len() {
                 ram_jit[i] = i as u8;

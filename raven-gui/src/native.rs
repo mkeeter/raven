@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use std::{io::Read, sync::mpsc};
 
-use uxn::{Uxn, UxnRam, UxnVm};
+use uxn::{JitRam, Uxn, UxnJit, UxnVm, VmRam};
 use varvara::Varvara;
 
 use anyhow::Result;
@@ -16,29 +16,19 @@ use crate::{audio_setup, Stage};
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Target file to load
+    /// ROM to load and execute
     rom: std::path::PathBuf,
+
+    /// Use the JIT-accelerated Uxn implementation
+    #[clap(long)]
+    jit: bool,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
     args: Vec<String>,
 }
 
-pub fn run() -> Result<()> {
-    let env = env_logger::Env::default()
-        .filter_or("UXN_LOG", "info")
-        .write_style_or("UXN_LOG", "always");
-    env_logger::init_from_env(env);
-
-    let args = Args::parse();
-    let mut f = std::fs::File::open(&args.rom)
-        .with_context(|| format!("failed to open {:?}", args.rom))?;
-
-    let mut rom = vec![];
-    f.read_to_end(&mut rom).context("failed to read file")?;
-
-    let ram = UxnRam::new();
-    let mut vm = UxnVm::new(&rom, ram.leak());
+pub fn run_uxn<U: Uxn + 'static>(mut vm: U, args: &[String]) -> Result<()> {
     let mut dev = Varvara::new();
 
     let _audio = audio_setup(dev.audio_streams());
@@ -49,7 +39,7 @@ pub fn run() -> Result<()> {
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;
-    dev.send_args(&mut vm, &args.args).check()?;
+    dev.send_args(&mut vm, args).check()?;
 
     let (width, height) = dev.output(&vm).size;
     let options = eframe::NativeOptions {
@@ -67,4 +57,28 @@ pub fn run() -> Result<()> {
         Box::new(move |cc| Box::new(Stage::new(vm, dev, rx, &cc.egui_ctx))),
     )
     .map_err(|e| anyhow!("got egui error: {e:?}"))
+}
+
+pub fn run() -> Result<()> {
+    let env = env_logger::Env::default()
+        .filter_or("UXN_LOG", "info")
+        .write_style_or("UXN_LOG", "always");
+    env_logger::init_from_env(env);
+
+    let args = Args::parse();
+    let mut f = std::fs::File::open(&args.rom)
+        .with_context(|| format!("failed to open {:?}", args.rom))?;
+
+    let mut rom = vec![];
+    f.read_to_end(&mut rom).context("failed to read file")?;
+
+    if args.jit {
+        let ram = JitRam::new();
+        let vm = UxnJit::new(&rom, ram.leak());
+        run_uxn(vm, &args.args)
+    } else {
+        let ram = VmRam::new();
+        let vm = UxnVm::new(&rom, ram.leak());
+        run_uxn(vm, &args.args)
+    }
 }
