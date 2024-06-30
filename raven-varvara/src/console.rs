@@ -83,7 +83,7 @@ impl Console {
             _ => (),
         }
     }
-    pub fn dei<U>(&mut self, _vm: &mut U, _target: u8) {
+    pub fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
         // Nothing to do here; data is pre-populated in `vm.dev` memory
     }
 

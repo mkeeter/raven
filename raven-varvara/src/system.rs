@@ -1,3 +1,4 @@
+use log::warn;
 use std::mem::offset_of;
 use uxn::{Ports, Uxn};
 use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
@@ -100,11 +101,11 @@ impl System {
                         let addr = f.addr.get();
                         for i in 0..f.length.get() {
                             let j = addr.wrapping_add(i);
-                            if bank == 0 {
-                                vm.ram_write_byte(j, f.value);
-                            } else {
-                                let b = usize::from(bank) - 1;
-                                self.banks[b][usize::from(j)] = f.value
+                            match usize::from(bank).checked_sub(1) {
+                                None => vm.ram_write_byte(j, f.value),
+                                Some(b) => {
+                                    self.banks[b][usize::from(j)] = f.value
+                                }
                             }
                         }
                     }
@@ -128,25 +129,23 @@ impl System {
 
                         for i in 0..c.length.get() {
                             let src_addr = offset(i, c.src_addr);
-                            let b = c.src_bank.get();
-                            let v = if b == 0 {
-                                vm.ram_read_byte(src_addr)
-                            } else {
-                                self.banks[usize::from(b) - 1]
-                                    [usize::from(src_addr)]
+                            let v = match usize::from(c.src_bank.get())
+                                .checked_sub(1)
+                            {
+                                None => vm.ram_read_byte(src_addr),
+                                Some(b) => self.banks[b][usize::from(src_addr)],
                             };
 
                             let dst_addr = offset(i, c.dst_addr);
-                            let b = c.dst_bank.get();
-                            if b == 0 {
-                                vm.ram_write_byte(dst_addr, v);
-                            } else {
-                                self.banks[usize::from(b) - 1]
-                                    [usize::from(dst_addr)] = v;
-                            };
+                            match usize::from(c.dst_bank.get()).checked_sub(1) {
+                                None => vm.ram_write_byte(dst_addr, v),
+                                Some(b) => {
+                                    self.banks[b][usize::from(dst_addr)] = v
+                                }
+                            }
                         }
                     }
-                    _ => panic!("invalid expansion opcode {op}"),
+                    _ => warn!("invalid expansion opcode {op}"),
                 }
             }
             SystemPorts::WST => {

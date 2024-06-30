@@ -1646,7 +1646,93 @@ impl<'a> Uxn<'a> {
     }
 }
 
-#[allow(dead_code, non_upper_case_globals)]
+/// Trait for a Uxn-compatible device
+pub trait Device {
+    /// Performs the `DEI` operation for the given target
+    ///
+    /// This function must write its output byte to `vm.dev[target]`; the CPU
+    /// evaluation loop will then copy this value to the stack.
+    fn dei(&mut self, vm: &mut Uxn, target: u8);
+
+    /// Performs the `DEO` operation on the given target
+    ///
+    /// The input byte will be written to `vm.dev[target]` before this function
+    /// is called, and can be read by the function.
+    ///
+    /// Returns `true` if the CPU should keep running, `false` if it should
+    /// exit.
+    #[must_use]
+    fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool;
+}
+
+/// Trait for a type which can be cast to a device ports `struct`
+pub trait Ports:
+    zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::FromZeroes
+{
+    /// Base address of the port, of the form `0xA0`
+    const BASE: u8;
+}
+
+/// Device which does nothing
+pub struct EmptyDevice;
+impl Device for EmptyDevice {
+    fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
+        // nothing to do here
+    }
+    fn deo(&mut self, _vm: &mut Uxn, _target: u8) -> bool {
+        // nothing to do here, keep running
+        true
+    }
+}
+
+#[cfg(feature = "alloc")]
+mod ram {
+    extern crate alloc;
+    use alloc::{boxed::Box, vec};
+
+    /// Helper type for building a RAM array of the appropriate size
+    ///
+    /// This is only available if the `"alloc"` feature is enabled
+    pub struct UxnRam(Box<[u8; 65536]>);
+
+    impl UxnRam {
+        /// Builds a new zero-initialized RAM
+        pub fn new() -> Self {
+            UxnRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
+        }
+
+        /// Leaks memory, setting it to a static lifetime
+        pub fn leak(self) -> &'static mut [u8; 65536] {
+            Box::leak(self.0)
+        }
+    }
+
+    impl Default for UxnRam {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl core::ops::Deref for UxnRam {
+        type Target = [u8; 65536];
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl core::ops::DerefMut for UxnRam {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+pub use ram::UxnRam;
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+#[allow(unused, non_upper_case_globals)]
 mod op {
     pub const BRK: u8 = 0x0;
     pub const INC: u8 = 0x1;
@@ -1905,7 +1991,6 @@ mod op {
     pub const EOR2kr: u8 = 0xfe;
     pub const SFT2kr: u8 = 0xff;
 
-    #[allow(unused)]
     pub const NAMES: [&str; 256] = [
         "BRK", "INC", "POP", "NIP", "SWP", "ROT", "DUP", "OVR", "EQU", "NEQ",
         "GTH", "LTH", "JMP", "JCN", "JSR", "STH", "LDZ", "STZ", "LDR", "STR",
@@ -1941,90 +2026,7 @@ mod op {
     ];
 }
 
-/// Trait for a Uxn-compatible device
-pub trait Device {
-    /// Performs the `DEI` operation for the given target
-    ///
-    /// This function must write its output byte to `vm.dev[target]`; the CPU
-    /// evaluation loop will then copy this value to the stack.
-    fn dei(&mut self, vm: &mut Uxn, target: u8);
-
-    /// Performs the `DEO` operation on the given target
-    ///
-    /// The input byte will be written to `vm.dev[target]` before this function
-    /// is called, and can be read by the function.
-    ///
-    /// Returns `true` if the CPU should keep running, `false` if it should
-    /// exit.
-    #[must_use]
-    fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool;
-}
-
-/// Trait for a type which can be cast to a device ports `struct`
-pub trait Ports:
-    zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::FromZeroes
-{
-    /// Base address of the port, of the form `0xA0`
-    const BASE: u8;
-}
-
-/// Device which does nothing
-pub struct EmptyDevice;
-impl Device for EmptyDevice {
-    fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
-        // nothing to do here
-    }
-    fn deo(&mut self, _vm: &mut Uxn, _target: u8) -> bool {
-        // nothing to do here, keep running
-        true
-    }
-}
-
-#[cfg(feature = "alloc")]
-mod ram {
-    extern crate alloc;
-    use alloc::{boxed::Box, vec};
-
-    /// Helper type for building a RAM array of the appropriate size
-    ///
-    /// This is only available if the `"alloc"` feature is enabled
-    pub struct UxnRam(Box<[u8; 65536]>);
-
-    impl UxnRam {
-        /// Builds a new zero-initialized RAM
-        pub fn new() -> Self {
-            UxnRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
-        }
-
-        /// Leaks memory, setting it to a static lifetime
-        pub fn leak(self) -> &'static mut [u8; 65536] {
-            Box::leak(self.0)
-        }
-    }
-
-    impl Default for UxnRam {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl core::ops::Deref for UxnRam {
-        type Target = [u8; 65536];
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-    impl core::ops::DerefMut for UxnRam {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
-        }
-    }
-}
-
-#[cfg(feature = "alloc")]
-pub use ram::UxnRam;
-
-#[cfg(test)]
+#[cfg(all(feature = "alloc", test))]
 mod test {
     use super::*;
 
@@ -2040,43 +2042,43 @@ mod test {
             | (u8::from(ret) << 6)
             | (u8::from(short) << 5);
         let out = match s {
-            "BRK" => 0x00,
-            "JCI" => 0x20,
-            "JMI" => 0x40,
-            "JSI" => 0x60,
-            "LIT" => 0x80 | mode,
+            "BRK" => op::BRK,
+            "JCI" => op::JCI,
+            "JMI" => op::JMI,
+            "JSI" => op::JSI,
+            "LIT" => op::LIT | mode,
 
-            "INC" => 0x01 | mode,
-            "POP" => 0x02 | mode,
-            "NIP" => 0x03 | mode,
-            "SWP" => 0x04 | mode,
-            "ROT" => 0x05 | mode,
-            "DUP" => 0x06 | mode,
-            "OVR" => 0x07 | mode,
-            "EQU" => 0x08 | mode,
-            "NEQ" => 0x09 | mode,
-            "GTH" => 0x0a | mode,
-            "LTH" => 0x0b | mode,
-            "JMP" => 0x0c | mode,
-            "JCN" => 0x0d | mode,
-            "JSR" => 0x0e | mode,
-            "STH" => 0x0f | mode,
-            "LDZ" => 0x10 | mode,
-            "STZ" => 0x11 | mode,
-            "LDR" => 0x12 | mode,
-            "STR" => 0x13 | mode,
-            "LDA" => 0x14 | mode,
-            "STA" => 0x15 | mode,
-            "DEI" => 0x16 | mode,
-            "DEO" => 0x17 | mode,
-            "ADD" => 0x18 | mode,
-            "SUB" => 0x19 | mode,
-            "MUL" => 0x1a | mode,
-            "DIV" => 0x1b | mode,
-            "AND" => 0x1c | mode,
-            "ORA" => 0x1d | mode,
-            "EOR" => 0x1e | mode,
-            "SFT" => 0x1f | mode,
+            "INC" => op::INC | mode,
+            "POP" => op::POP | mode,
+            "NIP" => op::NIP | mode,
+            "SWP" => op::SWP | mode,
+            "ROT" => op::ROT | mode,
+            "DUP" => op::DUP | mode,
+            "OVR" => op::OVR | mode,
+            "EQU" => op::EQU | mode,
+            "NEQ" => op::NEQ | mode,
+            "GTH" => op::GTH | mode,
+            "LTH" => op::LTH | mode,
+            "JMP" => op::JMP | mode,
+            "JCN" => op::JCN | mode,
+            "JSR" => op::JSR | mode,
+            "STH" => op::STH | mode,
+            "LDZ" => op::LDZ | mode,
+            "STZ" => op::STZ | mode,
+            "LDR" => op::LDR | mode,
+            "STR" => op::STR | mode,
+            "LDA" => op::LDA | mode,
+            "STA" => op::STA | mode,
+            "DEI" => op::DEI | mode,
+            "DEO" => op::DEO | mode,
+            "ADD" => op::ADD | mode,
+            "SUB" => op::SUB | mode,
+            "MUL" => op::MUL | mode,
+            "DIV" => op::DIV | mode,
+            "AND" => op::AND | mode,
+            "ORA" => op::ORA | mode,
+            "EOR" => op::EOR | mode,
+            "SFT" => op::SFT | mode,
             _ => return Err(s),
         };
         Ok(out)

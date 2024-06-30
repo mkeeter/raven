@@ -639,7 +639,7 @@ const JUMP_TABLE: [unsafe extern "C" fn(); 256] = [
     (SFT2kr as unsafe extern "C" fn()),
 ];
 
-#[cfg(test)]
+#[cfg(all(feature = "alloc", test))]
 mod test {
     use crate::{op::*, Backend, EmptyDevice, Uxn, UxnRam};
 
