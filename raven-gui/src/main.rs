@@ -57,8 +57,7 @@ impl<'a> Stage<'a> {
             [usize::from(size.0), usize::from(size.1)],
             egui::Color32::BLACK,
         );
-        let scale =
-            scale.unwrap_or_else(|| if size.0 < 320 { 2.0 } else { 1.0 });
+        let scale = scale.unwrap_or(if size.0 < 320 { 2.0 } else { 1.0 });
 
         let texture =
             ctx.load_texture("frame", image, egui::TextureOptions::NEAREST);
