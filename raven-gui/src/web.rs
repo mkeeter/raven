@@ -8,7 +8,7 @@ use log::{info, warn};
 use std::sync::mpsc;
 
 use crate::{audio_setup, Event, Stage};
-use uxn::{Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnRam};
 use varvara::Varvara;
 
 pub fn run() -> Result<()> {
@@ -16,7 +16,7 @@ pub fn run() -> Result<()> {
 
     let ram = UxnRam::new();
     let rom = include_bytes!("../../roms/controller.rom");
-    let mut vm = Uxn::new(rom, ram.leak());
+    let mut vm = Uxn::new(rom, ram.leak(), Backend::Interpreter);
     let mut dev = Varvara::new();
 
     // Run the reset vector

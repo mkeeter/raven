@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use std::{io::Read, sync::mpsc};
 
-use uxn::{Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnRam};
 use varvara::Varvara;
 
 use anyhow::Result;
@@ -16,8 +16,12 @@ use crate::{audio_setup, Stage};
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Target file to load
+    /// ROM to load and execute
     rom: std::path::PathBuf,
+
+    /// Use the native assembly Uxn implementation
+    #[clap(long)]
+    native: bool,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -38,7 +42,19 @@ pub fn run() -> Result<()> {
     f.read_to_end(&mut rom).context("failed to read file")?;
 
     let ram = UxnRam::new();
-    let mut vm = Uxn::new(&rom, ram.leak());
+    let mut vm = Uxn::new(
+        &rom,
+        ram.leak(),
+        if args.native {
+            #[cfg(not(target_arch = "aarch64"))]
+            anyhow::bail!("no native implementation for this arch");
+
+            #[cfg(target_arch = "aarch64")]
+            Backend::Native
+        } else {
+            Backend::Interpreter
+        },
+    );
     let mut dev = Varvara::new();
 
     let _audio = audio_setup(dev.audio_streams());

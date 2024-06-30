@@ -9,3 +9,4 @@ zerocopy.workspace = true
 [features]
 alloc = []
 default = ["alloc"]
+native = []

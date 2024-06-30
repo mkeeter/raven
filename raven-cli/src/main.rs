@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use uxn::{Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnRam};
 use varvara::Varvara;
 
 use anyhow::{Context, Result};
@@ -12,8 +12,14 @@ use log::info;
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    /// ROM to load and execute
     rom: PathBuf,
 
+    /// Use the native Uxn implementation
+    #[clap(long)]
+    native: bool,
+
+    /// Arguments to pass into the VM
     #[arg(last = true)]
     args: Vec<String>,
 }
@@ -32,7 +38,19 @@ fn main() -> Result<()> {
     f.read_to_end(&mut rom).context("failed to read file")?;
 
     let mut ram = UxnRam::new();
-    let mut vm = Uxn::new(&rom, &mut ram);
+    let mut vm = Uxn::new(
+        &rom,
+        &mut ram,
+        if args.native {
+            #[cfg(not(target_arch = "aarch64"))]
+            anyhow::bail!("no native implementation for this arch");
+
+            #[cfg(target_arch = "aarch64")]
+            Backend::Native
+        } else {
+            Backend::Interpreter
+        },
+    );
     let mut dev = Varvara::new();
 
     // Run the reset vector

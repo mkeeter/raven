@@ -45,7 +45,7 @@ impl<'a> Stage<'a> {
         mut dev: Varvara,
         rx: mpsc::Receiver<Event>,
         ctx: &egui::Context,
-    ) -> Stage<'a> {
+    ) -> Self {
         let out = dev.output(&vm);
 
         let size = out.size;
