@@ -19,6 +19,10 @@ struct Args {
     /// ROM to load and execute
     rom: std::path::PathBuf,
 
+    /// Scale factor for the window
+    #[clap(long)]
+    scale: Option<f32>,
+
     /// Use the native assembly Uxn implementation
     #[clap(long)]
     native: bool,
@@ -80,7 +84,9 @@ pub fn run() -> Result<()> {
     eframe::run_native(
         "Varvara",
         options,
-        Box::new(move |cc| Box::new(Stage::new(vm, dev, rx, &cc.egui_ctx))),
+        Box::new(move |cc| {
+            Box::new(Stage::new(vm, dev, args.scale, rx, &cc.egui_ctx))
+        }),
     )
     .map_err(|e| anyhow!("got egui error: {e:?}"))
 }

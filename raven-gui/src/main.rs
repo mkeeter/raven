@@ -19,7 +19,7 @@ pub struct Stage<'a> {
     dev: Varvara,
 
     /// Double the UI size
-    double: bool,
+    scale: f32,
 
     /// Time (in seconds) at which we should draw the next frame
     next_frame: f64,
@@ -46,6 +46,7 @@ impl<'a> Stage<'a> {
     pub fn new(
         vm: Uxn<'a>,
         mut dev: Varvara,
+        scale: Option<f32>,
         rx: mpsc::Receiver<Event>,
         ctx: &egui::Context,
     ) -> Self {
@@ -56,7 +57,8 @@ impl<'a> Stage<'a> {
             [usize::from(size.0), usize::from(size.1)],
             egui::Color32::BLACK,
         );
-        let double = size.0 < 320;
+        let scale =
+            scale.unwrap_or_else(|| if size.0 < 320 { 2.0 } else { 1.0 });
 
         let texture =
             ctx.load_texture("frame", image, egui::TextureOptions::NEAREST);
@@ -65,7 +67,7 @@ impl<'a> Stage<'a> {
             vm,
             dev,
 
-            double,
+            scale,
             next_frame: 0.0,
             needs_resize: true,
 
@@ -232,11 +234,8 @@ impl eframe::App for Stage<'_> {
         }
         if std::mem::take(&mut self.needs_resize) || prev_size != out.size {
             info!("resizing window to {:?}", out.size);
-            let mut size =
-                egui::Vec2::new(out.size.0 as f32, out.size.1 as f32);
-            if self.double {
-                size *= 2.0;
-            }
+            let size = egui::Vec2::new(out.size.0 as f32, out.size.1 as f32)
+                * self.scale;
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
             if let Some(f) = self.resized.as_mut() {
                 f(out.size.0, out.size.1);
@@ -255,13 +254,12 @@ impl eframe::App for Stage<'_> {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let mut mesh = egui::Mesh::with_texture(self.texture.id());
-            let scale = if self.double { 2.0 } else { 1.0 };
             mesh.add_rect_with_uv(
                 egui::Rect {
                     min: egui::Pos2::new(0.0, 0.0),
                     max: egui::Pos2::new(
-                        out.size.0 as f32 * scale,
-                        out.size.1 as f32 * scale,
+                        out.size.0 as f32 * self.scale,
+                        out.size.1 as f32 * self.scale,
                     ),
                 },
                 egui::Rect {

@@ -127,7 +127,8 @@ pub fn run() -> Result<()> {
                 "varvara",
                 options,
                 Box::new(move |cc| {
-                    let mut s = Box::new(Stage::new(vm, dev, rx, &cc.egui_ctx));
+                    let mut s =
+                        Box::new(Stage::new(vm, dev, None, rx, &cc.egui_ctx));
                     s.set_resize_callback(resize_closure);
                     s
                 }),
