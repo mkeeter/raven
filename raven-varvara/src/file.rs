@@ -236,6 +236,7 @@ impl File {
         }
 
         self.buf.resize(usize::from(ports.length.get()), 0u8);
+        self.buf.fill(0u8);
         let Some(Handle::Write { path, file }) = self.f.as_mut() else {
             unreachable!();
         };
@@ -348,8 +349,6 @@ impl File {
                     // Preload new data into the buffer
                     if n < self.buf.len() && scratch.is_empty() {
                         let Some(next) = dir.next() else {
-                            self.buf[n] = 0;
-                            n += 1;
                             break;
                         };
                         match next {
@@ -391,7 +390,7 @@ impl File {
 
         ports.success.set(n as u16);
         let mut addr = ports.read.get();
-        for &b in &self.buf[..n] {
+        for &b in &self.buf {
             vm.ram_write_byte(addr, b);
             addr = addr.wrapping_add(1);
         }
