@@ -420,6 +420,7 @@ fn decode_key(k: egui::Key, shift: bool) -> Option<Key> {
         (egui::Key::Space, _) => Key::Char(b' '),
         (egui::Key::Tab, _) => Key::Char(b'\t'),
         (egui::Key::Enter, _) => Key::Char(b'\r'),
+        (egui::Key::Backspace, _) => Key::Char(0x08),
         _ => return None,
     };
     Some(c)
