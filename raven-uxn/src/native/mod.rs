@@ -4,7 +4,7 @@ use crate::{Device, Uxn};
 mod aarch64;
 
 #[cfg(not(target_arch = "aarch64"))]
-compile_error!("no JIT implemented for this platform");
+compile_error!("no native implementation for this platform");
 
 ////////////////////////////////////////////////////////////////////////////////
 // Stubs for DEO calls
@@ -712,37 +712,41 @@ mod test {
         }
 
         let mut dev = EmptyDevice;
-        let mut ram_jit = UxnRam::new();
-        let mut ram_emu = UxnRam::new();
+        let mut ram_native = UxnRam::new();
+        let mut ram_interp = UxnRam::new();
         if fill_ram {
-            for i in 0..ram_jit.len() {
-                ram_jit[i] = i as u8;
-                ram_emu[i] = i as u8;
+            for i in 0..ram_native.len() {
+                ram_native[i] = i as u8;
+                ram_interp[i] = i as u8;
             }
         }
-        let mut vm_jit = Uxn::new(&cmd, &mut ram_jit, Backend::Jit);
-        let mut vm_emu = Uxn::new(&cmd, &mut ram_emu, Backend::Interpreter);
+        let mut vm_native = Uxn::new(&cmd, &mut ram_native, Backend::Native);
+        let mut vm_interp =
+            Uxn::new(&cmd, &mut ram_interp, Backend::Interpreter);
 
-        let pc_jit = vm_jit.run(&mut dev, 0x100);
-        let pc_emu = vm_emu.run(&mut dev, 0x100);
-        assert_eq!(pc_jit, pc_emu, "{op_name}: pc mismatch");
+        let pc_native = vm_native.run(&mut dev, 0x100);
+        let pc_interp = vm_interp.run(&mut dev, 0x100);
+        assert_eq!(pc_native, pc_interp, "{op_name}: pc mismatch");
 
-        assert_eq!(vm_jit.dev, vm_emu.dev, "{op_name}: dev memory mismatch");
-        assert_eq!(vm_jit.ram, vm_emu.ram, "{op_name}: ram mismatch");
         assert_eq!(
-            vm_jit.stack.index, vm_emu.stack.index,
+            vm_native.dev, vm_interp.dev,
+            "{op_name}: dev memory mismatch"
+        );
+        assert_eq!(vm_native.ram, vm_interp.ram, "{op_name}: ram mismatch");
+        assert_eq!(
+            vm_native.stack.index, vm_interp.stack.index,
             "{op_name}: stack index mismatch"
         );
         assert_eq!(
-            vm_jit.stack.data, vm_emu.stack.data,
+            vm_native.stack.data, vm_interp.stack.data,
             "{op_name}: stack data mismatch"
         );
         assert_eq!(
-            vm_jit.ret.index, vm_emu.ret.index,
+            vm_native.ret.index, vm_interp.ret.index,
             "{op_name}: ret index mismatch"
         );
         assert_eq!(
-            vm_jit.ret.data, vm_emu.ret.data,
+            vm_native.ret.data, vm_interp.ret.data,
             "{op_name}: ret index mismatch"
         );
     }

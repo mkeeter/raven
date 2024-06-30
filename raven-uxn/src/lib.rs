@@ -1,10 +1,10 @@
 //! Uxn virtual machine
 #![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
-#![cfg_attr(not(feature = "jit"), forbid(unsafe_code))]
+#![cfg_attr(not(feature = "native"), forbid(unsafe_code))]
 
-#[cfg(feature = "jit")]
-mod jit;
+#[cfg(feature = "native")]
+mod native;
 
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
@@ -36,9 +36,9 @@ pub enum Backend {
     /// Use a bytecode interpreter
     Interpreter,
 
-    #[cfg(feature = "jit")]
+    #[cfg(feature = "native")]
     /// Use hand-written threaded assembly
-    Jit,
+    Native,
 }
 
 /// Virtual stack, which is aware of `keep` and `short` modes
@@ -419,8 +419,8 @@ impl<'a> Uxn<'a> {
                 }
                 pc
             }
-            #[cfg(feature = "jit")]
-            Backend::Jit => jit::entry(self, dev, pc),
+            #[cfg(feature = "native")]
+            Backend::Native => native::entry(self, dev, pc),
         }
     }
 

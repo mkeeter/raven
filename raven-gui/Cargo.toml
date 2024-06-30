@@ -21,7 +21,7 @@ web-sys.workspace = true
 cpal = { workspace = true, features = ["wasm-bindgen"] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-uxn = { path = "../raven-uxn", package = "raven-uxn", features = ["jit"] }
+uxn = { path = "../raven-uxn", package = "raven-uxn", features = ["native"] }
 
 [target.'cfg(not(target_arch = "aarch64"))'.dependencies]
 uxn = { path = "../raven-uxn", package = "raven-uxn" }

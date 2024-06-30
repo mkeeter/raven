@@ -15,9 +15,9 @@ struct Args {
     /// ROM to load and execute
     rom: PathBuf,
 
-    /// Use the JIT-accelerated Uxn implementation
+    /// Use the native Uxn implementation
     #[clap(long)]
-    jit: bool,
+    native: bool,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -41,12 +41,12 @@ fn main() -> Result<()> {
     let mut vm = Uxn::new(
         &rom,
         &mut ram,
-        if args.jit {
+        if args.native {
             #[cfg(not(target_arch = "aarch64"))]
-            anyhow::bail!("no JIT compiler implemented for this arch");
+            anyhow::bail!("no native implementation for this arch");
 
             #[cfg(target_arch = "aarch64")]
-            Backend::Jit
+            Backend::Native
         } else {
             Backend::Interpreter
         },
