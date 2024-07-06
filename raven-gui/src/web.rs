@@ -14,8 +14,31 @@ use varvara::Varvara;
 pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
+    let window =
+        web_sys::window().ok_or_else(|| anyhow!("could not get window"))?;
+    let loc = window.location();
+    let hash = loc
+        .hash()
+        .map_err(|e| anyhow!("could not get location hash: {e:?}"))?;
+    let rom_name = hash.strip_prefix('#');
+
+    const ROMS: &[(&'static str, &'static [u8])] = &[
+        ("controller", include_bytes!("../../roms/controller.rom")),
+        ("screen", include_bytes!("../../roms/screen.rom")),
+        ("drool", include_bytes!("../../roms/drool.rom")),
+        ("audio", include_bytes!("../../roms/audio.rom")),
+        ("mandelbrot", include_bytes!("../../roms/mandelbrot.rom")),
+        ("bunnymark", include_bytes!("../../roms/bunnymark.rom")),
+        ("piano", include_bytes!("../../roms/piano.rom")),
+    ];
+
+    let rom = ROMS
+        .iter()
+        .find(|(name, _data)| Some(*name) == rom_name)
+        .map(|(_name, data)| *data)
+        .unwrap_or(include_bytes!("../../roms/controller.rom"));
+
     let ram = UxnRam::new();
-    let rom = include_bytes!("../../roms/controller.rom");
     let mut vm = Uxn::new(rom, ram.leak(), Backend::Interpreter);
     let mut dev = Varvara::new();
 
@@ -30,8 +53,6 @@ pub fn run() -> Result<()> {
     };
 
     info!("setting size to {width}, {height}");
-    let window =
-        web_sys::window().ok_or_else(|| anyhow!("could not get window"))?;
     let document = window
         .document()
         .ok_or_else(|| anyhow!("could not get document"))?;
@@ -57,23 +78,7 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::Node>()
         .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
 
-    let loc = window.location();
-    let hash = loc
-        .hash()
-        .map_err(|e| anyhow!("could not get location hash: {e:?}"))?;
-    let rom = hash.strip_prefix('#');
-
-    const ROMS: &[(&'static str, &'static [u8])] = &[
-        ("controller", include_bytes!("../../roms/controller.rom")),
-        ("screen", include_bytes!("../../roms/screen.rom")),
-        ("drool", include_bytes!("../../roms/drool.rom")),
-        ("audio", include_bytes!("../../roms/audio.rom")),
-        ("mandelbrot", include_bytes!("../../roms/mandelbrot.rom")),
-        ("bunnymark", include_bytes!("../../roms/bunnymark.rom")),
-        ("piano", include_bytes!("../../roms/piano.rom")),
-    ];
-    let (tx, rx) = mpsc::channel();
-    for (r, data) in ROMS {
+    for (r, _) in ROMS {
         let opt = document
             .create_element("option")
             .map_err(|e| anyhow!("could not create option: {e:?}"))?
@@ -81,13 +86,6 @@ pub fn run() -> Result<()> {
             .map_err(|e| {
                 anyhow!("could not convert example-selector: {e:?}")
             })?;
-        if Some(*r) == rom {
-            opt.set_selected(true);
-            info!("loading rom {r} from URL");
-            if tx.send(Event::LoadRom(data.to_vec())).is_err() {
-                warn!("error loading rom");
-            }
-        }
         opt.set_text_content(Some(r));
         sel.append_child(&opt.get_root_node())
             .map_err(|e| anyhow!("could not append node: {e:?}"))?;
@@ -99,6 +97,7 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::HtmlSelectElement>()
         .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
 
+    let (tx, rx) = mpsc::channel();
     let tx_ = tx.clone();
     let a = Closure::<dyn FnMut()>::new(move || match sel.selected_index() {
         0 => (),
@@ -159,8 +158,13 @@ pub fn run() -> Result<()> {
                 "varvara",
                 options,
                 Box::new(move |cc| {
-                    let mut s =
-                        Box::new(Stage::new(vm, dev, None, rx, &cc.egui_ctx));
+                    let mut s = Box::new(Stage::new(
+                        vm,
+                        dev,
+                        Some(1.0),
+                        rx,
+                        &cc.egui_ctx,
+                    ));
                     s.set_resize_callback(resize_closure);
                     s
                 }),
