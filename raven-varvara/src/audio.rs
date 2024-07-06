@@ -218,10 +218,15 @@ pub struct StreamData {
 
     /// Set in the audio thread when the note is done
     done: Arc<AtomicBool>,
+
+    /// Flag to mute the audio stream from the GUI
+    ///
+    /// This is read-only in the [`StreamData`] and set by the parent
+    muted: Arc<AtomicBool>,
 }
 
-impl Default for StreamData {
-    fn default() -> Self {
+impl StreamData {
+    fn new(muted: Arc<AtomicBool>) -> Self {
         Self {
             samples: vec![],
             crossfade: VecDeque::new(),
@@ -236,11 +241,10 @@ impl Default for StreamData {
             right: 0.0,
             envelope: Envelope(0.into()),
             done: Arc::new(AtomicBool::new(false)),
+            muted,
         }
     }
-}
 
-impl StreamData {
     /// Fills the buffer with stream data
     pub fn next(&mut self, data: &mut [f32]) {
         self.duration -= (data.len() / 2) as f32 / SAMPLE_RATE as f32 * 1000.0;
@@ -248,6 +252,7 @@ impl StreamData {
             self.done.store(true, Ordering::Relaxed);
         }
         let mut i = 0;
+        let muted = self.muted.load(Ordering::Relaxed);
 
         while i < data.len() {
             let wrap = self.samples.len() as f32;
@@ -276,6 +281,7 @@ impl StreamData {
             };
 
             static_assertions::const_assert!(CHANNELS == 1 || CHANNELS == 2);
+            let d = if muted { 0.0 } else { d };
             match CHANNELS {
                 1 => data[i] = d,
                 2 => {
@@ -330,24 +336,33 @@ impl StreamData {
 
 pub struct Audio {
     streams: [Stream; DEV_COUNT as usize],
+
+    /// Flag to mute the audio stream from the GUI
+    muted: Arc<AtomicBool>,
 }
 
 impl Audio {
     pub fn new() -> Self {
-        let stream_data =
-            [(); 4].map(|_| Arc::new(Mutex::new(StreamData::default())));
+        let muted = Arc::new(AtomicBool::new(false));
+        let stream_data = [(); 4]
+            .map(|_| Arc::new(Mutex::new(StreamData::new(muted.clone()))));
         let streams = [0, 1, 2, 3].map(|i| Stream {
             done: stream_data[i].lock().unwrap().done.clone(),
             data: stream_data[i].clone(),
         });
 
-        Audio { streams }
+        Audio { streams, muted }
+    }
+
+    /// Sets the global mute flag
+    pub fn set_muted(&mut self, m: bool) {
+        self.muted.store(m, Ordering::Relaxed);
     }
 
     /// Resets the audio stream data, preserving the same allocation
     pub fn reset(&mut self) {
         for s in &self.streams {
-            *s.data.lock().unwrap() = StreamData::default();
+            *s.data.lock().unwrap() = StreamData::new(self.muted.clone());
             s.done.store(false, Ordering::Relaxed);
         }
     }
@@ -426,6 +441,7 @@ impl Audio {
                     } else {
                         Stage::Decay
                     },
+                    muted: self.muted.clone(),
                 };
             }
         }

@@ -85,11 +85,12 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::HtmlSelectElement>()
         .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
 
+    let tx_ = tx.clone();
     let a = Closure::<dyn FnMut()>::new(move || match sel.selected_index() {
         0 => (),
         i => {
             if let Some((_, r)) = ROMS.get(i as usize - 1) {
-                if tx.send(Event::LoadRom(r.to_vec())).is_err() {
+                if tx_.send(Event::LoadRom(r.to_vec())).is_err() {
                     warn!("error loading rom");
                 }
             } else {
@@ -107,20 +108,28 @@ pub fn run() -> Result<()> {
 
     let mut _audio = None;
     let mut audio_data = Some(dev.audio_streams());
+    let audio_check = document
+        .get_element_by_id("audio-check")
+        .ok_or_else(|| anyhow!("could not find audio-check"))?
+        .dyn_into::<web_sys::HtmlElement>()
+        .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
     let a = Closure::<dyn FnMut()>::new(move || {
         if let Some(d) = audio_data.take() {
             info!("setting up audio");
             _audio = Some(audio_setup(d));
-
-            let div = document
-                .get_element_by_id("audio")
-                .expect("could not get audio warning")
-                .dyn_into::<web_sys::HtmlElement>()
-                .expect("could not cast to HtmlElement");
-            div.style().set_css_text("color: #aaa");
+        }
+        let audio_check = document
+            .get_element_by_id("audio-check")
+            .ok_or_else(|| anyhow!("could not find audio-check"))
+            .unwrap()
+            .dyn_into::<web_sys::HtmlInputElement>()
+            .map_err(|e| anyhow!("could not cast to HtmlInputElement: {e:?}"))
+            .unwrap();
+        if tx.send(Event::SetMuted(!audio_check.checked())).is_err() {
+            warn!("error setting muted flag");
         }
     });
-    div.set_onclick(Some(a.as_ref().unchecked_ref()));
+    audio_check.set_onclick(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
     let resize_closure = Box::new(move |width: u16, height: u16| {

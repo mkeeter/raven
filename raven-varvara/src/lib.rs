@@ -307,4 +307,9 @@ impl Varvara {
     pub fn audio_streams(&self) -> [Arc<Mutex<audio::StreamData>>; 4] {
         [0, 1, 2, 3].map(|i| self.audio.stream(i))
     }
+
+    /// Sets the global mute flag for audio
+    pub fn audio_set_muted(&mut self, m: bool) {
+        self.audio.set_muted(m)
+    }
 }

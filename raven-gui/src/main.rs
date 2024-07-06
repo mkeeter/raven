@@ -12,6 +12,7 @@ use log::{error, info};
 #[derive(Debug)]
 pub enum Event {
     LoadRom(Vec<u8>),
+    SetMuted(bool),
 }
 
 pub struct Stage<'a> {
@@ -106,6 +107,9 @@ impl eframe::App for Stage<'_> {
                     if let Err(e) = self.load_rom(&data) {
                         error!("could not load rom: {e:?}");
                     }
+                }
+                Event::SetMuted(m) => {
+                    self.dev.audio_set_muted(m);
                 }
             }
         }
