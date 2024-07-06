@@ -26,3 +26,20 @@ The Varvara implementation (`raven-varvara`) includes all peripherals, and has
 been tested on many of the
 [flagship applications](https://wiki.xxiivv.com/site/roms.html)
 (Left, Orca, Noodle, Potato).
+
+--------------------------------------------------------------------------------
+
+The repository includes two applications built on these libraries:
+
+- `raven-cli` is a command-line application to run console-based ROMs
+- `raven-gui` is a full-fledged GUI, which runs both as a native application and
+  [on the web](https://mattkeeter.com/projects/raven/demo)
+
+--------------------------------------------------------------------------------
+
+© 2024 Matthew Keeter  
+Released under the [Mozilla Public License 2.0](https://github.com/mkeeter/fidget/blob/main/LICENSE.txt)
+
+The repository includes ROMs compiled from the `uxnemu` reference
+implementation, which are © Devine Lu Linvega and released under the MIT
+license; see the [`roms/`](roms/) subfolder for details.

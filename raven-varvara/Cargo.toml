@@ -2,6 +2,11 @@
 name = "raven-varvara"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
+repository = "https://github.com/mkeeter/raven"
+description = "Varvara Ordinator"
+authors = ["Matt Keeter <matt.j.keeter@gmail.com"]
+readme = "../README.md"
 
 [dependencies]
 chrono.workspace = true
