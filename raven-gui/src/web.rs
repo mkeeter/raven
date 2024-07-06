@@ -4,8 +4,10 @@ use eframe::{
     wasm_bindgen::{closure::Closure, JsCast},
     web_sys,
 };
-use log::{info, warn};
+use log::{error, info};
 use std::sync::mpsc;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::js_sys::Uint8Array;
 
 use crate::{audio_setup, Event, Stage};
 use uxn::{Backend, Uxn, UxnRam};
@@ -104,10 +106,10 @@ pub fn run() -> Result<()> {
         i => {
             if let Some((name, r)) = ROMS.get(i as usize - 1) {
                 if tx_.send(Event::LoadRom(r.to_vec())).is_err() {
-                    warn!("error loading rom");
+                    error!("error loading rom");
                 }
                 if let Err(e) = loc.set_hash(&format!("#{name}")) {
-                    warn!("could not update URL hash: {e:?}");
+                    error!("could not update URL hash: {e:?}");
                 }
             }
         }
@@ -118,6 +120,56 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::HtmlSelectElement>()
         .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
     sel.set_onchange(Some(a.as_ref().unchecked_ref()));
+    std::mem::forget(a);
+
+    let file_load = document
+        .get_element_by_id("load-file")
+        .ok_or_else(|| anyhow!("could not find load-file"))?
+        .dyn_into::<web_sys::HtmlInputElement>()
+        .map_err(|e| anyhow!("could not convert load-file: {e:?}"))?;
+    let tx_ = tx.clone();
+    let a =
+        Closure::<dyn FnMut(web_sys::Event)>::new(move |e: web_sys::Event| {
+            let Some(t) = e.target() else {
+                error!("could not get target from event");
+                return;
+            };
+            let t = t.dyn_into::<web_sys::HtmlInputElement>().unwrap();
+            let Some(f) = t.files() else {
+                error!("could not get file list");
+                return;
+            };
+            let Some(f) = f.item(0) else {
+                error!("could not get file");
+                return;
+            };
+            log::info!("got files {f:?}");
+            let fut = JsFuture::from(f.array_buffer());
+            let tx_ = tx_.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let v = fut.await;
+                let v = match v {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("could not wait for future: {e:?}");
+                        return;
+                    }
+                };
+                let Ok(buf) = v.dyn_into::<web_sys::js_sys::ArrayBuffer>()
+                else {
+                    error!("could not cast to ArrayBuffer");
+                    return;
+                };
+                let buf = Uint8Array::new(&buf);
+                let mut dst = vec![0; buf.length() as usize];
+                buf.copy_to(&mut dst);
+                if tx_.send(Event::LoadRom(dst)).is_err() {
+                    error!("error loading rom");
+                }
+                log::info!("got result {buf:?}");
+            });
+        });
+    file_load.set_onchange(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
     let mut _audio = None;
@@ -140,7 +192,7 @@ pub fn run() -> Result<()> {
             .map_err(|e| anyhow!("could not cast to HtmlInputElement: {e:?}"))
             .unwrap();
         if tx.send(Event::SetMuted(!audio_check.checked())).is_err() {
-            warn!("error setting muted flag");
+            error!("error setting muted flag");
         }
     });
     audio_check.set_onclick(Some(a.as_ref().unchecked_ref()));

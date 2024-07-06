@@ -37,7 +37,7 @@
             float: right;
             display: block;
         }
-        .txt {
+        .below {
             float: left;
             clear: both;
         }
@@ -45,6 +45,11 @@
             margin-top: 5px;
             line-height: 1.4;
         }
+        /*
+         * egui sets `cursor: none` for the entire body :(
+         * We can improve the situation somewhat by showing the cursor in the
+         * footer of the page, but it's still not great
+         */
         #footer {
             cursor: auto;
         }
@@ -70,7 +75,10 @@
             <input type="checkbox" id="audio-check" name="audio" />
             <label for="audio">Audio</label>
         </div>
-        <div class="txt">
+        <div class="below">
+            <input id="load-file" type="file">
+        </div>
+        <div class="below">
             <p>
             Examples are from the <a href="https://git.sr.ht/~rabbits/uxn/">
             <code>uxn</code> reference implementation</a></p>
