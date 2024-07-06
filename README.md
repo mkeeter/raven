@@ -7,7 +7,7 @@ For details, see [the project writeup](https://mattkeeter.com/projects/raven).
 
 --------------------------------------------------------------------------------
 
-The `raven-uxn` crate implements two implementations of the Uxn CPU:
+The `raven-uxn` crate includes two implementations of the Uxn CPU:
 
 - The safe interpreter is a `#[no_std]` crate written in 100% safe Rust, with a
   single dependency (`zerocopy`).  It is 10-20% faster than
