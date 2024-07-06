@@ -182,7 +182,7 @@ pub fn run() -> Result<()> {
     let a = Closure::<dyn FnMut()>::new(move || {
         if let Some(d) = audio_data.take() {
             info!("setting up audio");
-            _audio = Some(audio_setup(d));
+            _audio = audio_setup(d);
         }
         let audio_check = document
             .get_element_by_id("audio-check")

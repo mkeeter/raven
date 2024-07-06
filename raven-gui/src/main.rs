@@ -281,7 +281,7 @@ impl eframe::App for Stage<'_> {
 
 pub fn audio_setup(
     data: [Arc<Mutex<varvara::StreamData>>; 4],
-) -> (cpal::Device, [cpal::Stream; 4]) {
+) -> Option<(cpal::Device, [cpal::Stream; 4])> {
     use cpal::traits::{DeviceTrait, HostTrait};
     let host = cpal::default_host();
     let device = host
@@ -291,12 +291,35 @@ pub fn audio_setup(
         .supported_output_configs()
         .expect("error while querying configs");
 
-    let supported_config = supported_configs_range
+    let Some(supported_config) = supported_configs_range
         .find_map(|c| {
             c.try_with_sample_rate(cpal::SampleRate(AUDIO_SAMPLE_RATE))
         })
         .filter(|c| usize::from(c.channels()) == AUDIO_CHANNELS)
-        .expect("no supported config?");
+    else {
+        error!(
+            "could not find supported audio config ({} channels, {} Hz)",
+            AUDIO_CHANNELS, AUDIO_SAMPLE_RATE
+        );
+        error!("available configs:");
+        for c in device.supported_output_configs().unwrap() {
+            if c.min_sample_rate() == c.max_sample_rate() {
+                error!(
+                    "  channels: {}, sample_rate: {} Hz",
+                    c.channels(),
+                    c.min_sample_rate().0,
+                );
+            } else {
+                error!(
+                    "  channels: {}, sample_rate: {} - {} Hz",
+                    c.channels(),
+                    c.min_sample_rate().0,
+                    c.max_sample_rate().0,
+                );
+            }
+        }
+        return None;
+    };
     let config = supported_config.config();
 
     let streams = data.map(|d| {
@@ -315,7 +338,7 @@ pub fn audio_setup(
         stream.play().unwrap();
         stream
     });
-    (device, streams)
+    Some((device, streams))
 }
 
 fn decode_key(k: egui::Key, shift: bool) -> Option<Key> {
