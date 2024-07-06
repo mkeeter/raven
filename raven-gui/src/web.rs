@@ -30,8 +30,9 @@ pub fn run() -> Result<()> {
     };
 
     info!("setting size to {width}, {height}");
-    let document = web_sys::window()
-        .ok_or_else(|| anyhow!("could not get window"))?
+    let window =
+        web_sys::window().ok_or_else(|| anyhow!("could not get window"))?;
+    let document = window
         .document()
         .ok_or_else(|| anyhow!("could not get document"))?;
     let div = document
@@ -56,6 +57,12 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::Node>()
         .map_err(|e| anyhow!("could not convert example-selector: {e:?}"))?;
 
+    let loc = window.location();
+    let hash = loc
+        .hash()
+        .map_err(|e| anyhow!("could not get location hash: {e:?}"))?;
+    let rom = hash.strip_prefix('#');
+
     const ROMS: &[(&'static str, &'static [u8])] = &[
         ("controller", include_bytes!("../../roms/controller.rom")),
         ("screen", include_bytes!("../../roms/screen.rom")),
@@ -65,7 +72,8 @@ pub fn run() -> Result<()> {
         ("bunnymark", include_bytes!("../../roms/bunnymark.rom")),
         ("piano", include_bytes!("../../roms/piano.rom")),
     ];
-    for (r, _) in ROMS {
+    let (tx, rx) = mpsc::channel();
+    for (r, data) in ROMS {
         let opt = document
             .create_element("option")
             .map_err(|e| anyhow!("could not create option: {e:?}"))?
@@ -73,12 +81,18 @@ pub fn run() -> Result<()> {
             .map_err(|e| {
                 anyhow!("could not convert example-selector: {e:?}")
             })?;
+        if Some(*r) == rom {
+            opt.set_selected(true);
+            info!("loading rom {r} from URL");
+            if tx.send(Event::LoadRom(data.to_vec())).is_err() {
+                warn!("error loading rom");
+            }
+        }
         opt.set_text_content(Some(r));
         sel.append_child(&opt.get_root_node())
             .map_err(|e| anyhow!("could not append node: {e:?}"))?;
     }
 
-    let (tx, rx) = mpsc::channel();
     let sel = document
         .get_element_by_id("example-selector")
         .ok_or_else(|| anyhow!("could not find example-selector"))?
@@ -89,12 +103,13 @@ pub fn run() -> Result<()> {
     let a = Closure::<dyn FnMut()>::new(move || match sel.selected_index() {
         0 => (),
         i => {
-            if let Some((_, r)) = ROMS.get(i as usize - 1) {
+            if let Some((name, r)) = ROMS.get(i as usize - 1) {
                 if tx_.send(Event::LoadRom(r.to_vec())).is_err() {
                     warn!("error loading rom");
                 }
-            } else {
-                warn!("invalid selection: {i}");
+                if let Err(e) = loc.set_hash(&format!("#{name}")) {
+                    warn!("could not update URL hash: {e:?}");
+                }
             }
         }
     });
