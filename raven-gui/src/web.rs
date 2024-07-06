@@ -42,6 +42,13 @@ pub fn run() -> Result<()> {
         .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
     div.style()
         .set_css_text(&format!("width: {width}px; height: {height}px"));
+    let footer = document
+        .get_element_by_id("footer")
+        .ok_or_else(|| anyhow!("could not find footer div"))?;
+    let footer = footer
+        .dyn_into::<web_sys::HtmlElement>()
+        .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
+    footer.style().set_css_text(&format!("width: {width}px"));
 
     let sel = document
         .get_element_by_id("example-selector")
@@ -119,6 +126,7 @@ pub fn run() -> Result<()> {
     let resize_closure = Box::new(move |width: u16, height: u16| {
         div.style()
             .set_css_text(&format!("width: {width}px; height: {height}px"));
+        footer.style().set_css_text(&format!("width: {width}px"));
     });
 
     wasm_bindgen_futures::spawn_local(async {

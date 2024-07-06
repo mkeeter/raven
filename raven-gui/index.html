@@ -26,6 +26,13 @@
         canvas {
             display: block;
         }
+        #examples {
+            float: left;
+            margin-left: 0px;
+        }
+        #audio {
+            float: right;
+        }
     </style>
 </head>
 
@@ -37,11 +44,13 @@
     <div id="box" style="width: 512px; height: 320px">
         <canvas id="varvara" style="width: 512px; height: 320px"></canvas>
     </div>
-    <div id="audio">(click for audio)</div>
-    <div>
-        <select name="Examples" id="example-selector">
-            <option value="0">Load example...</option>
-        </select>
+    <div id="footer">
+        <div id="examples">
+            <select name="Examples" id="example-selector">
+                <option value="0">Load example...</option>
+            </select>
+        </div>
+        <div id="audio">(click for audio)</div>
     </div>
 </body>
 
