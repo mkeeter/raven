@@ -287,34 +287,37 @@ pub fn audio_setup(
     let device = host
         .default_output_device()
         .expect("no output device available");
-    let mut supported_configs_range = device
+    let supported_configs_range = device
         .supported_output_configs()
         .expect("error while querying configs");
 
     let Some(supported_config) = supported_configs_range
+        .filter(|c| usize::from(c.channels()) == AUDIO_CHANNELS)
+        .filter(|c| c.sample_format() == cpal::SampleFormat::F32)
         .find_map(|c| {
             c.try_with_sample_rate(cpal::SampleRate(AUDIO_SAMPLE_RATE))
         })
-        .filter(|c| usize::from(c.channels()) == AUDIO_CHANNELS)
     else {
         error!(
-            "could not find supported audio config ({} channels, {} Hz)",
+            "could not find supported audio config ({} channels, {} Hz, f32)",
             AUDIO_CHANNELS, AUDIO_SAMPLE_RATE
         );
         error!("available configs:");
         for c in device.supported_output_configs().unwrap() {
             if c.min_sample_rate() == c.max_sample_rate() {
                 error!(
-                    "  channels: {}, sample_rate: {} Hz",
+                    "  channels: {}, sample_rate: {} Hz, {}",
                     c.channels(),
                     c.min_sample_rate().0,
+                    c.sample_format(),
                 );
             } else {
                 error!(
-                    "  channels: {}, sample_rate: {} - {} Hz",
+                    "  channels: {}, sample_rate: {} - {} Hz, {}",
                     c.channels(),
                     c.min_sample_rate().0,
                     c.max_sample_rate().0,
+                    c.sample_format(),
                 );
             }
         }
