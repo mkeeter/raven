@@ -139,6 +139,9 @@ pub struct Screen {
 
     /// Flag indicating whether `buffer` should be recalculated
     changed: bool,
+
+    /// Color palette
+    colors: [u32; 4],
 }
 
 impl Screen {
@@ -154,6 +157,7 @@ impl Screen {
             width: WIDTH,
             height: HEIGHT,
             changed: true,
+            colors: [0; 4],
         }
     }
 
@@ -177,12 +181,15 @@ impl Screen {
 
     /// Gets the current frame, returning a `(buffer, width, height)` tuple
     pub fn frame(&mut self, vm: &Uxn) -> &[u8] {
+        let prev_colors = self.colors;
+        let sys = vm.dev::<crate::system::SystemPorts>();
+        self.colors = [0, 1, 2, 3].map(|i| sys.color(i));
+        self.changed |= prev_colors != self.colors;
+
         if std::mem::take(&mut self.changed) {
-            let sys = vm.dev::<crate::system::SystemPorts>();
-            let colors = [0, 1, 2, 3].map(|i| sys.color(i));
             for (p, o) in self.pixels.iter().zip(self.buffer.chunks_mut(4)) {
                 o.copy_from_slice(
-                    &colors[(p.get() & 0b11) as usize].to_le_bytes(),
+                    &self.colors[(p.get() & 0b11) as usize].to_le_bytes(),
                 );
             }
         }

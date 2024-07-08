@@ -39,7 +39,6 @@ fn main() -> Result<()> {
 
     let mut ram = UxnRam::new();
     let mut vm = Uxn::new(
-        &rom,
         &mut ram,
         if args.native {
             #[cfg(not(target_arch = "aarch64"))]
@@ -52,6 +51,8 @@ fn main() -> Result<()> {
         },
     );
     let mut dev = Varvara::new();
+    let data = vm.reset(&rom);
+    dev.reset(data);
 
     // Run the reset vector
     let start = std::time::Instant::now();

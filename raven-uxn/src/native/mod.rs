@@ -720,9 +720,13 @@ mod test {
                 ram_interp[i] = i as u8;
             }
         }
-        let mut vm_native = Uxn::new(&cmd, &mut ram_native, Backend::Native);
-        let mut vm_interp =
-            Uxn::new(&cmd, &mut ram_interp, Backend::Interpreter);
+        let mut vm_native = Uxn::new(&mut ram_native, Backend::Native);
+        let r = vm_native.reset(&cmd);
+        assert!(r.is_empty());
+
+        let mut vm_interp = Uxn::new(&mut ram_interp, Backend::Interpreter);
+        let r = vm_interp.reset(&cmd);
+        assert!(r.is_empty());
 
         let pc_native = vm_native.run(&mut dev, 0x100);
         let pc_interp = vm_interp.run(&mut dev, 0x100);

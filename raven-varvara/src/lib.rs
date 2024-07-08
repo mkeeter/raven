@@ -169,12 +169,12 @@ impl Varvara {
         }
     }
 
-    /// Resets the CPU
+    /// Resets the CPU, loading extra data into expansion memory
     ///
     /// Note that the audio stream handles are unchanged, so any audio worker
     /// threads can continue to run.
-    pub fn reset(&mut self) {
-        self.system = system::System::new();
+    pub fn reset(&mut self, extra: &[u8]) {
+        self.system.reset(extra);
         self.console = console::Console::new();
         self.audio.reset();
         self.screen = screen::Screen::new();

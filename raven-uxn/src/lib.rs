@@ -307,24 +307,15 @@ macro_rules! op_bin {
 }
 
 impl<'a> Uxn<'a> {
-    /// Build a new `Uxn`, loading the given ROM at the start address
-    ///
-    /// # Panics
-    /// If `rom` cannot fit in memory
-    pub fn new<'b>(
-        rom: &'b [u8],
-        ram: &'a mut [u8; 65536],
-        backend: Backend,
-    ) -> Self {
-        let out = Self {
+    /// Build a new `Uxn` with zeroed memory
+    pub fn new(ram: &'a mut [u8; 65536], backend: Backend) -> Self {
+        Self {
             dev: [0u8; 256],
             ram,
             stack: Stack::default(),
             ret: Stack::default(),
             backend,
-        };
-        out.ram[0x100..][..rom.len()].copy_from_slice(rom);
-        out
+        }
     }
 
     /// Reads a byte from RAM at the program counter
@@ -487,12 +478,16 @@ impl<'a> Uxn<'a> {
     }
 
     /// Resets system memory and loads the given ROM
-    pub fn reset(&mut self, rom: &[u8]) {
+    ///
+    /// Returns trailing ROM data (or an empty slice)
+    pub fn reset<'b>(&mut self, rom: &'b [u8]) -> &'b [u8] {
         self.dev.fill(0);
         self.ram.fill(0);
         self.stack = Stack::default();
         self.ret = Stack::default();
-        self.ram[0x100..][..rom.len()].copy_from_slice(rom);
+        let n = (self.ram.len() - 0x100).min(rom.len());
+        self.ram[0x100..][..n].copy_from_slice(&rom[..n]);
+        &rom[n..]
     }
 
     /// Asserts that the given [`Ports`] object is of size [`DEV_SIZE`]
@@ -2086,7 +2081,7 @@ mod test {
 
     fn parse_and_test(s: &str) {
         let mut ram = UxnRam::new();
-        let mut vm = Uxn::new(&[], &mut ram, Backend::Interpreter);
+        let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
         let mut iter = s.split_whitespace();
         let mut op = None;
         let mut dev = EmptyDevice;

@@ -245,6 +245,11 @@ impl StreamData {
         }
     }
 
+    /// Safely reads a sample, returning 0 if it's not valid
+    fn get_sample(&self, f: usize) -> f32 {
+        self.samples.get(f).cloned().unwrap_or(0) as f32
+    }
+
     /// Fills the buffer with stream data
     pub fn next(&mut self, data: &mut [f32]) {
         self.duration -= (data.len() / 2) as f32 / SAMPLE_RATE as f32 * 1000.0;
@@ -266,8 +271,8 @@ impl StreamData {
             }
 
             let d = if valid {
-                let lo = self.samples[self.pos.floor() as usize] as f32;
-                let hi = self.samples[(self.pos.ceil() % wrap) as usize] as f32;
+                let lo = self.get_sample(self.pos.floor() as usize);
+                let hi = self.get_sample((self.pos.ceil() % wrap) as usize);
                 let frac = self.pos % 1.0;
 
                 let mut d = hi * frac + lo * (1.0 - frac);

@@ -89,8 +89,8 @@ impl<'a> Stage<'a> {
     }
 
     fn load_rom(&mut self, data: &[u8]) -> Result<()> {
-        self.vm.reset(data);
-        self.dev.reset();
+        let data = self.vm.reset(data);
+        self.dev.reset(data);
         self.vm.run(&mut self.dev, 0x100);
         self.needs_resize = true;
         let out = self.dev.output(&self.vm);

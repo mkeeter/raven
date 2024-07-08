@@ -47,7 +47,6 @@ pub fn run() -> Result<()> {
 
     let ram = UxnRam::new();
     let mut vm = Uxn::new(
-        &rom,
         ram.leak(),
         if args.native {
             #[cfg(not(target_arch = "aarch64"))]
@@ -60,6 +59,8 @@ pub fn run() -> Result<()> {
         },
     );
     let mut dev = Varvara::new();
+    let extra = vm.reset(&rom);
+    dev.reset(extra);
 
     let _audio = audio_setup(dev.audio_streams());
 

@@ -83,6 +83,17 @@ impl System {
         Self { banks, exit: None }
     }
 
+    /// Resets the peripheral, loading the given data into expansion memory
+    pub fn reset(&mut self, mut mem: &[u8]) {
+        for b in &mut self.banks {
+            let n = mem.len().min(b.len());
+            b[..n].copy_from_slice(&mem[..n]);
+            mem = &mem[n..];
+            b[n..].fill(0u8);
+        }
+        self.exit = None;
+    }
+
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<SystemPorts>();
         match target {
