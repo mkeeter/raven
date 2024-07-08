@@ -1,36 +1,3 @@
-; x0 - *EntryHandle
-; x1 - pc
-; x2 - table
-.global _aarch64_entry
-_aarch64_entry:
-    sub sp, sp, #0x200  ; make room in the stack
-    stp   x29, x30, [sp, 0x0]   ; store stack and frame pointer
-    mov   x29, sp
-
-    // Unpack from EntryHandle into registers
-    mov x5, x1 ; move PC (before overwriting x1)
-    mov x8, x2 ; jump table (before overwriting x2)
-    ldr x1, [x0, 0x8]  ; stack index pointer
-    ldr x2, [x0, 0x10] ; ret data pointer
-    ldr x3, [x0, 0x18] ; ret index pointer
-    ldr x4, [x0, 0x20] ; RAM pointer
-    ldr x6, [x0, 0x28] ; *mut Uxn
-    ldr x7, [x0, 0x30] ; *mut DeviceHandle
-    ldr x0, [x0, 0x00] ; stack data pointer (overwriting *EntryHandle)
-
-    ; Convert from index pointers to index values in w1 / w3
-    stp x1, x3, [sp, 0x10]      ; save stack index pointers
-    ldrb w1, [x1]               ; load stack index
-    ldrb w3, [x3]               ; load ret index
-
-    ; Jump into the instruction list
-    ldrb w9, [x4, x5]           ; load next opcode
-    add x5, x5, #1              ; update pc
-    and x5, x5, #0xffff         ; wrap to RAM size
-    ldr x10, [x8, x9, LSL #3]   ; load next opcode target
-    br x10                      ; jump to the code!
-
-
 ; x0 - stack pointer (&mut [u8; 256])
 ; x1 - stack index (u8)
 ; x2 - return stack pointer (&mut [u8; 256])
@@ -113,6 +80,34 @@ _aarch64_entry:
     ldrb w1, [x11]
     ldrb w3, [x12]
 .endm
+
+; x0 - *EntryHandle
+; x1 - pc
+; x2 - table
+.global _aarch64_entry
+_aarch64_entry:
+    sub sp, sp, #0x200  ; make room in the stack
+    stp   x29, x30, [sp, 0x0]   ; store stack and frame pointer
+    mov   x29, sp
+
+    // Unpack from EntryHandle into registers
+    mov x5, x1 ; move PC (before overwriting x1)
+    mov x8, x2 ; jump table (before overwriting x2)
+    ldr x1, [x0, 0x8]  ; stack index pointer
+    ldr x2, [x0, 0x10] ; ret data pointer
+    ldr x3, [x0, 0x18] ; ret index pointer
+    ldr x4, [x0, 0x20] ; RAM pointer
+    ldr x6, [x0, 0x28] ; *mut Uxn
+    ldr x7, [x0, 0x30] ; *mut DeviceHandle
+    ldr x0, [x0, 0x00] ; stack data pointer (overwriting *EntryHandle)
+
+    ; Convert from index pointers to index values in w1 / w3
+    stp x1, x3, [sp, 0x10]      ; save stack index pointers
+    ldrb w1, [x1]               ; load stack index
+    ldrb w3, [x3]               ; load ret index
+
+    ; Jump into the instruction list
+    next
 
 .global _BRK
 _BRK:
