@@ -41,8 +41,10 @@ pub fn run() -> Result<()> {
         .unwrap_or(include_bytes!("../../roms/controller.rom"));
 
     let ram = UxnRam::new();
-    let mut vm = Uxn::new(rom, ram.leak(), Backend::Interpreter);
+    let mut vm = Uxn::new(ram.leak(), Backend::Interpreter);
     let mut dev = Varvara::new();
+    let extra = vm.reset(&rom);
+    dev.reset(extra);
 
     // Run the reset vector
     vm.run(&mut dev, 0x100);
