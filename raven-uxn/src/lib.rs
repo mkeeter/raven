@@ -479,7 +479,9 @@ impl<'a> Uxn<'a> {
 
     /// Resets system memory and loads the given ROM
     ///
-    /// Returns trailing ROM data (or an empty slice)
+    /// Returns trailing ROM data (or an empty slice), which should be loaded
+    /// into extension memory.
+    #[must_use]
     pub fn reset<'b>(&mut self, rom: &'b [u8]) -> &'b [u8] {
         self.dev.fill(0);
         self.ram.fill(0);
