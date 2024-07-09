@@ -91,7 +91,16 @@ impl Output<'_> {
     pub fn check(&self) -> std::io::Result<()> {
         self.print()?;
         if let Some(e) = self.exit {
+            log::info!("requested exit ({e})");
+
+            #[cfg(not(target_arch = "wasm32"))]
             std::process::exit(e);
+
+            #[cfg(target_arch = "wasm32")]
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "exit requested",
+            ));
         }
         Ok(())
     }
