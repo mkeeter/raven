@@ -81,6 +81,11 @@
     ldrb w3, [x12]
 .endm
 
+.macro opcode, op
+    .global \op
+    \op:
+.endm
+
 ; x0 - *EntryHandle
 ; x1 - pc
 ; x2 - table
@@ -109,8 +114,7 @@ _aarch64_entry:
     ; Jump into the instruction list
     next
 
-.global _BRK
-_BRK:
+opcode _BRK
     ; Write index values back through index pointers
     ldp x9, x10, [sp, 0x10]     ; restore stack index pointers
     strb w1, [x9]               ; save stack index
@@ -122,35 +126,30 @@ _BRK:
     mov x0, x5 ; return PC from function
     ret
 
-.global _INC
-_INC:
+opcode _INC
     ldrb w9, [x0, x1]
     add w9, w9, #1
     strb w9, [x0, x1]
     next
 
-.global _POP
-_POP:
+opcode _POP
     pop
     next
 
-.global _NIP
-_NIP:
+opcode _NIP
     ldrb w9, [x0, x1]   ; get the top byte
     pop
     strb w9, [x0, x1]   ; overwrite the previous byte
     next
 
-.global _SWP
-_SWP:
+opcode _SWP
     ldrb w10, [x0, x1]   ; get the top byte
     peek w11, x9, 1      ; get the second-from-top byte
     strb w10, [x0, x9]   ; do the swap!
     strb w11, [x0, x1]
     next
 
-.global _ROT
-_ROT:
+opcode _ROT
     ; a b c -- b c a
     ldrb w10, [x0, x1] ; c
     peek w12, x11, 1
@@ -162,14 +161,12 @@ _ROT:
 
     next
 
-.global _DUP
-_DUP:
+opcode _DUP
     ldrb w10, [x0, x1]   ; get the top byte
     push w10
     next
 
-.global _OVR
-_OVR:
+opcode _OVR
     peek w10, x10, 1
     push w10
     next
@@ -184,32 +181,26 @@ _OVR:
     next
 .endm
 
-.global _EQU
-_EQU:
+opcode _EQU
     compare_op eq
 
-.global _NEQ
-_NEQ:
+opcode _NEQ
     compare_op ne
 
-.global _GTH
-_GTH:
+opcode _GTH
     compare_op hi
 
-.global _LTH
-_LTH:
+opcode _LTH
     compare_op lo
 
-.global _JMP
-_JMP:
+opcode _JMP
     ldrsb x9, [x0, x1]
     pop
     add x5, x5, x9
     and x5, x5, 0xffff
     next
 
-.global _JCN
-_JCN:
+opcode _JCN
     ldrsb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -220,8 +211,7 @@ _JCN:
     and x5, x5, 0xffff
     next
 
-.global _JSR
-_JSR:
+opcode _JSR
     ldrsb w9, [x0, x1]
     pop
     lsr w10, w5, 8
@@ -231,23 +221,20 @@ _JSR:
     and x5, x5, 0xffff
     next
 
-.global _STH
-_STH:
+opcode _STH
     ldrb w9, [x0, x1]
     pop
     rpush w9
     next
 
-.global _LDZ
-_LDZ:
+opcode _LDZ
     ldrb w9, [x0, x1]
     pop
     ldrb w9, [x4, x9]
     push w9
     next
 
-.global _STZ
-_STZ:
+opcode _STZ
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -255,8 +242,7 @@ _STZ:
     strb w10, [x4, x9]
     next
 
-.global _LDR
-_LDR:
+opcode _LDR
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -264,8 +250,7 @@ _LDR:
     strb w9, [x0, x1] ; push to stack
     next
 
-.global _STR
-_STR:
+opcode _STR
     ldrsb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -275,8 +260,7 @@ _STR:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDA
-_LDA:
+opcode _LDA
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -285,8 +269,7 @@ _LDA:
     strb w12, [x0, x1]
     next
 
-.global _STA
-_STA:
+opcode _STA
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -297,15 +280,13 @@ _STA:
     strb w10, [x4, x12]
     next
 
-.global _DEI
-_DEI:
+opcode _DEI
     precall
     bl _dei_entry
     postcall
     next
 
-.global _DEO
-_DEO:
+opcode _DEO
     precall
     bl _deo_entry ; todo check return value for early exit?
     postcall
@@ -320,36 +301,28 @@ _DEO:
     next
 .endm
 
-.global _ADD
-_ADD:
+opcode _ADD
     binary_op add
 
-.global _SUB
-_SUB:
+opcode _SUB
     binary_op sub
 
-.global _MUL
-_MUL:
+opcode _MUL
     binary_op mul
 
-.global _DIV
-_DIV:
+opcode _DIV
     binary_op udiv
 
-.global _AND
-_AND:
+opcode _AND
     binary_op and
 
-.global _ORA
-_ORA:
+opcode _ORA
     binary_op orr
 
-.global _EOR
-_EOR:
+opcode _EOR
     binary_op eor
 
-.global _SFT
-_SFT:
+opcode _SFT
     ldrb w10, [x0, x1]
     pop
     ldrb w11, [x0, x1]
@@ -360,8 +333,7 @@ _SFT:
     strb w11, [x0, x1]
     next
 
-.global _JCI
-_JCI:
+opcode _JCI
     ldrb w9, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
@@ -377,8 +349,7 @@ _JCI:
     and x5, x5, 0xffff
     next
 
-.global _INC2
-_INC2:
+opcode _INC2
     ldrb w10, [x0, x1]  ; get the top byte
     peek w11, x9, 1     ; get the second-from-top byte
     orr w12, w10, w11, lsl #8
@@ -389,14 +360,12 @@ _INC2:
     strb w12, [x0, x9]
     next
 
-.global _POP2
-_POP2:
+opcode _POP2
     sub x1, x1, #2
     and x1, x1, #0xff
     next
 
-.global _NIP2
-_NIP2:
+opcode _NIP2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -407,8 +376,7 @@ _NIP2:
     strb w10, [x0, x11]
     next
 
-.global _SWP2
-_SWP2:
+opcode _SWP2
     ldrb w11, [x0, x1]   ; get the top byte
     peek w12, x9, 2       ; get the second-from-top byte
     strb w11, [x0, x9]   ; do the swap!
@@ -421,8 +389,7 @@ _SWP2:
 
     next
 
-.global _ROT2
-_ROT2:
+opcode _ROT2
     ldrb w10, [x0, x1]
     peek w12, x11, 2
     peek w14, x13, 4
@@ -439,16 +406,14 @@ _ROT2:
 
     next
 
-.global _DUP2
-_DUP2:
+opcode _DUP2
     ldrb w11, [x0, x1]
     peek w10, x10, 1
     push w10
     push w11
     next
 
-.global _OVR2
-_OVR2:
+opcode _OVR2
     peek w10, x9, 2
     peek w11, x9, 3
     push w11
@@ -471,24 +436,19 @@ _OVR2:
     next
 .endm
 
-.global _EQU2
-_EQU2:
+opcode _EQU2
     compare_op2 eq
 
-.global _NEQ2
-_NEQ2:
+opcode _NEQ2
     compare_op2 ne
 
-.global _GTH2
-_GTH2:
+opcode _GTH2
     compare_op2 hi
 
-.global _LTH2
-_LTH2:
+opcode _LTH2
     compare_op2 lo
 
-.global _JMP2
-_JMP2:
+opcode _JMP2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -496,8 +456,7 @@ _JMP2:
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _JCN2
-_JCN2:
+opcode _JCN2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -509,8 +468,7 @@ _JCN2:
     csel w5, w5, w9, eq ; choose the jump or not
     next
 
-.global _JSR2
-_JSR2:
+opcode _JSR2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -521,8 +479,7 @@ _JSR2:
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _STH2
-_STH2:
+opcode _STH2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -531,8 +488,7 @@ _STH2:
     rpush w9
     next
 
-.global _LDZ2
-_LDZ2:
+opcode _LDZ2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x4, x9]
@@ -543,8 +499,7 @@ _LDZ2:
     push w10
     next
 
-.global _STZ2
-_STZ2:
+opcode _STZ2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -557,8 +512,7 @@ _STZ2:
     strb w10, [x4, x9]
     next
 
-.global _LDR2
-_LDR2:
+opcode _LDR2
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -570,8 +524,7 @@ _LDR2:
     push w10
     next
 
-.global _STR2
-_STR2:
+opcode _STR2
     ldrsb w9, [x0, x1]
     pop
     ldrsb w10, [x0, x1]
@@ -586,8 +539,7 @@ _STR2:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDA2
-_LDA2:
+opcode _LDA2
     ldrb w9, [x0, x1]
     peek w10, x12, 1
     orr w9, w9, w10, lsl #8
@@ -600,8 +552,7 @@ _LDA2:
     strb w10, [x0, x1]
     next
 
-.global _STA2
-_STA2:
+opcode _STA2
     ldrb w9, [x0, x1]
     pop
     ldrb w10, [x0, x1]
@@ -617,15 +568,13 @@ _STA2:
     strb w10, [x4, x12]
     next
 
-.global _DEI2
-_DEI2:
+opcode _DEI2
     precall
     bl _dei_2_entry
     postcall
     next
 
-.global _DEO2
-_DEO2:
+opcode _DEO2
     precall
     bl _deo_2_entry ; todo check return value for early exit?
     postcall
@@ -650,36 +599,28 @@ _DEO2:
     next
 .endm
 
-.global _ADD2
-_ADD2:
+opcode _ADD2
     binary_op2 add
 
-.global _SUB2
-_SUB2:
+opcode _SUB2
     binary_op2 sub
 
-.global _MUL2
-_MUL2:
+opcode _MUL2
     binary_op2 mul
 
-.global _DIV2
-_DIV2:
+opcode _DIV2
     binary_op2 udiv
 
-.global _AND2
-_AND2:
+opcode _AND2
     binary_op2 and
 
-.global _ORA2
-_ORA2:
+opcode _ORA2
     binary_op2 orr
 
-.global _EOR2
-_EOR2:
+opcode _EOR2
     binary_op2 eor
 
-.global _SFT2
-_SFT2:
+opcode _SFT2
     ldrb w10, [x0, x1]
     pop
     ldrb w11, [x0, x1]
@@ -696,8 +637,7 @@ _SFT2:
     push w11
     next
 
-.global _JMI
-_JMI:
+opcode _JMI
     ldrb w9, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
@@ -709,36 +649,31 @@ _JMI:
     and x5, x5, 0xffff
     next
 
-.global _INCr
-_INCr:
+opcode _INCr
     ldrb w9, [x2, x3]
     add w9, w9, #1
     strb w9, [x2, x3]
     next
 
-.global _POPr
-_POPr:
+opcode _POPr
     sub x3, x3, #1
     and x3, x3, #0xff
     next
 
-.global _NIPr
-_NIPr:
+opcode _NIPr
     ldrb w9, [x2, x3]   ; get the top byte
     rpop
     strb w9, [x2, x3]   ; overwrite the previous byte
     next
 
-.global _SWPr
-_SWPr:
+opcode _SWPr
     ldrb w10, [x2, x3]  ; get the top byte
     rpeek w11, x9, 1    ; get the second-from-top byte
     strb w10, [x2, x9]  ; do the swap!
     strb w11, [x2, x3]
     next
 
-.global _ROTr
-_ROTr:
+opcode _ROTr
     ldrb w10, [x2, x3]
     rpeek w12, x11, 1
     rpeek w14, x13, 2
@@ -748,14 +683,12 @@ _ROTr:
     strb w10, [x2, x11]
     next
 
-.global _DUPr
-_DUPr:
+opcode _DUPr
     ldrb w10, [x2, x3]   ; get the top byte
     rpush w10
     next
 
-.global _OVRr
-_OVRr:
+opcode _OVRr
     rpeek w10, x9, 1
     rpush w10
     next
@@ -770,32 +703,26 @@ _OVRr:
     next
 .endm
 
-.global _EQUr
-_EQUr:
+opcode _EQUr
     compare_opr eq
 
-.global _NEQr
-_NEQr:
+opcode _NEQr
     compare_opr ne
 
-.global _GTHr
-_GTHr:
+opcode _GTHr
     compare_opr hi
 
-.global _LTHr
-_LTHr:
+opcode _LTHr
     compare_opr lo
 
-.global _JMPr
-_JMPr:
+opcode _JMPr
     ldrsb x9, [x2, x3]
     rpop
     add x5, x5, x9
     and x5, x5, 0xffff
     next
 
-.global _JCNr
-_JCNr:
+opcode _JCNr
     ldrsb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -806,8 +733,7 @@ _JCNr:
     and x5, x5, 0xffff
     next
 
-.global _JSRr
-_JSRr:
+opcode _JSRr
     ldrsb w9, [x2, x3]
     rpop
     lsr w10, w5, 8
@@ -817,23 +743,20 @@ _JSRr:
     and x5, x5, 0xffff
     next
 
-.global _STHr
-_STHr:
+opcode _STHr
     ldrb w9, [x2, x3]
     rpop
     push w9
     next
 
-.global _LDZr
-_LDZr:
+opcode _LDZr
     ldrb w9, [x2, x3]
     rpop
     ldrb w9, [x4, x9]
     rpush w9
     next
 
-.global _STZr
-_STZr:
+opcode _STZr
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -841,8 +764,7 @@ _STZr:
     strb w10, [x4, x9]
     next
 
-.global _LDRr
-_LDRr:
+opcode _LDRr
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -850,8 +772,7 @@ _LDRr:
     strb w9, [x2, x3] ; push to stack
     next
 
-.global _STRr
-_STRr:
+opcode _STRr
     ldrsb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -861,8 +782,7 @@ _STRr:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDAr
-_LDAr:
+opcode _LDAr
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -871,8 +791,7 @@ _LDAr:
     strb w12, [x2, x3]
     next
 
-.global _STAr
-_STAr:
+opcode _STAr
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -883,15 +802,13 @@ _STAr:
     strb w10, [x4, x12]
     next
 
-.global _DEIr
-_DEIr:
+opcode _DEIr
     precall
     bl _dei_r_entry
     postcall
     next
 
-.global _DEOr
-_DEOr:
+opcode _DEOr
     precall
     bl _deo_r_entry ; todo check return value for early exit?
     postcall
@@ -906,36 +823,28 @@ _DEOr:
     next
 .endm
 
-.global _ADDr
-_ADDr:
+opcode _ADDr
     binary_opr add
 
-.global _SUBr
-_SUBr:
+opcode _SUBr
     binary_opr sub
 
-.global _MULr
-_MULr:
+opcode _MULr
     binary_opr mul
 
-.global _DIVr
-_DIVr:
+opcode _DIVr
     binary_opr udiv
 
-.global _ANDr
-_ANDr:
+opcode _ANDr
     binary_opr and
 
-.global _ORAr
-_ORAr:
+opcode _ORAr
     binary_opr orr
 
-.global _EORr
-_EORr:
+opcode _EORr
     binary_opr eor
 
-.global _SFTr
-_SFTr:
+opcode _SFTr
     ldrb w10, [x2, x3]
     rpop
     ldrb w11, [x2, x3]
@@ -946,8 +855,7 @@ _SFTr:
     strb w11, [x2, x3]
     next
 
-.global _JSI
-_JSI:
+opcode _JSI
     ldrb w9, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
@@ -966,8 +874,7 @@ _JSI:
     and x5, x5, 0xffff
     next
 
-.global _INC2r
-_INC2r:
+opcode _INC2r
     ldrb w10, [x2, x3]
     rpeek w11, x9, 1
     orr w12, w10, w11, lsl #8
@@ -978,14 +885,12 @@ _INC2r:
     strb w12, [x2, x9]
     next
 
-.global _POP2r
-_POP2r:
+opcode _POP2r
     sub x3, x3, #2
     and x3, x3, #0xff
     next
 
-.global _NIP2r
-_NIP2r:
+opcode _NIP2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -996,8 +901,7 @@ _NIP2r:
     strb w10, [x2, x31]
     next
 
-.global _SWP2r
-_SWP2r:
+opcode _SWP2r
     ldrb w11, [x2, x3]  ; get the top byte
     rpeek w12, x9, 2    ; get the second-from-top byte
     strb w11, [x2, x9]  ; do the swap!
@@ -1011,8 +915,7 @@ _SWP2r:
 
     next
 
-.global _ROT2r
-_ROT2r:
+opcode _ROT2r
     ldrb w10, [x2, x3]
     rpeek w12, x11, 2
     rpeek w14, x13, 4
@@ -1032,8 +935,7 @@ _ROT2r:
 
     next
 
-.global _DUP2r
-_DUP2r:
+opcode _DUP2r
     ldrb w11, [x2, x3]
     sub w9, w3, #1
     and w9, w9, #0xff
@@ -1042,8 +944,7 @@ _DUP2r:
     rpush w11
     next
 
-.global _OVR2r
-_OVR2r:
+opcode _OVR2r
     rpeek w10, x9, 2
     rpeek w11, x9, 3
     rpush w11
@@ -1066,24 +967,19 @@ _OVR2r:
     next
 .endm
 
-.global _EQU2r
-_EQU2r:
+opcode _EQU2r
     compare_op2r eq
 
-.global _NEQ2r
-_NEQ2r:
+opcode _NEQ2r
     compare_op2r ne
 
-.global _GTH2r
-_GTH2r:
+opcode _GTH2r
     compare_op2r hi
 
-.global _LTH2r
-_LTH2r:
+opcode _LTH2r
     compare_op2r lo
 
-.global _JMP2r
-_JMP2r:
+opcode _JMP2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -1091,8 +987,7 @@ _JMP2r:
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _JCN2r
-_JCN2r:
+opcode _JCN2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -1104,8 +999,7 @@ _JCN2r:
     csel w5, w5, w9, eq ; choose the jump or not
     next
 
-.global _JSR2r
-_JSR2r:
+opcode _JSR2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -1116,8 +1010,7 @@ _JSR2r:
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _STH2r
-_STH2r:
+opcode _STH2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -1126,8 +1019,7 @@ _STH2r:
     push w9
     next
 
-.global _LDZ2r
-_LDZ2r:
+opcode _LDZ2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x4, x9]
@@ -1138,8 +1030,7 @@ _LDZ2r:
     rpush w10
     next
 
-.global _STZ2r
-_STZ2r:
+opcode _STZ2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -1152,8 +1043,7 @@ _STZ2r:
     strb w10, [x4, x9]
     next
 
-.global _LDR2r
-_LDR2r:
+opcode _LDR2r
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -1165,8 +1055,7 @@ _LDR2r:
     rpush w10
     next
 
-.global _STR2r
-_STR2r:
+opcode _STR2r
     ldrsb w9, [x2, x3]
     rpop
     ldrsb w10, [x2, x3]
@@ -1181,8 +1070,7 @@ _STR2r:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDA2r
-_LDA2r:
+opcode _LDA2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -1195,8 +1083,7 @@ _LDA2r:
     rpush w10
     next
 
-.global _STA2r
-_STA2r:
+opcode _STA2r
     ldrb w9, [x2, x3]
     rpop
     ldrb w10, [x2, x3]
@@ -1212,15 +1099,13 @@ _STA2r:
     strb w10, [x4, x12]
     next
 
-.global _DEI2r
-_DEI2r:
+opcode _DEI2r
     precall
     bl _dei_2r_entry
     postcall
     next
 
-.global _DEO2r
-_DEO2r:
+opcode _DEO2r
     precall
     bl _deo_2r_entry ; todo check return value for early exit?
     postcall
@@ -1245,36 +1130,28 @@ _DEO2r:
     next
 .endm
 
-.global _ADD2r
-_ADD2r:
+opcode _ADD2r
     binary_op2r add
 
-.global _SUB2r
-_SUB2r:
+opcode _SUB2r
     binary_op2r sub
 
-.global _MUL2r
-_MUL2r:
+opcode _MUL2r
     binary_op2r mul
 
-.global _DIV2r
-_DIV2r:
+opcode _DIV2r
     binary_op2r udiv
 
-.global _AND2r
-_AND2r:
+opcode _AND2r
     binary_op2r and
 
-.global _ORA2r
-_ORA2r:
+opcode _ORA2r
     binary_op2r orr
 
-.global _EOR2r
-_EOR2r:
+opcode _EOR2r
     binary_op2r eor
 
-.global _SFT2r
-_SFT2r:
+opcode _SFT2r
     ldrb w10, [x2, x3]
     rpop
     ldrb w11, [x2, x3]
@@ -1291,41 +1168,35 @@ _SFT2r:
     rpush w11
     next
 
-.global _LIT
-_LIT:
+opcode _LIT
     ldrb w9, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
     push w9
     next
 
-.global _INCk
-_INCk:
+opcode _INCk
     ldrb w9, [x0, x1]
     add w9, w9, #1
     push w9
     next
 
-.global _POPk
-_POPk:
+opcode _POPk
     next
 
-.global _NIPk
-_NIPk:
+opcode _NIPk
     ldrb w9, [x0, x1]
     push w9
     next
 
-.global _SWPk
-_SWPk:
+opcode _SWPk
     ldrb w10, [x0, x1]   ; get the top byte
     peek w11, x9, 1      ; get the second-from-top byte
     push w10
     push w11
     next
 
-.global _ROTk
-_ROTk:
+opcode _ROTk
     ldrb w13, [x0, x1]
     peek w10, x11, 1
     push w10
@@ -1334,15 +1205,13 @@ _ROTk:
     push w10
     next
 
-.global _DUPk
-_DUPk:
+opcode _DUPk
     ldrb w11, [x0, x1]
     push w11
     push w11
     next
 
-.global _OVRk
-_OVRk:
+opcode _OVRk
     peek w10, x9, 1 ; get the second-from-top
     ldrb w11, [x0, x1]
     push w10
@@ -1359,31 +1228,25 @@ _OVRk:
     next
 .endm
 
-.global _EQUk
-_EQUk:
+opcode _EQUk
     compare_opk eq
 
-.global _NEQk
-_NEQk:
+opcode _NEQk
     compare_opk ne
 
-.global _GTHk
-_GTHk:
+opcode _GTHk
     compare_opk hi
 
-.global _LTHk
-_LTHk:
+opcode _LTHk
     compare_opk lo
 
-.global _JMPk
-_JMPk:
+opcode _JMPk
     ldrsb x9, [x0, x1]
     add x5, x5, x9
     and x5, x5, 0xffff
     next
 
-.global _JCNk
-_JCNk:
+opcode _JCNk
     ldrsb w9, [x0, x1]
     peek w10, x10, 1
     cmp w10, #0
@@ -1392,8 +1255,7 @@ _JCNk:
     and x5, x5, 0xffff
     next
 
-.global _JSRk
-_JSRk:
+opcode _JSRk
     ldrsb w9, [x0, x1]
     lsr w10, w5, 8
     rpush w10
@@ -1402,28 +1264,24 @@ _JSRk:
     and x5, x5, 0xffff
     next
 
-.global _STHk
-_STHk:
+opcode _STHk
     ldrb w9, [x0, x1]
     rpush w9
     next
 
-.global _LDZk
-_LDZk:
+opcode _LDZk
     ldrb w9, [x0, x1]
     ldrb w9, [x4, x9]
     push w9
     next
 
-.global _STZk
-_STZk:
+opcode _STZk
     ldrb w9, [x0, x1]
     peek w10, x10, 1
     strb w10, [x4, x9]
     next
 
-.global _LDRk
-_LDRk:
+opcode _LDRk
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -1431,8 +1289,7 @@ _LDRk:
     push w9
     next
 
-.global _STRk
-_STRk:
+opcode _STRk
     ldrsb w9, [x0, x1]
     peek w10, x10, 1
     add x9, x5, x9
@@ -1440,8 +1297,7 @@ _STRk:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDAk
-_LDAk:
+opcode _LDAk
     ldrb w9, [x0, x1]
     sub w10, w1, #1
     and w10, w10, #0xff
@@ -1451,8 +1307,7 @@ _LDAk:
     push w10
     next
 
-.global _STAk
-_STAk:
+opcode _STAk
     ldrb w9, [x0, x1]
     peek w10, x10, 1
     orr w12, w9, w10, lsl #8
@@ -1460,15 +1315,13 @@ _STAk:
     strb w10, [x4, x12]
     next
 
-.global _DEIk
-_DEIk:
+opcode _DEIk
     precall
     bl _dei_k_entry
     postcall
     next
 
-.global _DEOk
-_DEOk:
+opcode _DEOk
     precall
     bl _deo_k_entry ; todo check return value for early exit?
     postcall
@@ -1482,36 +1335,28 @@ _DEOk:
     next
 .endm
 
-.global _ADDk
-_ADDk:
+opcode _ADDk
     binary_opk add
 
-.global _SUBk
-_SUBk:
+opcode _SUBk
     binary_opk sub
 
-.global _MULk
-_MULk:
+opcode _MULk
     binary_opk mul
 
-.global _DIVk
-_DIVk:
+opcode _DIVk
     binary_opk udiv
 
-.global _ANDk
-_ANDk:
+opcode _ANDk
     binary_opk and
 
-.global _ORAk
-_ORAk:
+opcode _ORAk
     binary_opk orr
 
-.global _EORk
-_EORk:
+opcode _EORk
     binary_opk eor
 
-.global _SFTk
-_SFTk:
+opcode _SFTk
     ldrb w10, [x0, x1]
     peek w11, x9, 1
     lsr w12, w10, 4
@@ -1521,8 +1366,7 @@ _SFTk:
     push w11
     next
 
-.global _LIT2
-_LIT2:
+opcode _LIT2
     ldrb w9, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
@@ -1533,8 +1377,7 @@ _LIT2:
     push w9
     next
 
-.global _INC2k
-_INC2k:
+opcode _INC2k
     ldrb w10, [x0, x1]
     peek w11, x9, 1
     orr w12, w10, w11, lsl #8
@@ -1550,20 +1393,17 @@ _INC2k:
     strb w12, [x0, x10]
     next
 
-.global _POP2k
-_POP2k:
+opcode _POP2k
     next
 
-.global _NIP2k
-_NIP2k:
+opcode _NIP2k
     ldrb w9, [x0, x1]
     peek w10, x11, 1
     push w10
     push w9
     next
 
-.global _SWP2k
-_SWP2k:
+opcode _SWP2k
     peek w11, x9, 1
     push w11
     peek w11, x9, 1
@@ -1574,8 +1414,7 @@ _SWP2k:
     push w11
     next
 
-.global _ROT2k
-_ROT2k:
+opcode _ROT2k
     peek w11, x9, 3
     push w11
     peek w11, x9, 3
@@ -1590,8 +1429,7 @@ _ROT2k:
     push w11
     next
 
-.global _DUP2k
-_DUP2k:
+opcode _DUP2k
     ldrb w11, [x0, x1]
     sub w9, w1, #1
     and w9, w9, #0xff
@@ -1603,8 +1441,7 @@ _DUP2k:
     push w11
     next
 
-.global _OVR2k
-_OVR2k:
+opcode _OVR2k
     ldrb w10, [x0, x1]
     peek w11, x9, 1
     peek w12, x9, 2
@@ -1632,31 +1469,25 @@ _OVR2k:
     next
 .endm
 
-.global _EQU2k
-_EQU2k:
+opcode _EQU2k
     compare_op2k eq
 
-.global _NEQ2k
-_NEQ2k:
+opcode _NEQ2k
     compare_op2k ne
 
-.global _GTH2k
-_GTH2k:
+opcode _GTH2k
     compare_op2k hi
 
-.global _LTH2k
-_LTH2k:
+opcode _LTH2k
     compare_op2k lo
 
-.global _JMP2k
-_JMP2k:
+opcode _JMP2k
     ldrb w9, [x0, x1]
     peek w10, x10, 1
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _JCN2k
-_JCN2k:
+opcode _JCN2k
     ldrb w9, [x0, x1]
     peek w10, x12, 1
     peek w11, x12, 2
@@ -1666,8 +1497,7 @@ _JCN2k:
     csel w5, w5, w9, eq ; choose the jump or not
     next
 
-.global _JSR2k
-_JSR2k:
+opcode _JSR2k
     ldrb w9, [x0, x1]
     peek w10, x10, 1
 
@@ -1678,16 +1508,14 @@ _JSR2k:
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _STH2k
-_STH2k:
+opcode _STH2k
     ldrb w9, [x0, x1]
     peek w10, x10, 1
     rpush w10
     rpush w9
     next
 
-.global _LDZ2k
-_LDZ2k:
+opcode _LDZ2k
     ldrb w9, [x0, x1]
     ldrb w10, [x4, x9]
     push w10
@@ -1697,8 +1525,7 @@ _LDZ2k:
     push w10
     next
 
-.global _STZ2k
-_STZ2k:
+opcode _STZ2k
     ldrb w9, [x0, x1]
     peek w10, x10, 1
     peek w11, x11, 2
@@ -1709,8 +1536,7 @@ _STZ2k:
     strb w10, [x4, x9]
     next
 
-.global _LDR2k
-_LDR2k:
+opcode _LDR2k
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -1722,8 +1548,7 @@ _LDR2k:
     push w10
     next
 
-.global _STR2k
-_STR2k:
+opcode _STR2k
     ldrsb w9, [x0, x1]
     peek w10, x10, 1
     peek w11, x11, 2
@@ -1736,8 +1561,7 @@ _STR2k:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDA2k
-_LDA2k:
+opcode _LDA2k
     ldrb w9, [x0, x1]
     peek w10, x10, 1
     orr w12, w9, w10, lsl #8
@@ -1749,8 +1573,7 @@ _LDA2k:
     push w10
     next
 
-.global _STA2k
-_STA2k:
+opcode _STA2k
     ldrb w9, [x0, x1]
     peek w10, x10, 1
     orr w12, w9, w10, lsl #8
@@ -1764,15 +1587,13 @@ _STA2k:
     strb w10, [x4, x12]
     next
 
-.global _DEI2k
-_DEI2k:
+opcode _DEI2k
     precall
     bl _dei_2k_entry
     postcall
     next
 
-.global _DEO2k
-_DEO2k:
+opcode _DEO2k
     precall
     bl _deo_2k_entry ; todo check return value for early exit?
     postcall
@@ -1794,36 +1615,28 @@ _DEO2k:
     next
 .endm
 
-.global _ADD2k
-_ADD2k:
+opcode _ADD2k
     binary_op2k add
 
-.global _SUB2k
-_SUB2k:
+opcode _SUB2k
     binary_op2k sub
 
-.global _MUL2k
-_MUL2k:
+opcode _MUL2k
     binary_op2k mul
 
-.global _DIV2k
-_DIV2k:
+opcode _DIV2k
     binary_op2k udiv
 
-.global _AND2k
-_AND2k:
+opcode _AND2k
     binary_op2k and
 
-.global _ORA2k
-_ORA2k:
+opcode _ORA2k
     binary_op2k orr
 
-.global _EOR2k
-_EOR2k:
+opcode _EOR2k
     binary_op2k eor
 
-.global _SFT2k
-_SFT2k:
+opcode _SFT2k
     ldrb w10, [x0, x1]
     peek w11, x9, 1
     peek w12, x9, 2
@@ -1838,41 +1651,35 @@ _SFT2k:
     push w11
     next
 
-.global _LITr
-_LITr:
+opcode _LITr
     ldrb w9, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
     rpush w9
     next
 
-.global _INCkr
-_INCkr:
+opcode _INCkr
     ldrb w9, [x2, x3]
     add w9, w9, #1
     rpush w9
     next
 
-.global _POPkr
-_POPkr:
+opcode _POPkr
     next
 
-.global _NIPkr
-_NIPkr:
+opcode _NIPkr
     ldrb w9, [x2, x3]
     rpush w9
     next
 
-.global _SWPkr
-_SWPkr:
+opcode _SWPkr
     ldrb w10, [x2, x3]   ; get the top byte
     rpeek w11, x9, 1
     rpush w10
     rpush w11
     next
 
-.global _ROTkr
-_ROTkr:
+opcode _ROTkr
     ldrb w13, [x2, x3]
     rpeek w10, x11, 1
     rpush w10
@@ -1881,15 +1688,13 @@ _ROTkr:
     rpush w10
     next
 
-.global _DUPkr
-_DUPkr:
+opcode _DUPkr
     ldrb w11, [x2, x3]
     rpush w11
     rpush w11
     next
 
-.global _OVRkr
-_OVRkr:
+opcode _OVRkr
     rpeek w10, x9, 1
     ldrb w11, [x2, x3]
     rpush w10
@@ -1906,31 +1711,25 @@ _OVRkr:
     next
 .endm
 
-.global _EQUkr
-_EQUkr:
+opcode _EQUkr
     compare_opkr eq
 
-.global _NEQkr
-_NEQkr:
+opcode _NEQkr
     compare_opkr ne
 
-.global _GTHkr
-_GTHkr:
+opcode _GTHkr
     compare_opkr hi
 
-.global _LTHkr
-_LTHkr:
+opcode _LTHkr
     compare_opkr lo
 
-.global _JMPkr
-_JMPkr:
+opcode _JMPkr
     ldrsb x9, [x2, x3]
     add x5, x5, x9
     and x5, x5, 0xffff
     next
 
-.global _JCNkr
-_JCNkr:
+opcode _JCNkr
     ldrsb w9, [x2, x3]
     rpeek w10, x10, 1
     cmp w10, #0
@@ -1939,8 +1738,7 @@ _JCNkr:
     and x5, x5, 0xffff
     next
 
-.global _JSRkr
-_JSRkr:
+opcode _JSRkr
     ldrsb w9, [x2, x3]
     lsr w10, w5, 8
     push w10
@@ -1949,28 +1747,24 @@ _JSRkr:
     and x5, x5, 0xffff
     next
 
-.global _STHkr
-_STHkr:
+opcode _STHkr
     ldrb w9, [x2, x3]
     push w9
     next
 
-.global _LDZkr
-_LDZkr:
+opcode _LDZkr
     ldrb w9, [x2, x3]
     ldrb w9, [x4, x9]
     rpush w9
     next
 
-.global _STZkr
-_STZkr:
+opcode _STZkr
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
     strb w10, [x4, x9]
     next
 
-.global _LDRkr
-_LDRkr:
+opcode _LDRkr
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -1978,8 +1772,7 @@ _LDRkr:
     rpush w9
     next
 
-.global _STRkr
-_STRkr:
+opcode _STRkr
     ldrsb w9, [x2, x3]
     rpeek w10, x10, 1
     add x9, x5, x9
@@ -1987,8 +1780,7 @@ _STRkr:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDAkr
-_LDAkr:
+opcode _LDAkr
     ldrb w9, [x2, x3]
     sub w10, w3, #1
     and w10, w10, #0xff
@@ -1998,8 +1790,7 @@ _LDAkr:
     rpush w10
     next
 
-.global _STAkr
-_STAkr:
+opcode _STAkr
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
     orr w12, w9, w10, lsl #8
@@ -2007,15 +1798,13 @@ _STAkr:
     strb w10, [x4, x12]
     next
 
-.global _DEIkr
-_DEIkr:
+opcode _DEIkr
     precall
     bl _dei_kr_entry
     postcall
     next
 
-.global _DEOkr
-_DEOkr:
+opcode _DEOkr
     precall
     bl _deo_kr_entry ; todo check return value for early exit?
     postcall
@@ -2029,36 +1818,28 @@ _DEOkr:
     next
 .endm
 
-.global _ADDkr
-_ADDkr:
+opcode _ADDkr
     binary_opkr add
 
-.global _SUBkr
-_SUBkr:
+opcode _SUBkr
     binary_opkr sub
 
-.global _MULkr
-_MULkr:
+opcode _MULkr
     binary_opkr mul
 
-.global _DIVkr
-_DIVkr:
+opcode _DIVkr
     binary_opkr udiv
 
-.global _ANDkr
-_ANDkr:
+opcode _ANDkr
     binary_opkr and
 
-.global _ORAkr
-_ORAkr:
+opcode _ORAkr
     binary_opkr orr
 
-.global _EORkr
-_EORkr:
+opcode _EORkr
     binary_opkr eor
 
-.global _SFTkr
-_SFTkr:
+opcode _SFTkr
     ldrb w10, [x2, x3]
     rpeek w11, x9, 1
     lsr w12, w10, 4
@@ -2068,8 +1849,7 @@ _SFTkr:
     rpush w11
     next
 
-.global _LIT2r
-_LIT2r:
+opcode _LIT2r
     ldrb w9, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
@@ -2080,8 +1860,7 @@ _LIT2r:
     rpush w9
     next
 
-.global _INC2kr
-_INC2kr:
+opcode _INC2kr
     ldrb w10, [x2, x3]
     rpeek w11, x9, 1
     orr w12, w10, w11, lsl #8
@@ -2097,20 +1876,17 @@ _INC2kr:
     strb w12, [x2, x10]
     next
 
-.global _POP2kr
-_POP2kr:
+opcode _POP2kr
     next
 
-.global _NIP2kr
-_NIP2kr:
+opcode _NIP2kr
     ldrb w9, [x2, x3]
     rpeek w10, x11, 1
     rpush w10
     rpush w9
     next
 
-.global _SWP2kr
-_SWP2kr:
+opcode _SWP2kr
     rpeek w11, x9, 1
     rpush w11
     rpeek w11, x9, 1
@@ -2121,8 +1897,7 @@ _SWP2kr:
     rpush w11
     next
 
-.global _ROT2kr
-_ROT2kr:
+opcode _ROT2kr
     rpeek w11, x9, 3
     rpush w11
     rpeek w11, x9, 3
@@ -2137,8 +1912,7 @@ _ROT2kr:
     rpush w11
     next
 
-.global _DUP2kr
-_DUP2kr:
+opcode _DUP2kr
     ldrb w11, [x2, x3]
     sub w9, w3, #1
     and w9, w9, #0xff
@@ -2150,8 +1924,7 @@ _DUP2kr:
     rpush w11
     next
 
-.global _OVR2kr
-_OVR2kr:
+opcode _OVR2kr
     ldrb w10, [x2, x3]
     rpeek w11, x9, 1
     rpeek w12, x9, 2
@@ -2177,31 +1950,25 @@ _OVR2kr:
     next
 .endm
 
-.global _EQU2kr
-_EQU2kr:
+opcode _EQU2kr
     compare_op2kr eq
 
-.global _NEQ2kr
-_NEQ2kr:
+opcode _NEQ2kr
     compare_op2kr ne
 
-.global _GTH2kr
-_GTH2kr:
+opcode _GTH2kr
     compare_op2kr hi
 
-.global _LTH2kr
-_LTH2kr:
+opcode _LTH2kr
     compare_op2kr lo
 
-.global _JMP2kr
-_JMP2kr:
+opcode _JMP2kr
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _JCN2kr
-_JCN2kr:
+opcode _JCN2kr
     ldrb w9, [x2, x3]
     rpeek w10, x12, 1
     rpeek w11, x12, 2
@@ -2210,8 +1977,7 @@ _JCN2kr:
     csel w5, w5, w9, eq ; choose the jump or not
     next
 
-.global _JSR2kr
-_JSR2kr:
+opcode _JSR2kr
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
     lsr w11, w5, 8
@@ -2220,16 +1986,14 @@ _JSR2kr:
     orr w5, w9, w10, lsl #8 ; update program counter
     next
 
-.global _STH2kr
-_STH2kr:
+opcode _STH2kr
     ldrb w9, [x2, x3]
     rpeek w10, x11, 1
     push w10
     push w9
     next
 
-.global _LDZ2kr
-_LDZ2kr:
+opcode _LDZ2kr
     ldrb w9, [x2, x3]
     ldrb w10, [x4, x9]
     rpush w10
@@ -2239,8 +2003,7 @@ _LDZ2kr:
     rpush w10
     next
 
-.global _STZ2kr
-_STZ2kr:
+opcode _STZ2kr
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
     rpeek w11, x11, 2
@@ -2251,8 +2014,7 @@ _STZ2kr:
     strb w10, [x4, x9]
     next
 
-.global _LDR2kr
-_LDR2kr:
+opcode _LDR2kr
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
@@ -2264,8 +2026,7 @@ _LDR2kr:
     rpush w10
     next
 
-.global _STR2kr
-_STR2kr:
+opcode _STR2kr
     ldrsb w9, [x2, x3]
     rpeek w10, x10, 1
     rpeek w11, x11, 2
@@ -2278,8 +2039,7 @@ _STR2kr:
     strb w10, [x4, x9] ; write to RAM
     next
 
-.global _LDA2kr
-_LDA2kr:
+opcode _LDA2kr
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
     orr w12, w9, w10, lsl #8
@@ -2291,8 +2051,7 @@ _LDA2kr:
     rpush w10
     next
 
-.global _STA2kr
-_STA2kr:
+opcode _STA2kr
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
     orr w12, w9, w10, lsl #8
@@ -2306,15 +2065,13 @@ _STA2kr:
     strb w10, [x4, x12]
     next
 
-.global _DEI2kr
-_DEI2kr:
+opcode _DEI2kr
     precall
     bl _dei_2kr_entry
     postcall
     next
 
-.global _DEO2kr
-_DEO2kr:
+opcode _DEO2kr
     precall
     bl _deo_2kr_entry ; todo check return value for early exit?
     postcall
@@ -2336,36 +2093,28 @@ _DEO2kr:
     next
 .endm
 
-.global _ADD2kr
-_ADD2kr:
+opcode _ADD2kr
     binary_op2kr add
 
-.global _SUB2kr
-_SUB2kr:
+opcode _SUB2kr
     binary_op2kr sub
 
-.global _MUL2kr
-_MUL2kr:
+opcode _MUL2kr
     binary_op2kr mul
 
-.global _DIV2kr
-_DIV2kr:
+opcode _DIV2kr
     binary_op2kr udiv
 
-.global _AND2kr
-_AND2kr:
+opcode _AND2kr
     binary_op2kr and
 
-.global _ORA2kr
-_ORA2kr:
+opcode _ORA2kr
     binary_op2kr orr
 
-.global _EOR2kr
-_EOR2kr:
+opcode _EOR2kr
     binary_op2kr eor
 
-.global _SFT2kr
-_SFT2kr:
+opcode _SFT2kr
     ldrb w10, [x2, x3]
     rpeek w11, x9, 1
     rpeek w12, x9, 2
