@@ -121,523 +121,65 @@ pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     unsafe { aarch64::aarch64_entry(&mut e as *mut _, pc, JUMP_TABLE.as_ptr()) }
 }
 
-extern "C" {
-    fn BRK();
-    fn INC();
-    fn POP();
-    fn NIP();
-    fn SWP();
-    fn ROT();
-    fn DUP();
-    fn OVR();
-    fn EQU();
-    fn NEQ();
-    fn GTH();
-    fn LTH();
-    fn JMP();
-    fn JCN();
-    fn JSR();
-    fn STH();
-    fn LDZ();
-    fn STZ();
-    fn LDR();
-    fn STR();
-    fn LDA();
-    fn STA();
-    fn DEI();
-    fn DEO();
-    fn ADD();
-    fn SUB();
-    fn MUL();
-    fn DIV();
-    fn AND();
-    fn ORA();
-    fn EOR();
-    fn SFT();
-    fn JCI();
-    fn INC2();
-    fn POP2();
-    fn NIP2();
-    fn SWP2();
-    fn ROT2();
-    fn DUP2();
-    fn OVR2();
-    fn EQU2();
-    fn NEQ2();
-    fn GTH2();
-    fn LTH2();
-    fn JMP2();
-    fn JCN2();
-    fn JSR2();
-    fn STH2();
-    fn LDZ2();
-    fn STZ2();
-    fn LDR2();
-    fn STR2();
-    fn LDA2();
-    fn STA2();
-    fn DEI2();
-    fn DEO2();
-    fn ADD2();
-    fn SUB2();
-    fn MUL2();
-    fn DIV2();
-    fn AND2();
-    fn ORA2();
-    fn EOR2();
-    fn SFT2();
-    fn JMI();
-    fn INCr();
-    fn POPr();
-    fn NIPr();
-    fn SWPr();
-    fn ROTr();
-    fn DUPr();
-    fn OVRr();
-    fn EQUr();
-    fn NEQr();
-    fn GTHr();
-    fn LTHr();
-    fn JMPr();
-    fn JCNr();
-    fn JSRr();
-    fn STHr();
-    fn LDZr();
-    fn STZr();
-    fn LDRr();
-    fn STRr();
-    fn LDAr();
-    fn STAr();
-    fn DEIr();
-    fn DEOr();
-    fn ADDr();
-    fn SUBr();
-    fn MULr();
-    fn DIVr();
-    fn ANDr();
-    fn ORAr();
-    fn EORr();
-    fn SFTr();
-    fn JSI();
-    fn INC2r();
-    fn POP2r();
-    fn NIP2r();
-    fn SWP2r();
-    fn ROT2r();
-    fn DUP2r();
-    fn OVR2r();
-    fn EQU2r();
-    fn NEQ2r();
-    fn GTH2r();
-    fn LTH2r();
-    fn JMP2r();
-    fn JCN2r();
-    fn JSR2r();
-    fn STH2r();
-    fn LDZ2r();
-    fn STZ2r();
-    fn LDR2r();
-    fn STR2r();
-    fn LDA2r();
-    fn STA2r();
-    fn DEI2r();
-    fn DEO2r();
-    fn ADD2r();
-    fn SUB2r();
-    fn MUL2r();
-    fn DIV2r();
-    fn AND2r();
-    fn ORA2r();
-    fn EOR2r();
-    fn SFT2r();
-    fn LIT();
-    fn INCk();
-    fn POPk();
-    fn NIPk();
-    fn SWPk();
-    fn ROTk();
-    fn DUPk();
-    fn OVRk();
-    fn EQUk();
-    fn NEQk();
-    fn GTHk();
-    fn LTHk();
-    fn JMPk();
-    fn JCNk();
-    fn JSRk();
-    fn STHk();
-    fn LDZk();
-    fn STZk();
-    fn LDRk();
-    fn STRk();
-    fn LDAk();
-    fn STAk();
-    fn DEIk();
-    fn DEOk();
-    fn ADDk();
-    fn SUBk();
-    fn MULk();
-    fn DIVk();
-    fn ANDk();
-    fn ORAk();
-    fn EORk();
-    fn SFTk();
-    fn LIT2();
-    fn INC2k();
-    fn POP2k();
-    fn NIP2k();
-    fn SWP2k();
-    fn ROT2k();
-    fn DUP2k();
-    fn OVR2k();
-    fn EQU2k();
-    fn NEQ2k();
-    fn GTH2k();
-    fn LTH2k();
-    fn JMP2k();
-    fn JCN2k();
-    fn JSR2k();
-    fn STH2k();
-    fn LDZ2k();
-    fn STZ2k();
-    fn LDR2k();
-    fn STR2k();
-    fn LDA2k();
-    fn STA2k();
-    fn DEI2k();
-    fn DEO2k();
-    fn ADD2k();
-    fn SUB2k();
-    fn MUL2k();
-    fn DIV2k();
-    fn AND2k();
-    fn ORA2k();
-    fn EOR2k();
-    fn SFT2k();
-    fn LITr();
-    fn INCkr();
-    fn POPkr();
-    fn NIPkr();
-    fn SWPkr();
-    fn ROTkr();
-    fn DUPkr();
-    fn OVRkr();
-    fn EQUkr();
-    fn NEQkr();
-    fn GTHkr();
-    fn LTHkr();
-    fn JMPkr();
-    fn JCNkr();
-    fn JSRkr();
-    fn STHkr();
-    fn LDZkr();
-    fn STZkr();
-    fn LDRkr();
-    fn STRkr();
-    fn LDAkr();
-    fn STAkr();
-    fn DEIkr();
-    fn DEOkr();
-    fn ADDkr();
-    fn SUBkr();
-    fn MULkr();
-    fn DIVkr();
-    fn ANDkr();
-    fn ORAkr();
-    fn EORkr();
-    fn SFTkr();
-    fn LIT2r();
-    fn INC2kr();
-    fn POP2kr();
-    fn NIP2kr();
-    fn SWP2kr();
-    fn ROT2kr();
-    fn DUP2kr();
-    fn OVR2kr();
-    fn EQU2kr();
-    fn NEQ2kr();
-    fn GTH2kr();
-    fn LTH2kr();
-    fn JMP2kr();
-    fn JCN2kr();
-    fn JSR2kr();
-    fn STH2kr();
-    fn LDZ2kr();
-    fn STZ2kr();
-    fn LDR2kr();
-    fn STR2kr();
-    fn LDA2kr();
-    fn STA2kr();
-    fn DEI2kr();
-    fn DEO2kr();
-    fn ADD2kr();
-    fn SUB2kr();
-    fn MUL2kr();
-    fn DIV2kr();
-    fn AND2kr();
-    fn ORA2kr();
-    fn EOR2kr();
-    fn SFT2kr();
+// Helper macro to generate opcode tables
+macro_rules! opcodes {
+    ($($op:ident),+) => {
+        extern "C" {
+            $(
+                fn $op();
+            )+
+        }
+
+        const JUMP_TABLE: [unsafe extern "C" fn(); 256] = [
+            $(
+                ($op as unsafe extern "C" fn()),
+            )+
+        ];
+    }
 }
 
-const JUMP_TABLE: [unsafe extern "C" fn(); 256] = [
-    (BRK as unsafe extern "C" fn()),
-    (INC as unsafe extern "C" fn()),
-    (POP as unsafe extern "C" fn()),
-    (NIP as unsafe extern "C" fn()),
-    (SWP as unsafe extern "C" fn()),
-    (ROT as unsafe extern "C" fn()),
-    (DUP as unsafe extern "C" fn()),
-    (OVR as unsafe extern "C" fn()),
-    (EQU as unsafe extern "C" fn()),
-    (NEQ as unsafe extern "C" fn()),
-    (GTH as unsafe extern "C" fn()),
-    (LTH as unsafe extern "C" fn()),
-    (JMP as unsafe extern "C" fn()),
-    (JCN as unsafe extern "C" fn()),
-    (JSR as unsafe extern "C" fn()),
-    (STH as unsafe extern "C" fn()),
-    (LDZ as unsafe extern "C" fn()),
-    (STZ as unsafe extern "C" fn()),
-    (LDR as unsafe extern "C" fn()),
-    (STR as unsafe extern "C" fn()),
-    (LDA as unsafe extern "C" fn()),
-    (STA as unsafe extern "C" fn()),
-    (DEI as unsafe extern "C" fn()),
-    (DEO as unsafe extern "C" fn()),
-    (ADD as unsafe extern "C" fn()),
-    (SUB as unsafe extern "C" fn()),
-    (MUL as unsafe extern "C" fn()),
-    (DIV as unsafe extern "C" fn()),
-    (AND as unsafe extern "C" fn()),
-    (ORA as unsafe extern "C" fn()),
-    (EOR as unsafe extern "C" fn()),
-    (SFT as unsafe extern "C" fn()),
-    (JCI as unsafe extern "C" fn()),
-    (INC2 as unsafe extern "C" fn()),
-    (POP2 as unsafe extern "C" fn()),
-    (NIP2 as unsafe extern "C" fn()),
-    (SWP2 as unsafe extern "C" fn()),
-    (ROT2 as unsafe extern "C" fn()),
-    (DUP2 as unsafe extern "C" fn()),
-    (OVR2 as unsafe extern "C" fn()),
-    (EQU2 as unsafe extern "C" fn()),
-    (NEQ2 as unsafe extern "C" fn()),
-    (GTH2 as unsafe extern "C" fn()),
-    (LTH2 as unsafe extern "C" fn()),
-    (JMP2 as unsafe extern "C" fn()),
-    (JCN2 as unsafe extern "C" fn()),
-    (JSR2 as unsafe extern "C" fn()),
-    (STH2 as unsafe extern "C" fn()),
-    (LDZ2 as unsafe extern "C" fn()),
-    (STZ2 as unsafe extern "C" fn()),
-    (LDR2 as unsafe extern "C" fn()),
-    (STR2 as unsafe extern "C" fn()),
-    (LDA2 as unsafe extern "C" fn()),
-    (STA2 as unsafe extern "C" fn()),
-    (DEI2 as unsafe extern "C" fn()),
-    (DEO2 as unsafe extern "C" fn()),
-    (ADD2 as unsafe extern "C" fn()),
-    (SUB2 as unsafe extern "C" fn()),
-    (MUL2 as unsafe extern "C" fn()),
-    (DIV2 as unsafe extern "C" fn()),
-    (AND2 as unsafe extern "C" fn()),
-    (ORA2 as unsafe extern "C" fn()),
-    (EOR2 as unsafe extern "C" fn()),
-    (SFT2 as unsafe extern "C" fn()),
-    (JMI as unsafe extern "C" fn()),
-    (INCr as unsafe extern "C" fn()),
-    (POPr as unsafe extern "C" fn()),
-    (NIPr as unsafe extern "C" fn()),
-    (SWPr as unsafe extern "C" fn()),
-    (ROTr as unsafe extern "C" fn()),
-    (DUPr as unsafe extern "C" fn()),
-    (OVRr as unsafe extern "C" fn()),
-    (EQUr as unsafe extern "C" fn()),
-    (NEQr as unsafe extern "C" fn()),
-    (GTHr as unsafe extern "C" fn()),
-    (LTHr as unsafe extern "C" fn()),
-    (JMPr as unsafe extern "C" fn()),
-    (JCNr as unsafe extern "C" fn()),
-    (JSRr as unsafe extern "C" fn()),
-    (STHr as unsafe extern "C" fn()),
-    (LDZr as unsafe extern "C" fn()),
-    (STZr as unsafe extern "C" fn()),
-    (LDRr as unsafe extern "C" fn()),
-    (STRr as unsafe extern "C" fn()),
-    (LDAr as unsafe extern "C" fn()),
-    (STAr as unsafe extern "C" fn()),
-    (DEIr as unsafe extern "C" fn()),
-    (DEOr as unsafe extern "C" fn()),
-    (ADDr as unsafe extern "C" fn()),
-    (SUBr as unsafe extern "C" fn()),
-    (MULr as unsafe extern "C" fn()),
-    (DIVr as unsafe extern "C" fn()),
-    (ANDr as unsafe extern "C" fn()),
-    (ORAr as unsafe extern "C" fn()),
-    (EORr as unsafe extern "C" fn()),
-    (SFTr as unsafe extern "C" fn()),
-    (JSI as unsafe extern "C" fn()),
-    (INC2r as unsafe extern "C" fn()),
-    (POP2r as unsafe extern "C" fn()),
-    (NIP2r as unsafe extern "C" fn()),
-    (SWP2r as unsafe extern "C" fn()),
-    (ROT2r as unsafe extern "C" fn()),
-    (DUP2r as unsafe extern "C" fn()),
-    (OVR2r as unsafe extern "C" fn()),
-    (EQU2r as unsafe extern "C" fn()),
-    (NEQ2r as unsafe extern "C" fn()),
-    (GTH2r as unsafe extern "C" fn()),
-    (LTH2r as unsafe extern "C" fn()),
-    (JMP2r as unsafe extern "C" fn()),
-    (JCN2r as unsafe extern "C" fn()),
-    (JSR2r as unsafe extern "C" fn()),
-    (STH2r as unsafe extern "C" fn()),
-    (LDZ2r as unsafe extern "C" fn()),
-    (STZ2r as unsafe extern "C" fn()),
-    (LDR2r as unsafe extern "C" fn()),
-    (STR2r as unsafe extern "C" fn()),
-    (LDA2r as unsafe extern "C" fn()),
-    (STA2r as unsafe extern "C" fn()),
-    (DEI2r as unsafe extern "C" fn()),
-    (DEO2r as unsafe extern "C" fn()),
-    (ADD2r as unsafe extern "C" fn()),
-    (SUB2r as unsafe extern "C" fn()),
-    (MUL2r as unsafe extern "C" fn()),
-    (DIV2r as unsafe extern "C" fn()),
-    (AND2r as unsafe extern "C" fn()),
-    (ORA2r as unsafe extern "C" fn()),
-    (EOR2r as unsafe extern "C" fn()),
-    (SFT2r as unsafe extern "C" fn()),
-    (LIT as unsafe extern "C" fn()),
-    (INCk as unsafe extern "C" fn()),
-    (POPk as unsafe extern "C" fn()),
-    (NIPk as unsafe extern "C" fn()),
-    (SWPk as unsafe extern "C" fn()),
-    (ROTk as unsafe extern "C" fn()),
-    (DUPk as unsafe extern "C" fn()),
-    (OVRk as unsafe extern "C" fn()),
-    (EQUk as unsafe extern "C" fn()),
-    (NEQk as unsafe extern "C" fn()),
-    (GTHk as unsafe extern "C" fn()),
-    (LTHk as unsafe extern "C" fn()),
-    (JMPk as unsafe extern "C" fn()),
-    (JCNk as unsafe extern "C" fn()),
-    (JSRk as unsafe extern "C" fn()),
-    (STHk as unsafe extern "C" fn()),
-    (LDZk as unsafe extern "C" fn()),
-    (STZk as unsafe extern "C" fn()),
-    (LDRk as unsafe extern "C" fn()),
-    (STRk as unsafe extern "C" fn()),
-    (LDAk as unsafe extern "C" fn()),
-    (STAk as unsafe extern "C" fn()),
-    (DEIk as unsafe extern "C" fn()),
-    (DEOk as unsafe extern "C" fn()),
-    (ADDk as unsafe extern "C" fn()),
-    (SUBk as unsafe extern "C" fn()),
-    (MULk as unsafe extern "C" fn()),
-    (DIVk as unsafe extern "C" fn()),
-    (ANDk as unsafe extern "C" fn()),
-    (ORAk as unsafe extern "C" fn()),
-    (EORk as unsafe extern "C" fn()),
-    (SFTk as unsafe extern "C" fn()),
-    (LIT2 as unsafe extern "C" fn()),
-    (INC2k as unsafe extern "C" fn()),
-    (POP2k as unsafe extern "C" fn()),
-    (NIP2k as unsafe extern "C" fn()),
-    (SWP2k as unsafe extern "C" fn()),
-    (ROT2k as unsafe extern "C" fn()),
-    (DUP2k as unsafe extern "C" fn()),
-    (OVR2k as unsafe extern "C" fn()),
-    (EQU2k as unsafe extern "C" fn()),
-    (NEQ2k as unsafe extern "C" fn()),
-    (GTH2k as unsafe extern "C" fn()),
-    (LTH2k as unsafe extern "C" fn()),
-    (JMP2k as unsafe extern "C" fn()),
-    (JCN2k as unsafe extern "C" fn()),
-    (JSR2k as unsafe extern "C" fn()),
-    (STH2k as unsafe extern "C" fn()),
-    (LDZ2k as unsafe extern "C" fn()),
-    (STZ2k as unsafe extern "C" fn()),
-    (LDR2k as unsafe extern "C" fn()),
-    (STR2k as unsafe extern "C" fn()),
-    (LDA2k as unsafe extern "C" fn()),
-    (STA2k as unsafe extern "C" fn()),
-    (DEI2k as unsafe extern "C" fn()),
-    (DEO2k as unsafe extern "C" fn()),
-    (ADD2k as unsafe extern "C" fn()),
-    (SUB2k as unsafe extern "C" fn()),
-    (MUL2k as unsafe extern "C" fn()),
-    (DIV2k as unsafe extern "C" fn()),
-    (AND2k as unsafe extern "C" fn()),
-    (ORA2k as unsafe extern "C" fn()),
-    (EOR2k as unsafe extern "C" fn()),
-    (SFT2k as unsafe extern "C" fn()),
-    (LITr as unsafe extern "C" fn()),
-    (INCkr as unsafe extern "C" fn()),
-    (POPkr as unsafe extern "C" fn()),
-    (NIPkr as unsafe extern "C" fn()),
-    (SWPkr as unsafe extern "C" fn()),
-    (ROTkr as unsafe extern "C" fn()),
-    (DUPkr as unsafe extern "C" fn()),
-    (OVRkr as unsafe extern "C" fn()),
-    (EQUkr as unsafe extern "C" fn()),
-    (NEQkr as unsafe extern "C" fn()),
-    (GTHkr as unsafe extern "C" fn()),
-    (LTHkr as unsafe extern "C" fn()),
-    (JMPkr as unsafe extern "C" fn()),
-    (JCNkr as unsafe extern "C" fn()),
-    (JSRkr as unsafe extern "C" fn()),
-    (STHkr as unsafe extern "C" fn()),
-    (LDZkr as unsafe extern "C" fn()),
-    (STZkr as unsafe extern "C" fn()),
-    (LDRkr as unsafe extern "C" fn()),
-    (STRkr as unsafe extern "C" fn()),
-    (LDAkr as unsafe extern "C" fn()),
-    (STAkr as unsafe extern "C" fn()),
-    (DEIkr as unsafe extern "C" fn()),
-    (DEOkr as unsafe extern "C" fn()),
-    (ADDkr as unsafe extern "C" fn()),
-    (SUBkr as unsafe extern "C" fn()),
-    (MULkr as unsafe extern "C" fn()),
-    (DIVkr as unsafe extern "C" fn()),
-    (ANDkr as unsafe extern "C" fn()),
-    (ORAkr as unsafe extern "C" fn()),
-    (EORkr as unsafe extern "C" fn()),
-    (SFTkr as unsafe extern "C" fn()),
-    (LIT2r as unsafe extern "C" fn()),
-    (INC2kr as unsafe extern "C" fn()),
-    (POP2kr as unsafe extern "C" fn()),
-    (NIP2kr as unsafe extern "C" fn()),
-    (SWP2kr as unsafe extern "C" fn()),
-    (ROT2kr as unsafe extern "C" fn()),
-    (DUP2kr as unsafe extern "C" fn()),
-    (OVR2kr as unsafe extern "C" fn()),
-    (EQU2kr as unsafe extern "C" fn()),
-    (NEQ2kr as unsafe extern "C" fn()),
-    (GTH2kr as unsafe extern "C" fn()),
-    (LTH2kr as unsafe extern "C" fn()),
-    (JMP2kr as unsafe extern "C" fn()),
-    (JCN2kr as unsafe extern "C" fn()),
-    (JSR2kr as unsafe extern "C" fn()),
-    (STH2kr as unsafe extern "C" fn()),
-    (LDZ2kr as unsafe extern "C" fn()),
-    (STZ2kr as unsafe extern "C" fn()),
-    (LDR2kr as unsafe extern "C" fn()),
-    (STR2kr as unsafe extern "C" fn()),
-    (LDA2kr as unsafe extern "C" fn()),
-    (STA2kr as unsafe extern "C" fn()),
-    (DEI2kr as unsafe extern "C" fn()),
-    (DEO2kr as unsafe extern "C" fn()),
-    (ADD2kr as unsafe extern "C" fn()),
-    (SUB2kr as unsafe extern "C" fn()),
-    (MUL2kr as unsafe extern "C" fn()),
-    (DIV2kr as unsafe extern "C" fn()),
-    (AND2kr as unsafe extern "C" fn()),
-    (ORA2kr as unsafe extern "C" fn()),
-    (EOR2kr as unsafe extern "C" fn()),
-    (SFT2kr as unsafe extern "C" fn()),
-];
+#[rustfmt::skip]
+opcodes!(
+    BRK,    INC,    POP,    NIP,    SWP,    ROT,    DUP,    OVR,
+    EQU,    NEQ,    GTH,    LTH,    JMP,    JCN,    JSR,    STH,
+    LDZ,    STZ,    LDR,    STR,    LDA,    STA,    DEI,    DEO,
+    ADD,    SUB,    MUL,    DIV,    AND,    ORA,    EOR,    SFT,
+
+    JCI,    INC2,   POP2,   NIP2,   SWP2,   ROT2,   DUP2,   OVR2,
+    EQU2,   NEQ2,   GTH2,   LTH2,   JMP2,   JCN2,   JSR2,   STH2,
+    LDZ2,   STZ2,   LDR2,   STR2,   LDA2,   STA2,   DEI2,   DEO2,
+    ADD2,   SUB2,   MUL2,   DIV2,   AND2,   ORA2,   EOR2,   SFT2,
+
+    JMI,    INCr,   POPr,   NIPr,   SWPr,   ROTr,   DUPr,   OVRr,
+    EQUr,   NEQr,   GTHr,   LTHr,   JMPr,   JCNr,   JSRr,   STHr,
+    LDZr,   STZr,   LDRr,   STRr,   LDAr,   STAr,   DEIr,   DEOr,
+    ADDr,   SUBr,   MULr,   DIVr,   ANDr,   ORAr,   EORr,   SFTr,
+
+    JSI,    INC2r,  POP2r,  NIP2r,  SWP2r,  ROT2r,  DUP2r,  OVR2r,
+    EQU2r,  NEQ2r,  GTH2r,  LTH2r,  JMP2r,  JCN2r,  JSR2r,  STH2r,
+    LDZ2r,  STZ2r,  LDR2r,  STR2r,  LDA2r,  STA2r,  DEI2r,  DEO2r,
+    ADD2r,  SUB2r,  MUL2r,  DIV2r,  AND2r,  ORA2r,  EOR2r,  SFT2r,
+
+    LIT,    INCk,   POPk,   NIPk,   SWPk,   ROTk,   DUPk,   OVRk,
+    EQUk,   NEQk,   GTHk,   LTHk,   JMPk,   JCNk,   JSRk,   STHk,
+    LDZk,   STZk,   LDRk,   STRk,   LDAk,   STAk,   DEIk,   DEOk,
+    ADDk,   SUBk,   MULk,   DIVk,   ANDk,   ORAk,   EORk,   SFTk,
+
+    LIT2,   INC2k,  POP2k,  NIP2k,  SWP2k,  ROT2k,  DUP2k,  OVR2k,
+    EQU2k,  NEQ2k,  GTH2k,  LTH2k,  JMP2k,  JCN2k,  JSR2k,  STH2k,
+    LDZ2k,  STZ2k,  LDR2k,  STR2k,  LDA2k,  STA2k,  DEI2k,  DEO2k,
+    ADD2k,  SUB2k,  MUL2k,  DIV2k,  AND2k,  ORA2k,  EOR2k,  SFT2k,
+
+    LITr,   INCkr,  POPkr,  NIPkr,  SWPkr,  ROTkr,  DUPkr,  OVRkr,
+    EQUkr,  NEQkr,  GTHkr,  LTHkr,  JMPkr,  JCNkr,  JSRkr,  STHkr,
+    LDZkr,  STZkr,  LDRkr,  STRkr,  LDAkr,  STAkr,  DEIkr,  DEOkr,
+    ADDkr,  SUBkr,  MULkr,  DIVkr,  ANDkr,  ORAkr,  EORkr,  SFTkr,
+
+    LIT2r,  INC2kr, POP2kr, NIP2kr, SWP2kr, ROT2kr, DUP2kr, OVR2kr,
+    EQU2kr, NEQ2kr, GTH2kr, LTH2kr, JMP2kr, JCN2kr, JSR2kr, STH2kr,
+    LDZ2kr, STZ2kr, LDR2kr, STR2kr, LDA2kr, STA2kr, DEI2kr, DEO2kr,
+    ADD2kr, SUB2kr, MUL2kr, DIV2kr, AND2kr, ORA2kr, EOR2kr, SFT2kr
+);
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
