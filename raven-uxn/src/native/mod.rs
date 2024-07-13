@@ -99,13 +99,14 @@ pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
 
     // SAFETY: do you trust me?
     unsafe {
+        let ram = (*vm.ram).as_mut_ptr() as usize;
         core::arch::asm!("bl aarch64_entry",
             inout("x0") vm.stack.data.as_mut_ptr() as usize => r,
             in("x1") &mut vm.stack.index as *mut _,
             in("x2") vm.ret.data.as_mut_ptr(),
             in("x3") &mut vm.ret.index as *mut _,
-            in("x4") (*vm.ram).as_mut_ptr(),
-            in("x5") pc,
+            in("x4") ram,
+            in("x5") pc as usize + ram,
             in("x6") vm as *mut _,
             in("x7") &mut h as *mut _);
     }

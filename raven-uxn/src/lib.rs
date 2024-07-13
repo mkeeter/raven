@@ -1690,17 +1690,20 @@ mod ram {
     /// Helper type for building a RAM array of the appropriate size
     ///
     /// This is only available if the `"alloc"` feature is enabled
-    pub struct UxnRam(Box<[u8; 65536]>);
+    pub struct UxnRam(Box<[u8; 65536 * 3]>);
 
     impl UxnRam {
         /// Builds a new zero-initialized RAM
         pub fn new() -> Self {
-            UxnRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
+            UxnRam(vec![0u8; 65536 * 3].into_boxed_slice().try_into().unwrap())
         }
 
         /// Leaks memory, setting it to a static lifetime
         pub fn leak(self) -> &'static mut [u8; 65536] {
-            Box::leak(self.0)
+            let p = Box::leak(self.0).as_mut_ptr();
+            let p = p.wrapping_add(p.align_offset(65536 * 2));
+            let p = p as *mut [u8; 65536];
+            unsafe { &mut *p }
         }
     }
 
@@ -1713,12 +1716,17 @@ mod ram {
     impl core::ops::Deref for UxnRam {
         type Target = [u8; 65536];
         fn deref(&self) -> &Self::Target {
-            &self.0
+            let p = self.0.as_ptr();
+            let p = p.wrapping_add(p.align_offset(65536 * 2)) as *const [u8; 65536];
+            unsafe { &*p }
         }
     }
+
     impl core::ops::DerefMut for UxnRam {
         fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
+            let p = self.0.as_mut_ptr();
+            let p = p.wrapping_add(p.align_offset(65536 * 2)) as *mut [u8; 65536];
+            unsafe { &mut *p }
         }
     }
 }

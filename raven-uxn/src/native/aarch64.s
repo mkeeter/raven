@@ -3,17 +3,24 @@
 ; x2 - return stack pointer (&mut [u8; 256])
 ; x3 - return stack index (u8)
 ; x4 - RAM pointer (&mut [u8; 65536])
-; x5 - program counter (u16), offset of the next value in RAM
+; x5 - program counter (pointer into RAM)
 ; x6 - VM pointer (&mut Uxn)
 ; x7 - Device handle pointer (&DeviceHandle)
-; x8 - Jump table pointer
 ; x9-15 - scratch registers
 ;
 ; We do not use any callee-saved registers (besides x29 / x30)
+
+.macro wrapptr reg
+    bfc \reg, #16, #1
+.endm
+
+.macro wrappc
+    wrapptr x5
+.endm
+
 .macro next
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
     adrp x10, JUMP_TABLE@PAGE
     ldr x10, [x10, x9, lsl #3]
     br x10
@@ -46,6 +53,7 @@
     and \x, \x, #0xff
     ldrb \w, [x0, \x]
 .endm
+
 .macro rpeek, w, x, n
     sub \x, x3, \n
     and \x, \x, #0xff
@@ -87,8 +95,8 @@
 .global aarch64_entry
 aarch64_entry:
     sub sp, sp, #0x200  ; make room in the stack
-    stp   x29, x30, [sp, 0x0]   ; store stack and frame pointer
-    mov   x29, sp
+    stp x29, x30, [sp, 0x0]   ; store stack and frame pointer
+    mov x29, sp
 
     ; Convert from index pointers to index values in w1 / w3
     stp x1, x3, [sp, 0x10]      ; save stack index pointers
@@ -104,10 +112,10 @@ _BRK:
     strb w1, [x9]               ; save stack index
     strb w3, [x10]              ; save ret index
 
-    ldp   x29, x30, [sp, 0x0]   ; Restore stack and frame pointer
-    add sp, sp, #0x200  ; restore stack pointer
+    ldp x29, x30, [sp, 0x0]     ; Restore stack and frame pointer
+    add sp, sp, #0x200          ; restore stack pointer
 
-    mov x0, x5 ; return PC from function
+    sub x0, x5, x4 ; return PC (index) from function
     ret
 
 _INC:
@@ -179,30 +187,34 @@ _LTH:
 
 _JMP:
     ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     pop
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JCN:
-    ldrsb w9, [x0, x1]
+    ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     pop
     ldrb w10, [x0, x1]
     pop
     cmp w10, #0
     csel w10, wzr, w9, eq ; choose the jump or not
     add x5, x5, x10 ; jump or not
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JSR:
-    ldrsb w9, [x0, x1]
+    ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     pop
-    lsr w10, w5, 8
+    and w10, w5, 0xffff
+    lsr w11, w10, 8
+    rpush w11
     rpush w10
-    rpush w5
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _STH:
@@ -227,21 +239,23 @@ _STZ:
     next
 
 _LDR:
-    ldrsb w9, [x0, x1]
+    ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w9, [x9] ; read from RAM
     strb w9, [x0, x1] ; push to stack
     next
 
 _STR:
-    ldrsb w9, [x0, x1]
+    ldrsb x9, [x0, x1]
+    and x9, x9, 0xffff
     pop
     ldrb w10, [x0, x1]
     pop
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+    strb w10, [x9] ; write to RAM
     next
 
 _LDA:
@@ -318,19 +332,17 @@ _SFT:
     next
 
 _JCI:
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
-    ldrb w10, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
+    ldrb w10, [x5], #1
+    wrappc
     orr w12, w10, w9, lsl #8 ; build the jump offset
     ldrb w10, [x0, x1] ; read conditional byte
     pop
     cmp w10, #0
     csel w10, wzr, w12, eq ; choose the jump or not
     add x5, x5, x10 ; jump or not
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _INC2:
@@ -437,7 +449,8 @@ _JMP2:
     pop
     ldrb w10, [x0, x1]
     pop
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
+    add x5, x5, x4
     next
 
 _JCN2:
@@ -447,9 +460,11 @@ _JCN2:
     pop
     ldrb w11, [x0, x1]
     pop
-    orr w9, w9, w10, lsl #8 ; update program counter
+    orr x9, x9, x10, lsl #8 ; update program counter
+    add x9, x9, x4
+    wrapptr x9
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel x5, x5, x9, eq ; choose the jump or not
     next
 
 _JSR2:
@@ -457,10 +472,12 @@ _JSR2:
     pop
     ldrb w10, [x0, x1]
     pop
-    lsr w11, w5, 8
+    sub x11, x5, x4
+    lsr w12, w11, 8
+    rpush w12
     rpush w11
-    rpush w5
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
+    add x5, x5, x4
     next
 
 _STH2:
@@ -498,29 +515,29 @@ _STZ2:
 
 _LDR2:
     ldrsb w9, [x0, x1]
+    and x9, x9, 0xffff
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9], #1 ; read from RAM
     strb w10, [x0, x1] ; push to stack
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9]     ; read from RAM
     push w10
     next
 
 _STR2:
     ldrsb w9, [x0, x1]
+    and x9, x9, 0xffff
     pop
-    ldrsb w10, [x0, x1]
+    ldrb w10, [x0, x1]
     pop
-    ldrsb w11, [x0, x1]
+    ldrb w11, [x0, x1]
     pop
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+    strb w11, [x9], #1 ; write to RAM
+    wrapptr x9
+    strb w10, [x9]     ; write to RAM
     next
 
 _LDA2:
@@ -622,15 +639,13 @@ _SFT2:
     next
 
 _JMI:
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
-    ldrb w10, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
+    ldrb w10, [x5], #1
+    wrappc
     orr w12, w10, w9, lsl #8 ; build the jump offset
     add x5, x5, x12 ; do the jump
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _INCr:
@@ -701,30 +716,34 @@ _LTHr:
 
 _JMPr:
     ldrsb x9, [x2, x3]
+    and x9, x9, 0xffff
     rpop
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JCNr:
     ldrsb w9, [x2, x3]
+    and x9, x9, 0xffff
     rpop
     ldrb w10, [x2, x3]
     rpop
     cmp w10, #0
     csel w10, wzr, w9, eq ; choose the jump or not
     add x5, x5, x10 ; jump or not
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JSRr:
     ldrsb w9, [x2, x3]
+    and x9, x9, 0xffff
     rpop
-    lsr w10, w5, 8
+    sub x10, x5, x4
+    lsr w11, w10, 8
+    push w11
     push w10
-    push w5
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _STHr:
@@ -750,20 +769,22 @@ _STZr:
 
 _LDRr:
     ldrsb w9, [x2, x3]
+    and x9, x9, 0xffff
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w9, [x9]     ; read from RAM
     strb w9, [x2, x3] ; push to stack
     next
 
 _STRr:
     ldrsb w9, [x2, x3]
+    and x9, x9, 0xffff
     rpop
     ldrb w10, [x2, x3]
     rpop
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+    strb w10, [x9] ; write to RAM
     next
 
 _LDAr:
@@ -840,22 +861,21 @@ _SFTr:
     next
 
 _JSI:
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
-    ldrb w10, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
+    ldrb w10, [x5], #1
+    wrappc
 
     orr w12, w10, w9, lsl #8 ; build the jump offset
 
     ; Store PC + 2 to the return stack
-    lsr w9, w5, 8
+    and w9, w5, 0xffff
+    lsr w10, w9, 8
+    rpush w10
     rpush w9
-    rpush w5
 
     add x5, x5, x12 ; do the jump
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _INC2r:
@@ -968,7 +988,8 @@ _JMP2r:
     rpop
     ldrb w10, [x2, x3]
     rpop
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
+    add x5, x4, x5
     next
 
 _JCN2r:
@@ -978,9 +999,10 @@ _JCN2r:
     rpop
     ldrb w11, [x2, x3]
     rpop
-    orr w9, w9, w10, lsl #8 ; update program counter
+    orr x9, x9, x10, lsl #8 ; update program counter
+    add x9, x9, x4
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel x5, x5, x9, eq ; choose the jump or not
     next
 
 _JSR2r:
@@ -988,10 +1010,11 @@ _JSR2r:
     rpop
     ldrb w10, [x2, x3]
     rpop
-    lsr w11, w5, 8
+    and w11, w5, 0xffff
+    lsr w12, w11, 8
+    push w12
     push w11
-    push w5
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
     next
 
 _STH2r:
@@ -1029,29 +1052,29 @@ _STZ2r:
 
 _LDR2r:
     ldrsb w9, [x2, x3]
+    and x9, x9, 0xffff
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9], #1 ; read from RAM
     strb w10, [x2, x3] ; push to stack
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9]     ; read from RAM
     rpush w10
     next
 
 _STR2r:
     ldrsb w9, [x2, x3]
+    and x9, x9, 0xffff
     rpop
-    ldrsb w10, [x2, x3]
+    ldrb w10, [x2, x3]
     rpop
-    ldrsb w11, [x2, x3]
+    ldrb w11, [x2, x3]
     rpop
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+    strb w11, [x9], #1 ; write to RAM
+    wrapptr x9
+    strb w10, [x9]     ; write to RAM
     next
 
 _LDA2r:
@@ -1153,9 +1176,8 @@ _SFT2r:
     next
 
 _LIT:
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
     push w9
     next
 
@@ -1226,26 +1248,30 @@ _LTHk:
 
 _JMPk:
     ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JCNk:
     ldrsb w9, [x0, x1]
+    bfc x9, #16, #48
     peek w10, x10, 1
     cmp w10, #0
     csel w10, wzr, w9, eq ; choose the jump or not
     add x5, x5, x10 ; jump or not
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JSRk:
     ldrsb w9, [x0, x1]
-    lsr w10, w5, 8
+    bfc x9, #16, #48
+    and w10, w5, 0xffff
+    lsr w11, w10, 8
+    rpush w11
     rpush w10
-    rpush w5
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _STHk:
@@ -1267,18 +1293,20 @@ _STZk:
 
 _LDRk:
     ldrsb w9, [x0, x1]
+    bfc x9, #16, #48
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w9, [x9]   ; read from RAM
     push w9
     next
 
 _STRk:
-    ldrsb w9, [x0, x1]
-    peek w10, x10, 1
+    ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+    peek w10, x10, 1
+    strb w10, [x9] ; write to RAM
     next
 
 _LDAk:
@@ -1351,13 +1379,11 @@ _SFTk:
     next
 
 _LIT2:
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
     push w9
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
     push w9
     next
 
@@ -1468,7 +1494,8 @@ _LTH2k:
 _JMP2k:
     ldrb w9, [x0, x1]
     peek w10, x10, 1
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
+    add x5, x5, x4
     next
 
 _JCN2k:
@@ -1477,19 +1504,21 @@ _JCN2k:
     peek w11, x12, 2
 
     orr w9, w9, w10, lsl #8 ; update program counter
+    add x9, x4, x9
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel x5, x5, x9, eq ; choose the jump or not
     next
 
 _JSR2k:
     ldrb w9, [x0, x1]
     peek w10, x10, 1
-
-    lsr w11, w5, 8
+    and w11, w5, 0xffff
+    lsr w12, w11, 8
+    rpush w12
     rpush w11
-    rpush w5
 
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
+    add x5, x5, x4
     next
 
 _STH2k:
@@ -1521,28 +1550,29 @@ _STZ2k:
     next
 
 _LDR2k:
-    ldrsb w9, [x0, x1]
+    ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9], #1 ; read from RAM
     push w10
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9]     ; read from RAM
     push w10
     next
 
 _STR2k:
-    ldrsb w9, [x0, x1]
     peek w10, x10, 1
     peek w11, x11, 2
 
+    ldrsb x9, [x0, x1]
+    bfc x9, #16, #48
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+
+    strb w11, [x9], #1 ; write to RAM
+    wrapptr x9
+    strb w10, [x9]     ; write to RAM
     next
 
 _LDA2k:
@@ -1636,9 +1666,8 @@ _SFT2k:
     next
 
 _LITr:
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
     rpush w9
     next
 
@@ -1709,26 +1738,30 @@ _LTHkr:
 
 _JMPkr:
     ldrsb x9, [x2, x3]
+    bfc x9, #16, #48
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JCNkr:
-    ldrsb w9, [x2, x3]
+    ldrsb x9, [x2, x3]
+    bfc x9, #16, #48
     rpeek w10, x10, 1
     cmp w10, #0
     csel w10, wzr, w9, eq ; choose the jump or not
     add x5, x5, x10 ; jump or not
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _JSRkr:
-    ldrsb w9, [x2, x3]
-    lsr w10, w5, 8
+    ldrsb x9, [x2, x3]
+    bfc x9, #16, #48
+    and w10, w5, 0xffff
+    lsr w11, w10, 8
+    push w11
     push w10
-    push w5
     add x5, x5, x9
-    and x5, x5, 0xffff
+    wrappc
     next
 
 _STHkr:
@@ -1749,19 +1782,21 @@ _STZkr:
     next
 
 _LDRkr:
-    ldrsb w9, [x2, x3]
+    ldrsb x9, [x2, x3]
+    bfc x9, #16, #48
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w9, [x9] ; read from RAM
     rpush w9
     next
 
 _STRkr:
-    ldrsb w9, [x2, x3]
+    ldrsb x9, [x2, x3]
+    bfc x9, #16, #48
     rpeek w10, x10, 1
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+    strb w10, [x9] ; write to RAM
     next
 
 _LDAkr:
@@ -1834,13 +1869,11 @@ _SFTkr:
     next
 
 _LIT2r:
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
     rpush w9
-    ldrb w9, [x4, x5]
-    add x5, x5, #1
-    and x5, x5, #0xffff
+    ldrb w9, [x5], #1
+    wrappc
     rpush w9
     next
 
@@ -1949,7 +1982,8 @@ _LTH2kr:
 _JMP2kr:
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
+    add x5, x5, x4
     next
 
 _JCN2kr:
@@ -1957,17 +1991,20 @@ _JCN2kr:
     rpeek w10, x12, 1
     rpeek w11, x12, 2
     orr w9, w9, w10, lsl #8 ; update program counter
+    add x9, x9, x4
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel x5, x5, x9, eq ; choose the jump or not
     next
 
 _JSR2kr:
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
-    lsr w11, w5, 8
+    and w11, w5, 0xffff
+    lsr w12, w11, 8
+    push w12
     push w11
-    push w5
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr x5, x9, x10, lsl #8 ; update program counter
+    add x5, x5, x4
     next
 
 _STH2kr:
@@ -1999,28 +2036,28 @@ _STZ2kr:
     next
 
 _LDR2kr:
-    ldrsb w9, [x2, x3]
+    ldrsb x9, [x2, x3]
+    bfc x9, #16, #48
     add x9, x5, x9
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9], #1 ; read from RAM
     rpush w10
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    wrapptr x9
+    ldrb w10, [x9]     ; read from RAM
     rpush w10
     next
 
 _STR2kr:
-    ldrsb w9, [x2, x3]
+    ldrsb x9, [x2, x3]
+    bfc x9, #16, #48
     rpeek w10, x10, 1
     rpeek w11, x11, 2
 
     add x9, x5, x9
-    and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
-    add x9, x9, #1
-    and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    wrapptr x9
+    strb w11, [x9], #1 ; write to RAM
+    wrapptr x9
+    strb w10, [x9]     ; write to RAM
     next
 
 _LDA2kr:
