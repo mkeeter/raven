@@ -1,8 +1,5 @@
 use crate::{Device, Uxn};
 
-#[cfg(target_arch = "aarch64")]
-mod aarch64;
-
 #[cfg(not(target_arch = "aarch64"))]
 compile_error!("no native implementation for this platform");
 
@@ -92,34 +89,31 @@ extern "C" fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[repr(C)]
-pub(crate) struct EntryHandle {
-    stack_data: *mut u8,
-    stack_index: *mut u8,
-    ret_data: *mut u8,
-    ret_index: *mut u8,
-    ram: *mut u8,
-    vm: *mut core::ffi::c_void,  // *Uxn
-    dev: *mut core::ffi::c_void, // *DeviceHandle
-}
-
 struct DeviceHandle<'a>(&'a mut dyn Device);
 
 pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     let mut h = DeviceHandle(dev);
-    let mut e = EntryHandle {
-        stack_data: vm.stack.data.as_mut_ptr(),
-        stack_index: &mut vm.stack.index as *mut _,
-        ret_data: vm.ret.data.as_mut_ptr(),
-        ret_index: &mut vm.ret.index as *mut _,
-        ram: (*vm.ram).as_mut_ptr(),
-        vm: vm as *mut _ as *mut _,
-        dev: &mut h as *mut _ as *mut _,
-    };
+    let r: usize;
 
     // SAFETY: do you trust me?
-    unsafe { aarch64::aarch64_entry(&mut e as *mut _, pc, JUMP_TABLE.as_ptr()) }
+    unsafe {
+        core::arch::asm!(
+            "bl aarch64_entry",
+            inout("x0") vm.stack.data.as_mut_ptr() as usize => r,
+            in("x1") &mut vm.stack.index as *mut _,
+            in("x2") vm.ret.data.as_mut_ptr(),
+            in("x3") &mut vm.ret.index as *mut _,
+            in("x4") (*vm.ram).as_mut_ptr(),
+            in("x5") pc,
+            in("x6") vm as *mut _,
+            in("x7") &mut h as *mut _,
+            in("x8") JUMP_TABLE.as_ptr(),
+        );
+    }
+    r as u16
 }
+
+core::arch::global_asm!(include_str!("aarch64.s"));
 
 // Helper macro to generate opcode tables
 macro_rules! opcodes {

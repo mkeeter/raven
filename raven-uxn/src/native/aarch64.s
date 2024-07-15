@@ -75,7 +75,7 @@
     ldp x6, x7, [sp, #0x50]
     ldr x8,     [sp, #0x60]
 
-    ; The DEO operation may have changed stack pointers, so reload them here 
+    ; The DEO operation may have changed stack pointers, so reload them here
     ldp x11, x12, [sp, 0x10]
     ldrb w1, [x11]
     ldrb w3, [x12]
@@ -86,25 +86,11 @@
     \op:
 .endm
 
-; x0 - *EntryHandle
-; x1 - pc
-; x2 - table
-.global _aarch64_entry
-_aarch64_entry:
-    sub sp, sp, #0x200  ; make room in the stack
+.global aarch64_entry
+aarch64_entry:
+    sub sp, sp, #0x200          ; make room in the stack
     stp   x29, x30, [sp, 0x0]   ; store stack and frame pointer
     mov   x29, sp
-
-    // Unpack from EntryHandle into registers
-    mov x5, x1 ; move PC (before overwriting x1)
-    mov x8, x2 ; jump table (before overwriting x2)
-    ldr x1, [x0, 0x8]  ; stack index pointer
-    ldr x2, [x0, 0x10] ; ret data pointer
-    ldr x3, [x0, 0x18] ; ret index pointer
-    ldr x4, [x0, 0x20] ; RAM pointer
-    ldr x6, [x0, 0x28] ; *mut Uxn
-    ldr x7, [x0, 0x30] ; *mut DeviceHandle
-    ldr x0, [x0, 0x00] ; stack data pointer (overwriting *EntryHandle)
 
     ; Convert from index pointers to index values in w1 / w3
     stp x1, x3, [sp, 0x10]      ; save stack index pointers
