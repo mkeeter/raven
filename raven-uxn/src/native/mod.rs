@@ -123,7 +123,7 @@ pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
 
 // Helper macro to generate opcode tables
 macro_rules! opcodes {
-    ($($op:ident),+) => {
+    ($($op:ident),+ $(,)?) => {
         extern "C" {
             $(
                 fn $op();
@@ -178,7 +178,7 @@ opcodes!(
     LIT2r,  INC2kr, POP2kr, NIP2kr, SWP2kr, ROT2kr, DUP2kr, OVR2kr,
     EQU2kr, NEQ2kr, GTH2kr, LTH2kr, JMP2kr, JCN2kr, JSR2kr, STH2kr,
     LDZ2kr, STZ2kr, LDR2kr, STR2kr, LDA2kr, STA2kr, DEI2kr, DEO2kr,
-    ADD2kr, SUB2kr, MUL2kr, DIV2kr, AND2kr, ORA2kr, EOR2kr, SFT2kr
+    ADD2kr, SUB2kr, MUL2kr, DIV2kr, AND2kr, ORA2kr, EOR2kr, SFT2kr,
 );
 
 #[cfg(all(feature = "alloc", test))]
