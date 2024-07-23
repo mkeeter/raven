@@ -81,8 +81,8 @@
     ldrb w3, [x12]
 .endm
 
-.global aarch64_entry
-aarch64_entry:
+.global _aarch64_entry
+_aarch64_entry:
     sub sp, sp, #0x200          ; make room in the stack
     stp   x29, x30, [sp, 0x0]   ; store stack and frame pointer
     mov   x29, sp

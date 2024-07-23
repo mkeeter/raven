@@ -93,26 +93,36 @@ struct DeviceHandle<'a>(&'a mut dyn Device);
 
 pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     let mut h = DeviceHandle(dev);
-    let r: usize;
 
     // SAFETY: do you trust me?
     unsafe {
-        core::arch::asm!(
-            "bl aarch64_entry",
-            inout("x0") vm.stack.data.as_mut_ptr() as usize => r,
-            in("x1") &mut vm.stack.index as *mut _,
-            in("x2") vm.ret.data.as_mut_ptr(),
-            in("x3") &mut vm.ret.index as *mut _,
-            in("x4") (*vm.ram).as_mut_ptr(),
-            in("x5") pc,
-            in("x6") vm as *mut _,
-            in("x7") &mut h as *mut _,
-        );
+        aarch64_entry(
+            vm.stack.data.as_mut_ptr(),
+            &mut vm.stack.index as *mut _,
+            vm.ret.data.as_mut_ptr(),
+            &mut vm.ret.index as *mut _,
+            (*vm.ram).as_mut_ptr(),
+            pc,
+            vm as *mut _,
+            &mut h as *mut _,
+        )
     }
-    r as u16
 }
 
 core::arch::global_asm!(include_str!("aarch64.s"));
+extern "C" {
+    #[allow(improper_ctypes)]
+    fn aarch64_entry(
+        stack: *mut u8,
+        stack_index: *mut u8,
+        ret: *mut u8,
+        ret_index: *mut u8,
+        ram: *mut u8,
+        pc: u16,
+        vm: *mut Uxn,
+        dev: *mut DeviceHandle,
+    ) -> u16;
+}
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
