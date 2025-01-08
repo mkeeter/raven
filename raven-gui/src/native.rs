@@ -64,6 +64,8 @@ pub fn run() -> Result<()> {
 
     let _audio = audio_setup(dev.audio_streams());
 
+    dev.init_args(&mut vm, &args.args);
+
     // Run the reset vector
     let start = std::time::Instant::now();
     vm.run(&mut dev, 0x100);

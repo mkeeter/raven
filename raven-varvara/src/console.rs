@@ -87,6 +87,16 @@ impl Console {
         // Nothing to do here; data is pre-populated in `vm.dev` memory
     }
 
+    /// Sets the appropriate type value if there are arguments to be parsed
+    ///
+    /// This should be called before running the reset vector
+    pub fn set_has_args(&mut self, vm: &mut Uxn, has_args: bool) {
+        if has_args {
+            let p = vm.dev_mut::<ConsolePorts>();
+            p.type_ = 1;
+        }
+    }
+
     /// Sets the current character type
     ///
     /// This should be called before sending a console event
