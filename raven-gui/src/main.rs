@@ -19,14 +19,14 @@ pub struct Stage<'a> {
     vm: Uxn<'a>,
     dev: Varvara,
 
-    /// Double the UI size
+    /// Enlarge or shrink the screen size
     scale: f32,
+
+    /// Current size as set by ROM
+    size: (u16, u16),
 
     /// Time (in seconds) at which we should draw the next frame
     next_frame: f64,
-
-    /// Forces a window resize when set
-    needs_resize: bool,
 
     #[cfg(not(target_arch = "wasm32"))]
     console_rx: std::sync::mpsc::Receiver<u8>,
@@ -68,8 +68,8 @@ impl<'a> Stage<'a> {
             dev,
 
             scale,
+            size,
             next_frame: 0.0,
-            needs_resize: true,
 
             #[cfg(not(target_arch = "wasm32"))]
             console_rx: varvara::console_worker(),
@@ -92,7 +92,7 @@ impl<'a> Stage<'a> {
         let data = self.vm.reset(data);
         self.dev.reset(data);
         self.vm.run(&mut self.dev, 0x100);
-        self.needs_resize = true;
+        self.size = (0, 0);
         let out = self.dev.output(&self.vm);
         out.check()?;
         Ok(())
@@ -228,15 +228,15 @@ impl eframe::App for Stage<'_> {
         // Handle audio callback
         self.dev.audio(&mut self.vm);
 
-        let prev_size = self.dev.screen_size();
         let out = self.dev.output(&self.vm);
 
         // Update our GUI based on current state
         if out.hide_mouse {
             ctx.set_cursor_icon(egui::CursorIcon::None);
         }
-        if std::mem::take(&mut self.needs_resize) || prev_size != out.size {
+        if self.size != out.size {
             info!("resizing window to {:?}", out.size);
+            self.size = out.size;
             let size = egui::Vec2::new(out.size.0 as f32, out.size.1 as f32)
                 * self.scale;
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
