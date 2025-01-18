@@ -1,15 +1,15 @@
-; x0 - stack pointer (&mut [u8; 256])
-; x1 - stack index (u8)
-; x2 - return stack pointer (&mut [u8; 256])
-; x3 - return stack index (u8)
-; x4 - RAM pointer (&mut [u8; 65536])
-; x5 - program counter (u16), offset of the next value in RAM
-; x6 - VM pointer (&mut Uxn)
-; x7 - Device handle pointer (&DeviceHandle)
-; x8 - Jump table pointer (loaded in aarch64_entry)
-; x9-15 - scratch registers
-;
-; We do not use any callee-saved registers (besides x29 / x30)
+# x0 - stack pointer (&mut [u8; 256])
+# x1 - stack index (u8)
+# x2 - return stack pointer (&mut [u8; 256])
+# x3 - return stack index (u8)
+# x4 - RAM pointer (&mut [u8; 65536])
+# x5 - program counter (u16), offset of the next value in RAM
+# x6 - VM pointer (&mut Uxn)
+# x7 - Device handle pointer (&DeviceHandle)
+# x8 - Jump table pointer (loaded in aarch64_entry)
+# x9-15 - scratch registers
+#
+// We do not use any callee-saved registers (besides x29 / x30)
 .macro next
     ldrb w9, [x4, x5]
     add x5, x5, #1

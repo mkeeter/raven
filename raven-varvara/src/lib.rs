@@ -216,7 +216,6 @@ impl Varvara {
         self.console.set_has_args(vm, !args.is_empty());
     }
 
-
     /// Returns the current output state of the system
     ///
     /// This is not idempotent; the output is taken from various accumulators
