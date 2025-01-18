@@ -73,6 +73,7 @@ pub fn run() -> Result<()> {
     dev.send_args(&mut vm, &args.args).check()?;
 
     let (width, height) = dev.output(&vm).size;
+    info!("creating window with size {:?}", (width, height));
     let options = eframe::NativeOptions {
         window_builder: Some(Box::new(move |v| {
             v.with_inner_size(egui::Vec2::new(width as f32, height as f32))

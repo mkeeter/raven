@@ -193,11 +193,6 @@ impl Varvara {
         self.already_warned.fill(false);
     }
 
-    /// Returns the current screen size
-    pub fn screen_size(&self) -> (u16, u16) {
-        self.screen.size()
-    }
-
     /// Checks whether the SHIFT key is currently down
     fn warn_missing(&mut self, t: u8) {
         if !self.already_warned[usize::from(t >> 4)] {
