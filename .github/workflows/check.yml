@@ -1,0 +1,68 @@
+# Build, run Clippy, and test (native only) across all platforms
+name: Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        target: [
+          "ubuntu-24.04-arm",
+          "ubuntu-latest",
+          "windows-latest",
+          "macos-14",
+        ]
+    runs-on: ${{ matrix.target }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - if: runner.os == 'Linux'
+      name: Install dependencies
+      run: sudo apt install libasound2-dev
+      shell: bash
+    - name: Test
+      run: cargo test --verbose
+  clippy:
+    strategy:
+      matrix:
+        target: [
+          "ubuntu-24.04-arm",
+          "ubuntu-latest",
+          "windows-latest",
+          "macos-14",
+        ]
+    runs-on: ${{ matrix.target }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - if: runner.os == 'Linux'
+      name: Install dependencies
+      run: sudo apt install libasound2-dev
+    - name: Clippy
+      run: cargo clippy --all-targets --verbose
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - name: Install wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Clippy
+      run: cargo clippy --target=wasm32-unknown-unknown -praven-gui
+    - name: Build
+      run: cargo build --target=wasm32-unknown-unknown -praven-gui
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Check format
+      run: cargo fmt -- --check || exit 1

@@ -1,15 +1,15 @@
-; x0 - stack pointer (&mut [u8; 256])
-; x1 - stack index (u8)
-; x2 - return stack pointer (&mut [u8; 256])
-; x3 - return stack index (u8)
-; x4 - RAM pointer (&mut [u8; 65536])
-; x5 - program counter (u16), offset of the next value in RAM
-; x6 - VM pointer (&mut Uxn)
-; x7 - Device handle pointer (&DeviceHandle)
-; x8 - Jump table pointer (loaded in aarch64_entry)
-; x9-15 - scratch registers
-;
-; We do not use any callee-saved registers (besides x29 / x30)
+// x0 - stack pointer (&mut [u8; 256])
+// x1 - stack index (u8)
+// x2 - return stack pointer (&mut [u8; 256])
+// x3 - return stack index (u8)
+// x4 - RAM pointer (&mut [u8; 65536])
+// x5 - program counter (u16), offset of the next value in RAM
+// x6 - VM pointer (&mut Uxn)
+// x7 - Device handle pointer (&DeviceHandle)
+// x8 - Jump table pointer (loaded in aarch64_entry)
+// x9-15 - scratch registers
+//
+// We do not use any callee-saved registers (besides x29 / x30)
 .macro next
     ldrb w9, [x4, x5]
     add x5, x5, #1
@@ -53,10 +53,10 @@
 .endm
 
 .macro precall
-    ; We have to write our stack index pointers back into the &mut Uxn
-    ldp x11, x12, [sp, 0x10] ; restore stack index pointers
-    strb w1, [x11]   ; modify stack index pointer
-    strb w3, [x12]   ; modify return stack index pointer
+    // We have to write our stack index pointers back into the &mut Uxn
+    ldp x11, x12, [sp, 0x10] // restore stack index pointers
+    strb w1, [x11]   // modify stack index pointer
+    strb w3, [x12]   // modify return stack index pointer
 
     stp x0, x1, [sp, #0x20]
     stp x2, x3, [sp, #0x30]
@@ -75,37 +75,36 @@
     ldp x6, x7, [sp, #0x50]
     ldr x8,     [sp, #0x60]
 
-    ; The DEO operation may have changed stack pointers, so reload them here
+    // The DEO operation may have changed stack pointers, so reload them here
     ldp x11, x12, [sp, 0x10]
     ldrb w1, [x11]
     ldrb w3, [x12]
 .endm
 
-.global _aarch64_entry
-_aarch64_entry:
-    sub sp, sp, #0x200          ; make room in the stack
-    stp   x29, x30, [sp, 0x0]   ; store stack and frame pointer
+ENTRY aarch64_entry
+    sub sp, sp, #0x200          // make room in the stack
+    stp   x29, x30, [sp, 0x0]   // store stack and frame pointer
     mov   x29, sp
-    adrp x8, JUMP_TABLE@PAGE
+    load_jump_table x8 // platform-dependent
 
-    ; Convert from index pointers to index values in w1 / w3
-    stp x1, x3, [sp, 0x10]      ; save stack index pointers
-    ldrb w1, [x1]               ; load stack index
-    ldrb w3, [x3]               ; load ret index
+    // Convert from index pointers to index values in w1 / w3
+    stp x1, x3, [sp, 0x10]      // save stack index pointers
+    ldrb w1, [x1]               // load stack index
+    ldrb w3, [x3]               // load ret index
 
-    ; Jump into the instruction list
+    // Jump into the instruction list
     next
 
 _BRK:
-    ; Write index values back through index pointers
-    ldp x9, x10, [sp, 0x10]     ; restore stack index pointers
-    strb w1, [x9]               ; save stack index
-    strb w3, [x10]              ; save ret index
+    // Write index values back through index pointers
+    ldp x9, x10, [sp, 0x10]     // restore stack index pointers
+    strb w1, [x9]               // save stack index
+    strb w3, [x10]              // save ret index
 
-    ldp   x29, x30, [sp, 0x0]   ; Restore stack and frame pointer
-    add sp, sp, #0x200  ; restore stack pointer
+    ldp   x29, x30, [sp, 0x0]   // Restore stack and frame pointer
+    add sp, sp, #0x200  // restore stack pointer
 
-    mov x0, x5 ; return PC from function
+    mov x0, x5 // return PC from function
     ret
 
 _INC:
@@ -119,21 +118,21 @@ _POP:
     next
 
 _NIP:
-    ldrb w9, [x0, x1]   ; get the top byte
+    ldrb w9, [x0, x1]   // get the top byte
     pop
-    strb w9, [x0, x1]   ; overwrite the previous byte
+    strb w9, [x0, x1]   // overwrite the previous byte
     next
 
 _SWP:
-    ldrb w10, [x0, x1]   ; get the top byte
-    peek w11, x9, 1      ; get the second-from-top byte
-    strb w10, [x0, x9]   ; do the swap!
+    ldrb w10, [x0, x1]   // get the top byte
+    peek w11, x9, 1      // get the second-from-top byte
+    strb w10, [x0, x9]   // do the swap!
     strb w11, [x0, x1]
     next
 
 _ROT:
-    ; a b c -- b c a
-    ldrb w10, [x0, x1] ; c
+    // a b c -- b c a
+    ldrb w10, [x0, x1] // c
     peek w12, x11, 1
     peek w14, x13, 2
 
@@ -144,7 +143,7 @@ _ROT:
     next
 
 _DUP:
-    ldrb w10, [x0, x1]   ; get the top byte
+    ldrb w10, [x0, x1]   // get the top byte
     push w10
     next
 
@@ -188,8 +187,8 @@ _JCN:
     ldrb w10, [x0, x1]
     pop
     cmp w10, #0
-    csel w10, wzr, w9, eq ; choose the jump or not
-    add x5, x5, x10 ; jump or not
+    csel w10, wzr, w9, eq // choose the jump or not
+    add x5, x5, x10 // jump or not
     and x5, x5, 0xffff
     next
 
@@ -228,8 +227,8 @@ _LDR:
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
-    strb w9, [x0, x1] ; push to stack
+    ldrb w9, [x4, x9] // read from RAM
+    strb w9, [x0, x1] // push to stack
     next
 
 _STR:
@@ -239,7 +238,7 @@ _STR:
     pop
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDA:
@@ -264,13 +263,13 @@ _STA:
 
 _DEI:
     precall
-    bl _dei_entry
+    CALL dei_entry
     postcall
     next
 
 _DEO:
     precall
-    bl _deo_entry ; todo check return value for early exit?
+    CALL deo_entry // todo check return value for early exit?
     postcall
     next
 
@@ -322,18 +321,18 @@ _JCI:
     ldrb w10, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
-    orr w12, w10, w9, lsl #8 ; build the jump offset
-    ldrb w10, [x0, x1] ; read conditional byte
+    orr w12, w10, w9, lsl #8 // build the jump offset
+    ldrb w10, [x0, x1] // read conditional byte
     pop
     cmp w10, #0
-    csel w10, wzr, w12, eq ; choose the jump or not
-    add x5, x5, x10 ; jump or not
+    csel w10, wzr, w12, eq // choose the jump or not
+    add x5, x5, x10 // jump or not
     and x5, x5, 0xffff
     next
 
 _INC2:
-    ldrb w10, [x0, x1]  ; get the top byte
-    peek w11, x9, 1     ; get the second-from-top byte
+    ldrb w10, [x0, x1]  // get the top byte
+    peek w11, x9, 1     // get the second-from-top byte
     orr w12, w10, w11, lsl #8
     add w12, w12, #1
     and w12, w12, #0xffff
@@ -359,9 +358,9 @@ _NIP2:
     next
 
 _SWP2:
-    ldrb w11, [x0, x1]   ; get the top byte
-    peek w12, x9, 2       ; get the second-from-top byte
-    strb w11, [x0, x9]   ; do the swap!
+    ldrb w11, [x0, x1]   // get the top byte
+    peek w12, x9, 2       // get the second-from-top byte
+    strb w11, [x0, x9]   // do the swap!
     strb w12, [x0, x1]
 
     peek w11, x9, 1
@@ -435,7 +434,7 @@ _JMP2:
     pop
     ldrb w10, [x0, x1]
     pop
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _JCN2:
@@ -445,9 +444,9 @@ _JCN2:
     pop
     ldrb w11, [x0, x1]
     pop
-    orr w9, w9, w10, lsl #8 ; update program counter
+    orr w9, w9, w10, lsl #8 // update program counter
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel w5, w5, w9, eq // choose the jump or not
     next
 
 _JSR2:
@@ -458,7 +457,7 @@ _JSR2:
     lsr w11, w5, 8
     rpush w11
     rpush w5
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _STH2:
@@ -498,11 +497,11 @@ _LDR2:
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
-    strb w10, [x0, x1] ; push to stack
+    ldrb w10, [x4, x9] // read from RAM
+    strb w10, [x0, x1] // push to stack
     add x9, x9, #1
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    ldrb w10, [x4, x9] // read from RAM
     push w10
     next
 
@@ -515,10 +514,10 @@ _STR2:
     pop
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
+    strb w11, [x4, x9] // write to RAM
     add x9, x9, #1
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDA2:
@@ -552,13 +551,13 @@ _STA2:
 
 _DEI2:
     precall
-    bl _dei_2_entry
+    CALL dei_2_entry
     postcall
     next
 
 _DEO2:
     precall
-    bl _deo_2_entry ; todo check return value for early exit?
+    CALL deo_2_entry // todo check return value for early exit?
     postcall
     next
 
@@ -626,8 +625,8 @@ _JMI:
     ldrb w10, [x4, x5]
     add x5, x5, #1
     and x5, x5, #0xffff
-    orr w12, w10, w9, lsl #8 ; build the jump offset
-    add x5, x5, x12 ; do the jump
+    orr w12, w10, w9, lsl #8 // build the jump offset
+    add x5, x5, x12 // do the jump
     and x5, x5, 0xffff
     next
 
@@ -643,15 +642,15 @@ _POPr:
     next
 
 _NIPr:
-    ldrb w9, [x2, x3]   ; get the top byte
+    ldrb w9, [x2, x3]   // get the top byte
     rpop
-    strb w9, [x2, x3]   ; overwrite the previous byte
+    strb w9, [x2, x3]   // overwrite the previous byte
     next
 
 _SWPr:
-    ldrb w10, [x2, x3]  ; get the top byte
-    rpeek w11, x9, 1    ; get the second-from-top byte
-    strb w10, [x2, x9]  ; do the swap!
+    ldrb w10, [x2, x3]  // get the top byte
+    rpeek w11, x9, 1    // get the second-from-top byte
+    strb w10, [x2, x9]  // do the swap!
     strb w11, [x2, x3]
     next
 
@@ -666,7 +665,7 @@ _ROTr:
     next
 
 _DUPr:
-    ldrb w10, [x2, x3]   ; get the top byte
+    ldrb w10, [x2, x3]   // get the top byte
     rpush w10
     next
 
@@ -710,8 +709,8 @@ _JCNr:
     ldrb w10, [x2, x3]
     rpop
     cmp w10, #0
-    csel w10, wzr, w9, eq ; choose the jump or not
-    add x5, x5, x10 ; jump or not
+    csel w10, wzr, w9, eq // choose the jump or not
+    add x5, x5, x10 // jump or not
     and x5, x5, 0xffff
     next
 
@@ -750,8 +749,8 @@ _LDRr:
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
-    strb w9, [x2, x3] ; push to stack
+    ldrb w9, [x4, x9] // read from RAM
+    strb w9, [x2, x3] // push to stack
     next
 
 _STRr:
@@ -761,7 +760,7 @@ _STRr:
     rpop
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDAr:
@@ -786,13 +785,13 @@ _STAr:
 
 _DEIr:
     precall
-    bl _dei_r_entry
+    CALL dei_r_entry
     postcall
     next
 
 _DEOr:
     precall
-    bl _deo_r_entry ; todo check return value for early exit?
+    CALL deo_r_entry // todo check return value for early exit?
     postcall
     next
 
@@ -845,14 +844,14 @@ _JSI:
     add x5, x5, #1
     and x5, x5, #0xffff
 
-    orr w12, w10, w9, lsl #8 ; build the jump offset
+    orr w12, w10, w9, lsl #8 // build the jump offset
 
-    ; Store PC + 2 to the return stack
+    // Store PC + 2 to the return stack
     lsr w9, w5, 8
     rpush w9
     rpush w5
 
-    add x5, x5, x12 ; do the jump
+    add x5, x5, x12 // do the jump
     and x5, x5, 0xffff
     next
 
@@ -884,9 +883,9 @@ _NIP2r:
     next
 
 _SWP2r:
-    ldrb w11, [x2, x3]  ; get the top byte
-    rpeek w12, x9, 2    ; get the second-from-top byte
-    strb w11, [x2, x9]  ; do the swap!
+    ldrb w11, [x2, x3]  // get the top byte
+    rpeek w12, x9, 2    // get the second-from-top byte
+    strb w11, [x2, x9]  // do the swap!
     strb w12, [x2, x3]
 
     rpeek w11, x9, 1
@@ -966,7 +965,7 @@ _JMP2r:
     rpop
     ldrb w10, [x2, x3]
     rpop
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _JCN2r:
@@ -976,9 +975,9 @@ _JCN2r:
     rpop
     ldrb w11, [x2, x3]
     rpop
-    orr w9, w9, w10, lsl #8 ; update program counter
+    orr w9, w9, w10, lsl #8 // update program counter
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel w5, w5, w9, eq // choose the jump or not
     next
 
 _JSR2r:
@@ -989,7 +988,7 @@ _JSR2r:
     lsr w11, w5, 8
     push w11
     push w5
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _STH2r:
@@ -1029,11 +1028,11 @@ _LDR2r:
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
-    strb w10, [x2, x3] ; push to stack
+    ldrb w10, [x4, x9] // read from RAM
+    strb w10, [x2, x3] // push to stack
     add x9, x9, #1
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    ldrb w10, [x4, x9] // read from RAM
     rpush w10
     next
 
@@ -1046,10 +1045,10 @@ _STR2r:
     rpop
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
+    strb w11, [x4, x9] // write to RAM
     add x9, x9, #1
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDA2r:
@@ -1083,13 +1082,13 @@ _STA2r:
 
 _DEI2r:
     precall
-    bl _dei_2r_entry
+    CALL dei_2r_entry
     postcall
     next
 
 _DEO2r:
     precall
-    bl _deo_2r_entry ; todo check return value for early exit?
+    CALL deo_2r_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1172,8 +1171,8 @@ _NIPk:
     next
 
 _SWPk:
-    ldrb w10, [x0, x1]   ; get the top byte
-    peek w11, x9, 1      ; get the second-from-top byte
+    ldrb w10, [x0, x1]   // get the top byte
+    peek w11, x9, 1      // get the second-from-top byte
     push w10
     push w11
     next
@@ -1194,7 +1193,7 @@ _DUPk:
     next
 
 _OVRk:
-    peek w10, x9, 1 ; get the second-from-top
+    peek w10, x9, 1 // get the second-from-top
     ldrb w11, [x0, x1]
     push w10
     push w11
@@ -1232,8 +1231,8 @@ _JCNk:
     ldrsb w9, [x0, x1]
     peek w10, x10, 1
     cmp w10, #0
-    csel w10, wzr, w9, eq ; choose the jump or not
-    add x5, x5, x10 ; jump or not
+    csel w10, wzr, w9, eq // choose the jump or not
+    add x5, x5, x10 // jump or not
     and x5, x5, 0xffff
     next
 
@@ -1267,7 +1266,7 @@ _LDRk:
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
+    ldrb w9, [x4, x9] // read from RAM
     push w9
     next
 
@@ -1276,7 +1275,7 @@ _STRk:
     peek w10, x10, 1
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDAk:
@@ -1284,8 +1283,8 @@ _LDAk:
     sub w10, w1, #1
     and w10, w10, #0xff
     ldrb w10, [x0, x10]
-    orr w10, w9, w10, lsl #8    ; build address
-    ldrb w10, [x4, x10]         ; load byte from RAM
+    orr w10, w9, w10, lsl #8    // build address
+    ldrb w10, [x4, x10]         // load byte from RAM
     push w10
     next
 
@@ -1299,13 +1298,13 @@ _STAk:
 
 _DEIk:
     precall
-    bl _dei_k_entry
+    CALL dei_k_entry
     postcall
     next
 
 _DEOk:
     precall
-    bl _deo_k_entry ; todo check return value for early exit?
+    CALL deo_k_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1466,7 +1465,7 @@ _LTH2k:
 _JMP2k:
     ldrb w9, [x0, x1]
     peek w10, x10, 1
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _JCN2k:
@@ -1474,9 +1473,9 @@ _JCN2k:
     peek w10, x12, 1
     peek w11, x12, 2
 
-    orr w9, w9, w10, lsl #8 ; update program counter
+    orr w9, w9, w10, lsl #8 // update program counter
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel w5, w5, w9, eq // choose the jump or not
     next
 
 _JSR2k:
@@ -1487,7 +1486,7 @@ _JSR2k:
     rpush w11
     rpush w5
 
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _STH2k:
@@ -1522,11 +1521,11 @@ _LDR2k:
     ldrsb w9, [x0, x1]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    ldrb w10, [x4, x9] // read from RAM
     push w10
     add x9, x9, #1
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    ldrb w10, [x4, x9] // read from RAM
     push w10
     next
 
@@ -1537,10 +1536,10 @@ _STR2k:
 
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
+    strb w11, [x4, x9] // write to RAM
     add x9, x9, #1
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDA2k:
@@ -1571,13 +1570,13 @@ _STA2k:
 
 _DEI2k:
     precall
-    bl _dei_2k_entry
+    CALL dei_2k_entry
     postcall
     next
 
 _DEO2k:
     precall
-    bl _deo_2k_entry ; todo check return value for early exit?
+    CALL deo_2k_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1655,7 +1654,7 @@ _NIPkr:
     next
 
 _SWPkr:
-    ldrb w10, [x2, x3]   ; get the top byte
+    ldrb w10, [x2, x3]   // get the top byte
     rpeek w11, x9, 1
     rpush w10
     rpush w11
@@ -1715,8 +1714,8 @@ _JCNkr:
     ldrsb w9, [x2, x3]
     rpeek w10, x10, 1
     cmp w10, #0
-    csel w10, wzr, w9, eq ; choose the jump or not
-    add x5, x5, x10 ; jump or not
+    csel w10, wzr, w9, eq // choose the jump or not
+    add x5, x5, x10 // jump or not
     and x5, x5, 0xffff
     next
 
@@ -1750,7 +1749,7 @@ _LDRkr:
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w9, [x4, x9] ; read from RAM
+    ldrb w9, [x4, x9] // read from RAM
     rpush w9
     next
 
@@ -1759,7 +1758,7 @@ _STRkr:
     rpeek w10, x10, 1
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDAkr:
@@ -1767,8 +1766,8 @@ _LDAkr:
     sub w10, w3, #1
     and w10, w10, #0xff
     ldrb w10, [x2, x10]
-    orr w10, w9, w10, lsl #8    ; build address
-    ldrb w10, [x4, x10]         ; load byte from RAM
+    orr w10, w9, w10, lsl #8    // build address
+    ldrb w10, [x4, x10]         // load byte from RAM
     rpush w10
     next
 
@@ -1782,13 +1781,13 @@ _STAkr:
 
 _DEIkr:
     precall
-    bl _dei_kr_entry
+    CALL dei_kr_entry
     postcall
     next
 
 _DEOkr:
     precall
-    bl _deo_kr_entry ; todo check return value for early exit?
+    CALL deo_kr_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1947,16 +1946,16 @@ _LTH2kr:
 _JMP2kr:
     ldrb w9, [x2, x3]
     rpeek w10, x10, 1
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _JCN2kr:
     ldrb w9, [x2, x3]
     rpeek w10, x12, 1
     rpeek w11, x12, 2
-    orr w9, w9, w10, lsl #8 ; update program counter
+    orr w9, w9, w10, lsl #8 // update program counter
     cmp w11, #0
-    csel w5, w5, w9, eq ; choose the jump or not
+    csel w5, w5, w9, eq // choose the jump or not
     next
 
 _JSR2kr:
@@ -1965,7 +1964,7 @@ _JSR2kr:
     lsr w11, w5, 8
     push w11
     push w5
-    orr w5, w9, w10, lsl #8 ; update program counter
+    orr w5, w9, w10, lsl #8 // update program counter
     next
 
 _STH2kr:
@@ -2000,11 +1999,11 @@ _LDR2kr:
     ldrsb w9, [x2, x3]
     add x9, x5, x9
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    ldrb w10, [x4, x9] // read from RAM
     rpush w10
     add x9, x9, #1
     and x9, x9, #0xffff
-    ldrb w10, [x4, x9] ; read from RAM
+    ldrb w10, [x4, x9] // read from RAM
     rpush w10
     next
 
@@ -2015,10 +2014,10 @@ _STR2kr:
 
     add x9, x5, x9
     and x9, x9, #0xffff
-    strb w11, [x4, x9] ; write to RAM
+    strb w11, [x4, x9] // write to RAM
     add x9, x9, #1
     and x9, x9, #0xffff
-    strb w10, [x4, x9] ; write to RAM
+    strb w10, [x4, x9] // write to RAM
     next
 
 _LDA2kr:
@@ -2049,13 +2048,13 @@ _STA2kr:
 
 _DEI2kr:
     precall
-    bl _dei_2kr_entry
+    CALL dei_2kr_entry
     postcall
     next
 
 _DEO2kr:
     precall
-    bl _deo_2kr_entry ; todo check return value for early exit?
+    CALL deo_2kr_entry // todo check return value for early exit?
     postcall
     next
 

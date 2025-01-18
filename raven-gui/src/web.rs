@@ -24,7 +24,7 @@ pub fn run() -> Result<()> {
         .map_err(|e| anyhow!("could not get location hash: {e:?}"))?;
     let rom_name = hash.strip_prefix('#');
 
-    const ROMS: &[(&'static str, &'static [u8])] = &[
+    const ROMS: &[(&str, &[u8])] = &[
         ("controller", include_bytes!("../../roms/controller.rom")),
         ("screen", include_bytes!("../../roms/screen.rom")),
         ("drool", include_bytes!("../../roms/drool.rom")),
@@ -43,7 +43,7 @@ pub fn run() -> Result<()> {
     let ram = UxnRam::new();
     let mut vm = Uxn::new(ram.leak(), Backend::Interpreter);
     let mut dev = Varvara::new();
-    let extra = vm.reset(&rom);
+    let extra = vm.reset(rom);
     dev.reset(extra);
 
     // Run the reset vector
