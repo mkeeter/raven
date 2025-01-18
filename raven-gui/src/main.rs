@@ -19,17 +19,20 @@ pub struct Stage<'a> {
     vm: Uxn<'a>,
     dev: Varvara,
 
-    /// Enlarge or shrink the screen size
+    /// Scale factor to adjust window size
     scale: f32,
 
-    /// Current size as set by ROM
+    /// Current window size
+    ///
+    /// When the ROM writes to `Screen/width` or `Screen/height`, the window is
+    /// resized and this value is updated accordingly.
     size: (u16, u16),
 
     /// Time (in seconds) at which we should draw the next frame
     next_frame: f64,
 
     #[cfg(not(target_arch = "wasm32"))]
-    console_rx: std::sync::mpsc::Receiver<u8>,
+    console_rx: mpsc::Receiver<u8>,
 
     scroll: (f32, f32),
     cursor_pos: Option<(f32, f32)>,
@@ -37,7 +40,7 @@ pub struct Stage<'a> {
     texture: egui::TextureHandle,
 
     /// Event injector
-    rx: mpsc::Receiver<Event>,
+    event_rx: mpsc::Receiver<Event>,
 
     /// Callback when the size is changed by the ROM
     resized: Option<Box<dyn FnMut(u16, u16)>>,
@@ -48,7 +51,7 @@ impl<'a> Stage<'a> {
         vm: Uxn<'a>,
         mut dev: Varvara,
         scale: Option<f32>,
-        rx: mpsc::Receiver<Event>,
+        event_rx: mpsc::Receiver<Event>,
         ctx: &egui::Context,
     ) -> Self {
         let out = dev.output(&vm);
@@ -73,7 +76,7 @@ impl<'a> Stage<'a> {
 
             #[cfg(not(target_arch = "wasm32"))]
             console_rx: varvara::console_worker(),
-            rx,
+            event_rx,
             resized: None,
 
             scroll: (0.0, 0.0),
@@ -92,7 +95,6 @@ impl<'a> Stage<'a> {
         let data = self.vm.reset(data);
         self.dev.reset(data);
         self.vm.run(&mut self.dev, 0x100);
-        self.size = (0, 0);
         let out = self.dev.output(&self.vm);
         out.check()?;
         Ok(())
@@ -101,7 +103,7 @@ impl<'a> Stage<'a> {
 
 impl eframe::App for Stage<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        while let Ok(e) = self.rx.try_recv() {
+        while let Ok(e) = self.event_rx.try_recv() {
             match e {
                 Event::LoadRom(data) => {
                     if let Err(e) = self.load_rom(&data) {
