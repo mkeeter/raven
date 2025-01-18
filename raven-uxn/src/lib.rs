@@ -147,17 +147,17 @@ impl Value {
         }
     }
     #[inline]
-    fn wrapping_shr(&self, i: u32) -> Self {
+    fn shr(&self, i: u32) -> Self {
         match self {
-            Value::Short(v) => Value::Short(v.wrapping_shr(i)),
-            Value::Byte(v) => Value::Byte(v.wrapping_shr(i)),
+            Value::Short(v) => Value::Short(v.checked_shr(i).unwrap_or(0)),
+            Value::Byte(v) => Value::Byte(v.checked_shr(i).unwrap_or(0)),
         }
     }
     #[inline]
-    fn wrapping_shl(&self, i: u32) -> Self {
+    fn shl(&self, i: u32) -> Self {
         match self {
-            Value::Short(v) => Value::Short(v.wrapping_shl(i)),
-            Value::Byte(v) => Value::Byte(v.wrapping_shl(i)),
+            Value::Short(v) => Value::Short(v.checked_shl(i).unwrap_or(0)),
+            Value::Byte(v) => Value::Byte(v.checked_shl(i).unwrap_or(0)),
         }
     }
 }
@@ -1661,7 +1661,7 @@ impl<'a> Uxn<'a> {
         let shr = u32::from(shift & 0xF);
         let shl = u32::from(shift >> 4);
         let v = s.pop();
-        s.push(v.wrapping_shr(shr).wrapping_shl(shl));
+        s.push(v.shr(shr).shl(shl));
         Some(pc)
     }
 }
