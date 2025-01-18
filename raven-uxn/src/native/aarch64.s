@@ -81,8 +81,7 @@
     ldrb w3, [x12]
 .endm
 
-.global _aarch64_entry
-_aarch64_entry:
+ENTRY aarch64_entry
     sub sp, sp, #0x200          // make room in the stack
     stp   x29, x30, [sp, 0x0]   // store stack and frame pointer
     mov   x29, sp
@@ -264,13 +263,13 @@ _STA:
 
 _DEI:
     precall
-    bl _dei_entry
+    CALL dei_entry
     postcall
     next
 
 _DEO:
     precall
-    bl _deo_entry // todo check return value for early exit?
+    CALL deo_entry // todo check return value for early exit?
     postcall
     next
 
@@ -552,13 +551,13 @@ _STA2:
 
 _DEI2:
     precall
-    bl _dei_2_entry
+    CALL dei_2_entry
     postcall
     next
 
 _DEO2:
     precall
-    bl _deo_2_entry // todo check return value for early exit?
+    CALL deo_2_entry // todo check return value for early exit?
     postcall
     next
 
@@ -786,13 +785,13 @@ _STAr:
 
 _DEIr:
     precall
-    bl _dei_r_entry
+    CALL dei_r_entry
     postcall
     next
 
 _DEOr:
     precall
-    bl _deo_r_entry // todo check return value for early exit?
+    CALL deo_r_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1083,13 +1082,13 @@ _STA2r:
 
 _DEI2r:
     precall
-    bl _dei_2r_entry
+    CALL dei_2r_entry
     postcall
     next
 
 _DEO2r:
     precall
-    bl _deo_2r_entry // todo check return value for early exit?
+    CALL deo_2r_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1299,13 +1298,13 @@ _STAk:
 
 _DEIk:
     precall
-    bl _dei_k_entry
+    CALL dei_k_entry
     postcall
     next
 
 _DEOk:
     precall
-    bl _deo_k_entry // todo check return value for early exit?
+    CALL deo_k_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1571,13 +1570,13 @@ _STA2k:
 
 _DEI2k:
     precall
-    bl _dei_2k_entry
+    CALL dei_2k_entry
     postcall
     next
 
 _DEO2k:
     precall
-    bl _deo_2k_entry // todo check return value for early exit?
+    CALL deo_2k_entry // todo check return value for early exit?
     postcall
     next
 
@@ -1782,13 +1781,13 @@ _STAkr:
 
 _DEIkr:
     precall
-    bl _dei_kr_entry
+    CALL dei_kr_entry
     postcall
     next
 
 _DEOkr:
     precall
-    bl _deo_kr_entry // todo check return value for early exit?
+    CALL deo_kr_entry // todo check return value for early exit?
     postcall
     next
 
@@ -2049,13 +2048,13 @@ _STA2kr:
 
 _DEI2kr:
     precall
-    bl _dei_2kr_entry
+    CALL dei_2kr_entry
     postcall
     next
 
 _DEO2kr:
     precall
-    bl _deo_2kr_entry // todo check return value for early exit?
+    CALL deo_2kr_entry // todo check return value for early exit?
     postcall
     next
 
