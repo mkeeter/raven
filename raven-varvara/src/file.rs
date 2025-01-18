@@ -76,6 +76,7 @@ impl FilePorts {
     const DELETE: u8 = offset_of!(Self, delete) as u8;
 }
 
+#[cfg_attr(target_os = "windows", allow(clippy::large_enum_variant))]
 enum Handle {
     File {
         path: std::path::PathBuf,
@@ -83,7 +84,7 @@ enum Handle {
     },
     Dir {
         path: std::path::PathBuf,
-        dir: std::fs::ReadDir,
+        dir: std::fs::ReadDir, // weirdly huge (616 bytes) on Windows!
 
         /// Buffer of left-over characters to write
         scratch: VecDeque<u8>,
