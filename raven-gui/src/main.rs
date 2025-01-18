@@ -13,6 +13,7 @@ use log::{error, info};
 pub enum Event {
     LoadRom(Vec<u8>),
     SetMuted(bool),
+    Console(u8),
 }
 
 pub struct Stage<'a> {
@@ -30,9 +31,6 @@ pub struct Stage<'a> {
 
     /// Time (in seconds) at which we should draw the next frame
     next_frame: f64,
-
-    #[cfg(not(target_arch = "wasm32"))]
-    console_rx: mpsc::Receiver<u8>,
 
     scroll: (f32, f32),
     cursor_pos: Option<(f32, f32)>,
@@ -74,8 +72,6 @@ impl<'a> Stage<'a> {
             size,
             next_frame: 0.0,
 
-            #[cfg(not(target_arch = "wasm32"))]
-            console_rx: varvara::console_worker(),
             event_rx,
             resized: None,
 
@@ -112,6 +108,9 @@ impl eframe::App for Stage<'_> {
                 }
                 Event::SetMuted(m) => {
                     self.dev.audio_set_muted(m);
+                }
+                Event::Console(b) => {
+                    self.dev.console(&mut self.vm, b);
                 }
             }
         }
@@ -220,12 +219,6 @@ impl eframe::App for Stage<'_> {
             self.dev.mouse(&mut self.vm, m);
             i.time
         });
-
-        // Listen for console characters
-        #[cfg(not(target_arch = "wasm32"))]
-        if let Ok(c) = self.console_rx.try_recv() {
-            self.dev.console(&mut self.vm, c);
-        }
 
         // Handle audio callback
         self.dev.audio(&mut self.vm);

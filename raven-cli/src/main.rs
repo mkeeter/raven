@@ -64,7 +64,8 @@ fn main() -> Result<()> {
     dev.send_args(&mut vm, &args.args).check()?;
 
     // Blocking loop, listening to the stdin reader thread
-    let rx = varvara::console_worker();
+    let (tx, rx) = std::sync::mpsc::channel();
+    varvara::spawn_console_worker(move |e| tx.send(e));
     while let Ok(c) = rx.recv() {
         dev.console(&mut vm, c);
         dev.output(&vm).check()?;

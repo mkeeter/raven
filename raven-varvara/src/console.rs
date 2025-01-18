@@ -44,23 +44,26 @@ impl ConsolePorts {
 }
 
 /// Spawns a worker thread that listens on `stdin` and emits characters
-#[cfg(not(target_arch = "wasm32"))]
-pub fn worker() -> std::sync::mpsc::Receiver<u8> {
+///
+/// # Panics
+/// If threads are not available on the system (e.g. in WebAssembly)
+pub fn spawn_worker<F, E>(mut tx: F)
+where
+    F: FnMut(u8) -> Result<(), E> + Send + 'static,
+{
     use std::io::Read;
-    let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let mut i = std::io::stdin().lock();
         let mut buf = [0u8; 32];
         loop {
             let n = i.read(&mut buf).unwrap();
             for &c in &buf[..n] {
-                if tx.send(c).is_err() {
+                if tx(c).is_err() {
                     return;
                 }
             }
         }
     });
-    rx
 }
 
 impl Console {
