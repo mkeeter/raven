@@ -13,5 +13,7 @@ zerocopy.workspace = true
 
 [features]
 alloc = []
+std = ["alloc"]
 default = ["alloc"]
 native = []
+fuzz = ["std"]

@@ -1,5 +1,5 @@
 //! Uxn virtual machine
-#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "native"), forbid(unsafe_code))]
 
@@ -20,7 +20,7 @@ const fn ret(flags: u8) -> bool {
 pub const DEV_SIZE: usize = 16;
 
 /// Simple circular stack, with room for 256 items
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Stack {
     data: [u8; 256],
 
@@ -400,18 +400,41 @@ impl<'a> Uxn<'a> {
     #[inline]
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) -> u16 {
         match self.backend {
-            Backend::Interpreter => {
-                loop {
-                    let op = self.next(&mut pc);
-                    let Some(next) = self.op(op, dev, pc) else {
-                        break;
-                    };
-                    pc = next;
-                }
-                pc
-            }
+            Backend::Interpreter => loop {
+                let op = self.next(&mut pc);
+                let Some(next) = self.op(op, dev, pc) else {
+                    break pc;
+                };
+                pc = next;
+            },
             #[cfg(feature = "native")]
             Backend::Native => native::entry(self, dev, pc),
+        }
+    }
+
+    /// Runs until the program terminates or a cycle is detected
+    ///
+    /// Returns the new program counter if the program terminated, or `None` if
+    /// a cycle is detected.
+    #[cfg(feature = "fuzz")]
+    #[inline]
+    pub fn run_without_cycles<D: Device>(
+        &mut self,
+        dev: &mut D,
+        mut pc: u16,
+    ) -> Option<u16> {
+        use std::collections::HashSet;
+        let mut seen = HashSet::new();
+        loop {
+            let state = (self.dev, self.ram.to_owned(), self.stack, self.ret);
+            if !seen.insert(state) {
+                break None;
+            }
+            let op = self.next(&mut pc);
+            let Some(next) = self.op(op, dev, pc) else {
+                break Some(pc);
+            };
+            pc = next;
         }
     }
 
@@ -1728,9 +1751,9 @@ pub use ram::UxnRam;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(test)]
-#[allow(unused, non_upper_case_globals)]
-mod op {
+/// Opcode names and constants
+#[allow(non_upper_case_globals, missing_docs)]
+pub mod op {
     pub const BRK: u8 = 0x0;
     pub const INC: u8 = 0x1;
     pub const POP: u8 = 0x2;

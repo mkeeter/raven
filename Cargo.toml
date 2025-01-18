@@ -5,6 +5,7 @@ members = [
     "raven-varvara",
     "raven-cli",
     "raven-gui",
+    "fuzz",
 ]
 
 [workspace.dependencies]
