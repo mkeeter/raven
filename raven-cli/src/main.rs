@@ -53,7 +53,6 @@ fn main() -> Result<()> {
     let mut dev = Varvara::new();
     let data = vm.reset(&rom);
     dev.reset(data);
-
     dev.init_args(&mut vm, &args.args);
 
     // Run the reset vector

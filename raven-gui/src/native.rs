@@ -61,10 +61,9 @@ pub fn run() -> Result<()> {
     let mut dev = Varvara::new();
     let extra = vm.reset(&rom);
     dev.reset(extra);
+    dev.init_args(&mut vm, &args.args);
 
     let _audio = audio_setup(dev.audio_streams());
-
-    dev.init_args(&mut vm, &args.args);
 
     // Run the reset vector
     let start = std::time::Instant::now();
@@ -75,7 +74,7 @@ pub fn run() -> Result<()> {
     dev.send_args(&mut vm, &args.args).check()?;
 
     let (width, height) = dev.output(&vm).size;
-    info!("creating window with size {:?}", (width, height));
+    info!("creating window with size ({width}, {height})");
     let options = eframe::NativeOptions {
         window_builder: Some(Box::new(move |v| {
             v.with_inner_size(egui::Vec2::new(width as f32, height as f32))
