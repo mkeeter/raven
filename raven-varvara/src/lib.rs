@@ -209,6 +209,14 @@ impl Varvara {
         self.process_event(vm, e);
     }
 
+    /// Sets initial value for Console/type based on the presense of arguments
+    ///
+    /// This should be called before running the reset vector
+    pub fn init_args(&mut self, vm: &mut Uxn, args: &[String]) {
+        self.console.set_has_args(vm, !args.is_empty());
+    }
+
+
     /// Returns the current output state of the system
     ///
     /// This is not idempotent; the output is taken from various accumulators
