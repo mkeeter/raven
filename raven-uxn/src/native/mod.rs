@@ -109,7 +109,18 @@ pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     }
 }
 
-core::arch::global_asm!(include_str!("aarch64.s"));
+#[cfg(target_os = "macos")]
+core::arch::global_asm!(concat!(
+    include_str!("aarch64_macos.s"),
+    include_str!("aarch64.s")
+));
+
+#[cfg(target_os = "linux")]
+core::arch::global_asm!(concat!(
+    include_str!("aarch64_linux.s"),
+    include_str!("aarch64.s")
+));
+
 extern "C" {
     #[allow(improper_ctypes)]
     fn aarch64_entry(

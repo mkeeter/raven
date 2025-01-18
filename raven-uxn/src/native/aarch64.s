@@ -86,7 +86,7 @@ _aarch64_entry:
     sub sp, sp, #0x200          // make room in the stack
     stp   x29, x30, [sp, 0x0]   // store stack and frame pointer
     mov   x29, sp
-    adrp x8, JUMP_TABLE@PAGE
+    load_jump_table x8 // platform-dependent
 
     // Convert from index pointers to index values in w1 / w3
     stp x1, x3, [sp, 0x10]      // save stack index pointers
