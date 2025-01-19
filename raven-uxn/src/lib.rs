@@ -532,262 +532,262 @@ impl<'a> Uxn<'a> {
     #[inline]
     fn op<D: Device>(&mut self, op: u8, dev: &mut D, pc: u16) -> Option<u16> {
         match op {
-            0x00 => self.brk(dev, pc),
-            0x01 => self.inc::<0b000, D>(dev, pc),
-            0x02 => self.pop::<0b000, D>(dev, pc),
-            0x03 => self.nip::<0b000, D>(dev, pc),
-            0x04 => self.swp::<0b000, D>(dev, pc),
-            0x05 => self.rot::<0b000, D>(dev, pc),
-            0x06 => self.dup::<0b000, D>(dev, pc),
-            0x07 => self.ovr::<0b000, D>(dev, pc),
-            0x08 => self.equ::<0b000, D>(dev, pc),
-            0x09 => self.neq::<0b000, D>(dev, pc),
-            0x0a => self.gth::<0b000, D>(dev, pc),
-            0x0b => self.lth::<0b000, D>(dev, pc),
-            0x0c => self.jmp::<0b000, D>(dev, pc),
-            0x0d => self.jcn::<0b000, D>(dev, pc),
-            0x0e => self.jsr::<0b000, D>(dev, pc),
-            0x0f => self.sth::<0b000, D>(dev, pc),
-            0x10 => self.ldz::<0b000, D>(dev, pc),
-            0x11 => self.stz::<0b000, D>(dev, pc),
-            0x12 => self.ldr::<0b000, D>(dev, pc),
-            0x13 => self.str::<0b000, D>(dev, pc),
-            0x14 => self.lda::<0b000, D>(dev, pc),
-            0x15 => self.sta::<0b000, D>(dev, pc),
-            0x16 => self.dei::<0b000>(dev, pc),
-            0x17 => self.deo::<0b000>(dev, pc),
-            0x18 => self.add::<0b000, D>(dev, pc),
-            0x19 => self.sub::<0b000, D>(dev, pc),
-            0x1a => self.mul::<0b000, D>(dev, pc),
-            0x1b => self.div::<0b000, D>(dev, pc),
-            0x1c => self.and::<0b000, D>(dev, pc),
-            0x1d => self.ora::<0b000, D>(dev, pc),
-            0x1e => self.eor::<0b000, D>(dev, pc),
-            0x1f => self.sft::<0b000, D>(dev, pc),
-            0x20 => self.jci(dev, pc),
-            0x21 => self.inc::<0b001, D>(dev, pc),
-            0x22 => self.pop::<0b001, D>(dev, pc),
-            0x23 => self.nip::<0b001, D>(dev, pc),
-            0x24 => self.swp::<0b001, D>(dev, pc),
-            0x25 => self.rot::<0b001, D>(dev, pc),
-            0x26 => self.dup::<0b001, D>(dev, pc),
-            0x27 => self.ovr::<0b001, D>(dev, pc),
-            0x28 => self.equ::<0b001, D>(dev, pc),
-            0x29 => self.neq::<0b001, D>(dev, pc),
-            0x2a => self.gth::<0b001, D>(dev, pc),
-            0x2b => self.lth::<0b001, D>(dev, pc),
-            0x2c => self.jmp::<0b001, D>(dev, pc),
-            0x2d => self.jcn::<0b001, D>(dev, pc),
-            0x2e => self.jsr::<0b001, D>(dev, pc),
-            0x2f => self.sth::<0b001, D>(dev, pc),
-            0x30 => self.ldz::<0b001, D>(dev, pc),
-            0x31 => self.stz::<0b001, D>(dev, pc),
-            0x32 => self.ldr::<0b001, D>(dev, pc),
-            0x33 => self.str::<0b001, D>(dev, pc),
-            0x34 => self.lda::<0b001, D>(dev, pc),
-            0x35 => self.sta::<0b001, D>(dev, pc),
-            0x36 => self.dei::<0b001>(dev, pc),
-            0x37 => self.deo::<0b001>(dev, pc),
-            0x38 => self.add::<0b001, D>(dev, pc),
-            0x39 => self.sub::<0b001, D>(dev, pc),
-            0x3a => self.mul::<0b001, D>(dev, pc),
-            0x3b => self.div::<0b001, D>(dev, pc),
-            0x3c => self.and::<0b001, D>(dev, pc),
-            0x3d => self.ora::<0b001, D>(dev, pc),
-            0x3e => self.eor::<0b001, D>(dev, pc),
-            0x3f => self.sft::<0b001, D>(dev, pc),
-            0x40 => self.jmi(dev, pc),
-            0x41 => self.inc::<0b010, D>(dev, pc),
-            0x42 => self.pop::<0b010, D>(dev, pc),
-            0x43 => self.nip::<0b010, D>(dev, pc),
-            0x44 => self.swp::<0b010, D>(dev, pc),
-            0x45 => self.rot::<0b010, D>(dev, pc),
-            0x46 => self.dup::<0b010, D>(dev, pc),
-            0x47 => self.ovr::<0b010, D>(dev, pc),
-            0x48 => self.equ::<0b010, D>(dev, pc),
-            0x49 => self.neq::<0b010, D>(dev, pc),
-            0x4a => self.gth::<0b010, D>(dev, pc),
-            0x4b => self.lth::<0b010, D>(dev, pc),
-            0x4c => self.jmp::<0b010, D>(dev, pc),
-            0x4d => self.jcn::<0b010, D>(dev, pc),
-            0x4e => self.jsr::<0b010, D>(dev, pc),
-            0x4f => self.sth::<0b010, D>(dev, pc),
-            0x50 => self.ldz::<0b010, D>(dev, pc),
-            0x51 => self.stz::<0b010, D>(dev, pc),
-            0x52 => self.ldr::<0b010, D>(dev, pc),
-            0x53 => self.str::<0b010, D>(dev, pc),
-            0x54 => self.lda::<0b010, D>(dev, pc),
-            0x55 => self.sta::<0b010, D>(dev, pc),
-            0x56 => self.dei::<0b010>(dev, pc),
-            0x57 => self.deo::<0b010>(dev, pc),
-            0x58 => self.add::<0b010, D>(dev, pc),
-            0x59 => self.sub::<0b010, D>(dev, pc),
-            0x5a => self.mul::<0b010, D>(dev, pc),
-            0x5b => self.div::<0b010, D>(dev, pc),
-            0x5c => self.and::<0b010, D>(dev, pc),
-            0x5d => self.ora::<0b010, D>(dev, pc),
-            0x5e => self.eor::<0b010, D>(dev, pc),
-            0x5f => self.sft::<0b010, D>(dev, pc),
-            0x60 => self.jsi(dev, pc),
-            0x61 => self.inc::<0b011, D>(dev, pc),
-            0x62 => self.pop::<0b011, D>(dev, pc),
-            0x63 => self.nip::<0b011, D>(dev, pc),
-            0x64 => self.swp::<0b011, D>(dev, pc),
-            0x65 => self.rot::<0b011, D>(dev, pc),
-            0x66 => self.dup::<0b011, D>(dev, pc),
-            0x67 => self.ovr::<0b011, D>(dev, pc),
-            0x68 => self.equ::<0b011, D>(dev, pc),
-            0x69 => self.neq::<0b011, D>(dev, pc),
-            0x6a => self.gth::<0b011, D>(dev, pc),
-            0x6b => self.lth::<0b011, D>(dev, pc),
-            0x6c => self.jmp::<0b011, D>(dev, pc),
-            0x6d => self.jcn::<0b011, D>(dev, pc),
-            0x6e => self.jsr::<0b011, D>(dev, pc),
-            0x6f => self.sth::<0b011, D>(dev, pc),
-            0x70 => self.ldz::<0b011, D>(dev, pc),
-            0x71 => self.stz::<0b011, D>(dev, pc),
-            0x72 => self.ldr::<0b011, D>(dev, pc),
-            0x73 => self.str::<0b011, D>(dev, pc),
-            0x74 => self.lda::<0b011, D>(dev, pc),
-            0x75 => self.sta::<0b011, D>(dev, pc),
-            0x76 => self.dei::<0b011>(dev, pc),
-            0x77 => self.deo::<0b011>(dev, pc),
-            0x78 => self.add::<0b011, D>(dev, pc),
-            0x79 => self.sub::<0b011, D>(dev, pc),
-            0x7a => self.mul::<0b011, D>(dev, pc),
-            0x7b => self.div::<0b011, D>(dev, pc),
-            0x7c => self.and::<0b011, D>(dev, pc),
-            0x7d => self.ora::<0b011, D>(dev, pc),
-            0x7e => self.eor::<0b011, D>(dev, pc),
-            0x7f => self.sft::<0b011, D>(dev, pc),
-            0x80 => self.lit::<0b100, D>(dev, pc),
-            0x81 => self.inc::<0b100, D>(dev, pc),
-            0x82 => self.pop::<0b100, D>(dev, pc),
-            0x83 => self.nip::<0b100, D>(dev, pc),
-            0x84 => self.swp::<0b100, D>(dev, pc),
-            0x85 => self.rot::<0b100, D>(dev, pc),
-            0x86 => self.dup::<0b100, D>(dev, pc),
-            0x87 => self.ovr::<0b100, D>(dev, pc),
-            0x88 => self.equ::<0b100, D>(dev, pc),
-            0x89 => self.neq::<0b100, D>(dev, pc),
-            0x8a => self.gth::<0b100, D>(dev, pc),
-            0x8b => self.lth::<0b100, D>(dev, pc),
-            0x8c => self.jmp::<0b100, D>(dev, pc),
-            0x8d => self.jcn::<0b100, D>(dev, pc),
-            0x8e => self.jsr::<0b100, D>(dev, pc),
-            0x8f => self.sth::<0b100, D>(dev, pc),
-            0x90 => self.ldz::<0b100, D>(dev, pc),
-            0x91 => self.stz::<0b100, D>(dev, pc),
-            0x92 => self.ldr::<0b100, D>(dev, pc),
-            0x93 => self.str::<0b100, D>(dev, pc),
-            0x94 => self.lda::<0b100, D>(dev, pc),
-            0x95 => self.sta::<0b100, D>(dev, pc),
-            0x96 => self.dei::<0b100>(dev, pc),
-            0x97 => self.deo::<0b100>(dev, pc),
-            0x98 => self.add::<0b100, D>(dev, pc),
-            0x99 => self.sub::<0b100, D>(dev, pc),
-            0x9a => self.mul::<0b100, D>(dev, pc),
-            0x9b => self.div::<0b100, D>(dev, pc),
-            0x9c => self.and::<0b100, D>(dev, pc),
-            0x9d => self.ora::<0b100, D>(dev, pc),
-            0x9e => self.eor::<0b100, D>(dev, pc),
-            0x9f => self.sft::<0b100, D>(dev, pc),
-            0xa0 => self.lit::<0b101, D>(dev, pc),
-            0xa1 => self.inc::<0b101, D>(dev, pc),
-            0xa2 => self.pop::<0b101, D>(dev, pc),
-            0xa3 => self.nip::<0b101, D>(dev, pc),
-            0xa4 => self.swp::<0b101, D>(dev, pc),
-            0xa5 => self.rot::<0b101, D>(dev, pc),
-            0xa6 => self.dup::<0b101, D>(dev, pc),
-            0xa7 => self.ovr::<0b101, D>(dev, pc),
-            0xa8 => self.equ::<0b101, D>(dev, pc),
-            0xa9 => self.neq::<0b101, D>(dev, pc),
-            0xaa => self.gth::<0b101, D>(dev, pc),
-            0xab => self.lth::<0b101, D>(dev, pc),
-            0xac => self.jmp::<0b101, D>(dev, pc),
-            0xad => self.jcn::<0b101, D>(dev, pc),
-            0xae => self.jsr::<0b101, D>(dev, pc),
-            0xaf => self.sth::<0b101, D>(dev, pc),
-            0xb0 => self.ldz::<0b101, D>(dev, pc),
-            0xb1 => self.stz::<0b101, D>(dev, pc),
-            0xb2 => self.ldr::<0b101, D>(dev, pc),
-            0xb3 => self.str::<0b101, D>(dev, pc),
-            0xb4 => self.lda::<0b101, D>(dev, pc),
-            0xb5 => self.sta::<0b101, D>(dev, pc),
-            0xb6 => self.dei::<0b101>(dev, pc),
-            0xb7 => self.deo::<0b101>(dev, pc),
-            0xb8 => self.add::<0b101, D>(dev, pc),
-            0xb9 => self.sub::<0b101, D>(dev, pc),
-            0xba => self.mul::<0b101, D>(dev, pc),
-            0xbb => self.div::<0b101, D>(dev, pc),
-            0xbc => self.and::<0b101, D>(dev, pc),
-            0xbd => self.ora::<0b101, D>(dev, pc),
-            0xbe => self.eor::<0b101, D>(dev, pc),
-            0xbf => self.sft::<0b101, D>(dev, pc),
-            0xc0 => self.lit::<0b110, D>(dev, pc),
-            0xc1 => self.inc::<0b110, D>(dev, pc),
-            0xc2 => self.pop::<0b110, D>(dev, pc),
-            0xc3 => self.nip::<0b110, D>(dev, pc),
-            0xc4 => self.swp::<0b110, D>(dev, pc),
-            0xc5 => self.rot::<0b110, D>(dev, pc),
-            0xc6 => self.dup::<0b110, D>(dev, pc),
-            0xc7 => self.ovr::<0b110, D>(dev, pc),
-            0xc8 => self.equ::<0b110, D>(dev, pc),
-            0xc9 => self.neq::<0b110, D>(dev, pc),
-            0xca => self.gth::<0b110, D>(dev, pc),
-            0xcb => self.lth::<0b110, D>(dev, pc),
-            0xcc => self.jmp::<0b110, D>(dev, pc),
-            0xcd => self.jcn::<0b110, D>(dev, pc),
-            0xce => self.jsr::<0b110, D>(dev, pc),
-            0xcf => self.sth::<0b110, D>(dev, pc),
-            0xd0 => self.ldz::<0b110, D>(dev, pc),
-            0xd1 => self.stz::<0b110, D>(dev, pc),
-            0xd2 => self.ldr::<0b110, D>(dev, pc),
-            0xd3 => self.str::<0b110, D>(dev, pc),
-            0xd4 => self.lda::<0b110, D>(dev, pc),
-            0xd5 => self.sta::<0b110, D>(dev, pc),
-            0xd6 => self.dei::<0b110>(dev, pc),
-            0xd7 => self.deo::<0b110>(dev, pc),
-            0xd8 => self.add::<0b110, D>(dev, pc),
-            0xd9 => self.sub::<0b110, D>(dev, pc),
-            0xda => self.mul::<0b110, D>(dev, pc),
-            0xdb => self.div::<0b110, D>(dev, pc),
-            0xdc => self.and::<0b110, D>(dev, pc),
-            0xdd => self.ora::<0b110, D>(dev, pc),
-            0xde => self.eor::<0b110, D>(dev, pc),
-            0xdf => self.sft::<0b110, D>(dev, pc),
-            0xe0 => self.lit::<0b111, D>(dev, pc),
-            0xe1 => self.inc::<0b111, D>(dev, pc),
-            0xe2 => self.pop::<0b111, D>(dev, pc),
-            0xe3 => self.nip::<0b111, D>(dev, pc),
-            0xe4 => self.swp::<0b111, D>(dev, pc),
-            0xe5 => self.rot::<0b111, D>(dev, pc),
-            0xe6 => self.dup::<0b111, D>(dev, pc),
-            0xe7 => self.ovr::<0b111, D>(dev, pc),
-            0xe8 => self.equ::<0b111, D>(dev, pc),
-            0xe9 => self.neq::<0b111, D>(dev, pc),
-            0xea => self.gth::<0b111, D>(dev, pc),
-            0xeb => self.lth::<0b111, D>(dev, pc),
-            0xec => self.jmp::<0b111, D>(dev, pc),
-            0xed => self.jcn::<0b111, D>(dev, pc),
-            0xee => self.jsr::<0b111, D>(dev, pc),
-            0xef => self.sth::<0b111, D>(dev, pc),
-            0xf0 => self.ldz::<0b111, D>(dev, pc),
-            0xf1 => self.stz::<0b111, D>(dev, pc),
-            0xf2 => self.ldr::<0b111, D>(dev, pc),
-            0xf3 => self.str::<0b111, D>(dev, pc),
-            0xf4 => self.lda::<0b111, D>(dev, pc),
-            0xf5 => self.sta::<0b111, D>(dev, pc),
-            0xf6 => self.dei::<0b111>(dev, pc),
-            0xf7 => self.deo::<0b111>(dev, pc),
-            0xf8 => self.add::<0b111, D>(dev, pc),
-            0xf9 => self.sub::<0b111, D>(dev, pc),
-            0xfa => self.mul::<0b111, D>(dev, pc),
-            0xfb => self.div::<0b111, D>(dev, pc),
-            0xfc => self.and::<0b111, D>(dev, pc),
-            0xfd => self.ora::<0b111, D>(dev, pc),
-            0xfe => self.eor::<0b111, D>(dev, pc),
-            0xff => self.sft::<0b111, D>(dev, pc),
+            op::BRK => self.brk(pc),
+            op::INC => self.inc::<0b000>(pc),
+            op::POP => self.pop::<0b000>(pc),
+            op::NIP => self.nip::<0b000>(pc),
+            op::SWP => self.swp::<0b000>(pc),
+            op::ROT => self.rot::<0b000>(pc),
+            op::DUP => self.dup::<0b000>(pc),
+            op::OVR => self.ovr::<0b000>(pc),
+            op::EQU => self.equ::<0b000>(pc),
+            op::NEQ => self.neq::<0b000>(pc),
+            op::GTH => self.gth::<0b000>(pc),
+            op::LTH => self.lth::<0b000>(pc),
+            op::JMP => self.jmp::<0b000>(pc),
+            op::JCN => self.jcn::<0b000>(pc),
+            op::JSR => self.jsr::<0b000>(pc),
+            op::STH => self.sth::<0b000>(pc),
+            op::LDZ => self.ldz::<0b000>(pc),
+            op::STZ => self.stz::<0b000>(pc),
+            op::LDR => self.ldr::<0b000>(pc),
+            op::STR => self.str::<0b000>(pc),
+            op::LDA => self.lda::<0b000>(pc),
+            op::STA => self.sta::<0b000>(pc),
+            op::DEI => self.dei::<0b000>(dev, pc),
+            op::DEO => self.deo::<0b000>(dev, pc),
+            op::ADD => self.add::<0b000>(pc),
+            op::SUB => self.sub::<0b000>(pc),
+            op::MUL => self.mul::<0b000>(pc),
+            op::DIV => self.div::<0b000>(pc),
+            op::AND => self.and::<0b000>(pc),
+            op::ORA => self.ora::<0b000>(pc),
+            op::EOR => self.eor::<0b000>(pc),
+            op::SFT => self.sft::<0b000>(pc),
+            op::JCI => self.jci(pc),
+            op::INC2 => self.inc::<0b001>(pc),
+            op::POP2 => self.pop::<0b001>(pc),
+            op::NIP2 => self.nip::<0b001>(pc),
+            op::SWP2 => self.swp::<0b001>(pc),
+            op::ROT2 => self.rot::<0b001>(pc),
+            op::DUP2 => self.dup::<0b001>(pc),
+            op::OVR2 => self.ovr::<0b001>(pc),
+            op::EQU2 => self.equ::<0b001>(pc),
+            op::NEQ2 => self.neq::<0b001>(pc),
+            op::GTH2 => self.gth::<0b001>(pc),
+            op::LTH2 => self.lth::<0b001>(pc),
+            op::JMP2 => self.jmp::<0b001>(pc),
+            op::JCN2 => self.jcn::<0b001>(pc),
+            op::JSR2 => self.jsr::<0b001>(pc),
+            op::STH2 => self.sth::<0b001>(pc),
+            op::LDZ2 => self.ldz::<0b001>(pc),
+            op::STZ2 => self.stz::<0b001>(pc),
+            op::LDR2 => self.ldr::<0b001>(pc),
+            op::STR2 => self.str::<0b001>(pc),
+            op::LDA2 => self.lda::<0b001>(pc),
+            op::STA2 => self.sta::<0b001>(pc),
+            op::DEI2 => self.dei::<0b001>(dev, pc),
+            op::DEO2 => self.deo::<0b001>(dev, pc),
+            op::ADD2 => self.add::<0b001>(pc),
+            op::SUB2 => self.sub::<0b001>(pc),
+            op::MUL2 => self.mul::<0b001>(pc),
+            op::DIV2 => self.div::<0b001>(pc),
+            op::AND2 => self.and::<0b001>(pc),
+            op::ORA2 => self.ora::<0b001>(pc),
+            op::EOR2 => self.eor::<0b001>(pc),
+            op::SFT2 => self.sft::<0b001>(pc),
+            op::JMI => self.jmi(pc),
+            op::INCr => self.inc::<0b010>(pc),
+            op::POPr => self.pop::<0b010>(pc),
+            op::NIPr => self.nip::<0b010>(pc),
+            op::SWPr => self.swp::<0b010>(pc),
+            op::ROTr => self.rot::<0b010>(pc),
+            op::DUPr => self.dup::<0b010>(pc),
+            op::OVRr => self.ovr::<0b010>(pc),
+            op::EQUr => self.equ::<0b010>(pc),
+            op::NEQr => self.neq::<0b010>(pc),
+            op::GTHr => self.gth::<0b010>(pc),
+            op::LTHr => self.lth::<0b010>(pc),
+            op::JMPr => self.jmp::<0b010>(pc),
+            op::JCNr => self.jcn::<0b010>(pc),
+            op::JSRr => self.jsr::<0b010>(pc),
+            op::STHr => self.sth::<0b010>(pc),
+            op::LDZr => self.ldz::<0b010>(pc),
+            op::STZr => self.stz::<0b010>(pc),
+            op::LDRr => self.ldr::<0b010>(pc),
+            op::STRr => self.str::<0b010>(pc),
+            op::LDAr => self.lda::<0b010>(pc),
+            op::STAr => self.sta::<0b010>(pc),
+            op::DEIr => self.dei::<0b010>(dev, pc),
+            op::DEOr => self.deo::<0b010>(dev, pc),
+            op::ADDr => self.add::<0b010>(pc),
+            op::SUBr => self.sub::<0b010>(pc),
+            op::MULr => self.mul::<0b010>(pc),
+            op::DIVr => self.div::<0b010>(pc),
+            op::ANDr => self.and::<0b010>(pc),
+            op::ORAr => self.ora::<0b010>(pc),
+            op::EORr => self.eor::<0b010>(pc),
+            op::SFTr => self.sft::<0b010>(pc),
+            op::JSI => self.jsi(pc),
+            op::INC2r => self.inc::<0b011>(pc),
+            op::POP2r => self.pop::<0b011>(pc),
+            op::NIP2r => self.nip::<0b011>(pc),
+            op::SWP2r => self.swp::<0b011>(pc),
+            op::ROT2r => self.rot::<0b011>(pc),
+            op::DUP2r => self.dup::<0b011>(pc),
+            op::OVR2r => self.ovr::<0b011>(pc),
+            op::EQU2r => self.equ::<0b011>(pc),
+            op::NEQ2r => self.neq::<0b011>(pc),
+            op::GTH2r => self.gth::<0b011>(pc),
+            op::LTH2r => self.lth::<0b011>(pc),
+            op::JMP2r => self.jmp::<0b011>(pc),
+            op::JCN2r => self.jcn::<0b011>(pc),
+            op::JSR2r => self.jsr::<0b011>(pc),
+            op::STH2r => self.sth::<0b011>(pc),
+            op::LDZ2r => self.ldz::<0b011>(pc),
+            op::STZ2r => self.stz::<0b011>(pc),
+            op::LDR2r => self.ldr::<0b011>(pc),
+            op::STR2r => self.str::<0b011>(pc),
+            op::LDA2r => self.lda::<0b011>(pc),
+            op::STA2r => self.sta::<0b011>(pc),
+            op::DEI2r => self.dei::<0b011>(dev, pc),
+            op::DEO2r => self.deo::<0b011>(dev, pc),
+            op::ADD2r => self.add::<0b011>(pc),
+            op::SUB2r => self.sub::<0b011>(pc),
+            op::MUL2r => self.mul::<0b011>(pc),
+            op::DIV2r => self.div::<0b011>(pc),
+            op::AND2r => self.and::<0b011>(pc),
+            op::ORA2r => self.ora::<0b011>(pc),
+            op::EOR2r => self.eor::<0b011>(pc),
+            op::SFT2r => self.sft::<0b011>(pc),
+            op::LIT => self.lit::<0b100>(pc),
+            op::INCk => self.inc::<0b100>(pc),
+            op::POPk => self.pop::<0b100>(pc),
+            op::NIPk => self.nip::<0b100>(pc),
+            op::SWPk => self.swp::<0b100>(pc),
+            op::ROTk => self.rot::<0b100>(pc),
+            op::DUPk => self.dup::<0b100>(pc),
+            op::OVRk => self.ovr::<0b100>(pc),
+            op::EQUk => self.equ::<0b100>(pc),
+            op::NEQk => self.neq::<0b100>(pc),
+            op::GTHk => self.gth::<0b100>(pc),
+            op::LTHk => self.lth::<0b100>(pc),
+            op::JMPk => self.jmp::<0b100>(pc),
+            op::JCNk => self.jcn::<0b100>(pc),
+            op::JSRk => self.jsr::<0b100>(pc),
+            op::STHk => self.sth::<0b100>(pc),
+            op::LDZk => self.ldz::<0b100>(pc),
+            op::STZk => self.stz::<0b100>(pc),
+            op::LDRk => self.ldr::<0b100>(pc),
+            op::STRk => self.str::<0b100>(pc),
+            op::LDAk => self.lda::<0b100>(pc),
+            op::STAk => self.sta::<0b100>(pc),
+            op::DEIk => self.dei::<0b100>(dev, pc),
+            op::DEOk => self.deo::<0b100>(dev, pc),
+            op::ADDk => self.add::<0b100>(pc),
+            op::SUBk => self.sub::<0b100>(pc),
+            op::MULk => self.mul::<0b100>(pc),
+            op::DIVk => self.div::<0b100>(pc),
+            op::ANDk => self.and::<0b100>(pc),
+            op::ORAk => self.ora::<0b100>(pc),
+            op::EORk => self.eor::<0b100>(pc),
+            op::SFTk => self.sft::<0b100>(pc),
+            op::LIT2 => self.lit::<0b101>(pc),
+            op::INC2k => self.inc::<0b101>(pc),
+            op::POP2k => self.pop::<0b101>(pc),
+            op::NIP2k => self.nip::<0b101>(pc),
+            op::SWP2k => self.swp::<0b101>(pc),
+            op::ROT2k => self.rot::<0b101>(pc),
+            op::DUP2k => self.dup::<0b101>(pc),
+            op::OVR2k => self.ovr::<0b101>(pc),
+            op::EQU2k => self.equ::<0b101>(pc),
+            op::NEQ2k => self.neq::<0b101>(pc),
+            op::GTH2k => self.gth::<0b101>(pc),
+            op::LTH2k => self.lth::<0b101>(pc),
+            op::JMP2k => self.jmp::<0b101>(pc),
+            op::JCN2k => self.jcn::<0b101>(pc),
+            op::JSR2k => self.jsr::<0b101>(pc),
+            op::STH2k => self.sth::<0b101>(pc),
+            op::LDZ2k => self.ldz::<0b101>(pc),
+            op::STZ2k => self.stz::<0b101>(pc),
+            op::LDR2k => self.ldr::<0b101>(pc),
+            op::STR2k => self.str::<0b101>(pc),
+            op::LDA2k => self.lda::<0b101>(pc),
+            op::STA2k => self.sta::<0b101>(pc),
+            op::DEI2k => self.dei::<0b101>(dev, pc),
+            op::DEO2k => self.deo::<0b101>(dev, pc),
+            op::ADD2k => self.add::<0b101>(pc),
+            op::SUB2k => self.sub::<0b101>(pc),
+            op::MUL2k => self.mul::<0b101>(pc),
+            op::DIV2k => self.div::<0b101>(pc),
+            op::AND2k => self.and::<0b101>(pc),
+            op::ORA2k => self.ora::<0b101>(pc),
+            op::EOR2k => self.eor::<0b101>(pc),
+            op::SFT2k => self.sft::<0b101>(pc),
+            op::LITr => self.lit::<0b110>(pc),
+            op::INCkr => self.inc::<0b110>(pc),
+            op::POPkr => self.pop::<0b110>(pc),
+            op::NIPkr => self.nip::<0b110>(pc),
+            op::SWPkr => self.swp::<0b110>(pc),
+            op::ROTkr => self.rot::<0b110>(pc),
+            op::DUPkr => self.dup::<0b110>(pc),
+            op::OVRkr => self.ovr::<0b110>(pc),
+            op::EQUkr => self.equ::<0b110>(pc),
+            op::NEQkr => self.neq::<0b110>(pc),
+            op::GTHkr => self.gth::<0b110>(pc),
+            op::LTHkr => self.lth::<0b110>(pc),
+            op::JMPkr => self.jmp::<0b110>(pc),
+            op::JCNkr => self.jcn::<0b110>(pc),
+            op::JSRkr => self.jsr::<0b110>(pc),
+            op::STHkr => self.sth::<0b110>(pc),
+            op::LDZkr => self.ldz::<0b110>(pc),
+            op::STZkr => self.stz::<0b110>(pc),
+            op::LDRkr => self.ldr::<0b110>(pc),
+            op::STRkr => self.str::<0b110>(pc),
+            op::LDAkr => self.lda::<0b110>(pc),
+            op::STAkr => self.sta::<0b110>(pc),
+            op::DEIkr => self.dei::<0b110>(dev, pc),
+            op::DEOkr => self.deo::<0b110>(dev, pc),
+            op::ADDkr => self.add::<0b110>(pc),
+            op::SUBkr => self.sub::<0b110>(pc),
+            op::MULkr => self.mul::<0b110>(pc),
+            op::DIVkr => self.div::<0b110>(pc),
+            op::ANDkr => self.and::<0b110>(pc),
+            op::ORAkr => self.ora::<0b110>(pc),
+            op::EORkr => self.eor::<0b110>(pc),
+            op::SFTkr => self.sft::<0b110>(pc),
+            op::LIT2r => self.lit::<0b111>(pc),
+            op::INC2kr => self.inc::<0b111>(pc),
+            op::POP2kr => self.pop::<0b111>(pc),
+            op::NIP2kr => self.nip::<0b111>(pc),
+            op::SWP2kr => self.swp::<0b111>(pc),
+            op::ROT2kr => self.rot::<0b111>(pc),
+            op::DUP2kr => self.dup::<0b111>(pc),
+            op::OVR2kr => self.ovr::<0b111>(pc),
+            op::EQU2kr => self.equ::<0b111>(pc),
+            op::NEQ2kr => self.neq::<0b111>(pc),
+            op::GTH2kr => self.gth::<0b111>(pc),
+            op::LTH2kr => self.lth::<0b111>(pc),
+            op::JMP2kr => self.jmp::<0b111>(pc),
+            op::JCN2kr => self.jcn::<0b111>(pc),
+            op::JSR2kr => self.jsr::<0b111>(pc),
+            op::STH2kr => self.sth::<0b111>(pc),
+            op::LDZ2kr => self.ldz::<0b111>(pc),
+            op::STZ2kr => self.stz::<0b111>(pc),
+            op::LDR2kr => self.ldr::<0b111>(pc),
+            op::STR2kr => self.str::<0b111>(pc),
+            op::LDA2kr => self.lda::<0b111>(pc),
+            op::STA2kr => self.sta::<0b111>(pc),
+            op::DEI2kr => self.dei::<0b111>(dev, pc),
+            op::DEO2kr => self.deo::<0b111>(dev, pc),
+            op::ADD2kr => self.add::<0b111>(pc),
+            op::SUB2kr => self.sub::<0b111>(pc),
+            op::MUL2kr => self.mul::<0b111>(pc),
+            op::DIV2kr => self.div::<0b111>(pc),
+            op::AND2kr => self.and::<0b111>(pc),
+            op::ORA2kr => self.ora::<0b111>(pc),
+            op::EOR2kr => self.eor::<0b111>(pc),
+            op::SFT2kr => self.sft::<0b111>(pc),
         }
     }
 
@@ -810,7 +810,7 @@ impl<'a> Uxn<'a> {
     ///
     /// Ends the evaluation of the current vector. This opcode has no modes.
     #[inline]
-    pub fn brk<D: Device>(&mut self, _: &mut D, _: u16) -> Option<u16> {
+    pub fn brk(&mut self, _: u16) -> Option<u16> {
         None
     }
 
@@ -824,7 +824,7 @@ impl<'a> Uxn<'a> {
     /// the `PC` to a relative address at a distance equal to the next short in
     /// memory, otherwise moves `PC+2`. This opcode has no modes.
     #[inline]
-    pub fn jci<D: Device>(&mut self, _: &mut D, mut pc: u16) -> Option<u16> {
+    pub fn jci(&mut self, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
         if self.stack.pop_byte() != 0 {
             pc = pc.wrapping_add(dt);
@@ -837,7 +837,7 @@ impl<'a> Uxn<'a> {
     /// JMI  -- Moves the PC to a relative address at a distance equal to the
     /// next short in memory. This opcode has no modes.
     #[inline]
-    pub fn jmi<D: Device>(&mut self, _: &mut D, mut pc: u16) -> Option<u16> {
+    pub fn jmi(&mut self, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
         Some(pc.wrapping_add(dt))
     }
@@ -852,7 +852,7 @@ impl<'a> Uxn<'a> {
     /// address at a distance equal to the next short in memory. This opcode has
     /// no modes.
     #[inline]
-    pub fn jsi<D: Device>(&mut self, _: &mut D, mut pc: u16) -> Option<u16> {
+    pub fn jsi(&mut self, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
         self.ret.push(Value::Short(pc));
         Some(pc.wrapping_add(dt))
@@ -873,11 +873,7 @@ impl<'a> Uxn<'a> {
     /// LIT2 abcd       ( ab cd )
     /// ```
     #[inline]
-    pub fn lit<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        mut pc: u16,
-    ) -> Option<u16> {
+    pub fn lit<const FLAGS: u8>(&mut self, mut pc: u16) -> Option<u16> {
         let v = if short(FLAGS) {
             Value::Short(self.next2(&mut pc))
         } else {
@@ -901,11 +897,7 @@ impl<'a> Uxn<'a> {
     /// #0001 INC2k     ( 00 01 00 02 )
     /// ```
     #[inline]
-    pub fn inc<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn inc<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let v = s.pop();
         s.push(v.wrapping_add(1));
@@ -926,11 +918,7 @@ impl<'a> Uxn<'a> {
     /// #1234 POP2k  ( 12 34 )
     /// ```
     #[inline]
-    pub fn pop<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn pop<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         self.stack_view::<FLAGS>().pop();
         Some(pc)
     }
@@ -950,11 +938,7 @@ impl<'a> Uxn<'a> {
     /// #1234 #5678 NIP2k  ( 12 34 56 78 56 78 )
     /// ```
     #[inline]
-    pub fn nip<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn nip<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let v = s.pop();
         let _ = s.pop();
@@ -977,11 +961,7 @@ impl<'a> Uxn<'a> {
     /// #1234 #5678 SWP2k  ( 12 34 56 78 56 78 12 34 )
     /// ```
     #[inline]
-    pub fn swp<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn swp<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let b = s.pop();
         let a = s.pop();
@@ -1006,11 +986,7 @@ impl<'a> Uxn<'a> {
     /// #1234 #5678 #9abc ROT2k  ( 12 34 56 78 9a bc 56 78 9a bc 12 34 )
     /// ```
     #[inline]
-    pub fn rot<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn rot<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let c = s.pop();
         let b = s.pop();
@@ -1035,11 +1011,7 @@ impl<'a> Uxn<'a> {
     /// #1234 DUP2  ( 12 34 12 34 )
     /// ```
     #[inline]
-    pub fn dup<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn dup<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let v = s.pop();
         s.push(v);
@@ -1062,11 +1034,7 @@ impl<'a> Uxn<'a> {
     /// #1234 #5678 OVR2k  ( 12 34 56 78 12 34 56 78 12 34 )
     /// ```
     #[inline]
-    pub fn ovr<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn ovr<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let b = s.pop();
         let a = s.pop();
@@ -1092,11 +1060,7 @@ impl<'a> Uxn<'a> {
     /// #abcd #abcd EQU2k  ( ab cd ab cd 01 )
     /// ```
     #[inline]
-    pub fn equ<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn equ<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_cmp!(self, FLAGS, |a, b| a == b);
         Some(pc)
     }
@@ -1117,11 +1081,7 @@ impl<'a> Uxn<'a> {
     /// #abcd #abcd NEQ2k  ( ab cd ab cd 00 )
     /// ```
     #[inline]
-    pub fn neq<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn neq<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_cmp!(self, FLAGS, |a, b| a != b);
         Some(pc)
     }
@@ -1142,11 +1102,7 @@ impl<'a> Uxn<'a> {
     /// #1234 #3456 GTH2k  ( 12 34 34 56 00 )
     /// ```
     #[inline]
-    pub fn gth<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn gth<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_cmp!(self, FLAGS, |a, b| a > b);
         Some(pc)
     }
@@ -1167,11 +1123,7 @@ impl<'a> Uxn<'a> {
     /// #0001 #0000 LTH2k  ( 00 01 00 00 00 )
     /// ```
     #[inline]
-    pub fn lth<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn lth<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_cmp!(self, FLAGS, |a, b| a < b);
         Some(pc)
     }
@@ -1189,11 +1141,7 @@ impl<'a> Uxn<'a> {
     /// ,&skip-rel JMP BRK &skip-rel #01  ( 01 )
     /// ```
     #[inline]
-    pub fn jmp<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn jmp<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         Some(Self::jump_offset(pc, s.pop()))
     }
@@ -1213,11 +1161,7 @@ impl<'a> Uxn<'a> {
     /// #abcd #00 ,&fail JCN SWP &fail POP  ( cd )
     /// ```
     #[inline]
-    pub fn jcn<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn jcn<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let dst = s.pop();
         let cond = s.pop_byte();
@@ -1243,11 +1187,7 @@ impl<'a> Uxn<'a> {
     /// ,&get JSR #01 BRK &get #02 JMP2r  ( 02 01 )
     /// ```
     #[inline]
-    pub fn jsr<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn jsr<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         self.ret_stack_view::<FLAGS>().push(Value::Short(pc));
         let mut s = self.stack_view::<FLAGS>();
         Some(Self::jump_offset(pc, s.pop()))
@@ -1268,11 +1208,7 @@ impl<'a> Uxn<'a> {
     /// LITr 34 STHr  ( 34 )
     /// ```
     #[inline]
-    pub fn sth<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn sth<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let v = self.stack_view::<FLAGS>().pop();
         self.ret_stack_view::<FLAGS>().push(v);
         Some(pc)
@@ -1290,11 +1226,7 @@ impl<'a> Uxn<'a> {
     /// |00 @cell $2 |0100 .cell LDZ ( 00 )
     /// ```
     #[inline]
-    pub fn ldz<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn ldz<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let addr = self.stack_view::<FLAGS>().pop_byte();
         let v = self.ram_read::<FLAGS>(u16::from(addr));
         self.stack_view::<FLAGS>().push(v);
@@ -1312,11 +1244,7 @@ impl<'a> Uxn<'a> {
     /// |00 @cell $2 |0100 #abcd .cell STZ2  { ab cd }
     /// ```
     #[inline]
-    pub fn stz<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn stz<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let addr = s.pop_byte();
         let v = s.pop();
@@ -1337,11 +1265,7 @@ impl<'a> Uxn<'a> {
     /// ,cell LDR2 BRK @cell abcd  ( ab cd )
     /// ```
     #[inline]
-    pub fn ldr<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn ldr<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let offset = self.stack_view::<FLAGS>().pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
         let v = self.ram_read::<FLAGS>(addr);
@@ -1362,11 +1286,7 @@ impl<'a> Uxn<'a> {
     /// #1234 ,cell STR2 BRK @cell $2  ( )
     /// ```
     #[inline]
-    pub fn str<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn str<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let offset = s.pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
@@ -1387,11 +1307,7 @@ impl<'a> Uxn<'a> {
     /// ;cell LDA BRK @cell abcd ( ab )
     /// ```
     #[inline]
-    pub fn lda<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn lda<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let addr = self.stack_view::<FLAGS>().pop_short();
         let v = self.ram_read::<FLAGS>(addr);
         self.stack_view::<FLAGS>().push(v);
@@ -1410,11 +1326,7 @@ impl<'a> Uxn<'a> {
     /// #abcd ;cell STA BRK @cell $1 ( ab )
     /// ```
     #[inline]
-    pub fn sta<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn sta<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let addr = s.pop_short();
         let v = s.pop();
@@ -1512,11 +1424,7 @@ impl<'a> Uxn<'a> {
     /// #0001 #0002 ADD2  ( 00 03 )
     /// ```
     #[inline]
-    pub fn add<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn add<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_bin!(self, FLAGS, |a, b| a.wrapping_add(b));
         Some(pc)
     }
@@ -1530,11 +1438,7 @@ impl<'a> Uxn<'a> {
     /// Pushes the difference of the first value minus the second, to the top of
     /// the stack.
     #[inline]
-    pub fn sub<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn sub<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_bin!(self, FLAGS, |a, b| a.wrapping_sub(b));
         Some(pc)
     }
@@ -1548,11 +1452,7 @@ impl<'a> Uxn<'a> {
     /// Pushes the product of the first and second values at the top of the
     /// stack.
     #[inline]
-    pub fn mul<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn mul<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_bin!(self, FLAGS, |a, b| a.wrapping_mul(b));
         Some(pc)
     }
@@ -1573,11 +1473,7 @@ impl<'a> Uxn<'a> {
     /// #0010 #0000 DIV2  ( 00 00 )
     /// ```
     #[inline]
-    pub fn div<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn div<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_bin!(self, FLAGS, |a, b| if b != 0 { a / b } else { 0 });
         Some(pc)
     }
@@ -1591,11 +1487,7 @@ impl<'a> Uxn<'a> {
     /// Pushes the result of the bitwise operation `AND`, to the top of the
     /// stack.
     #[inline]
-    pub fn and<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn and<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_bin!(self, FLAGS, |a, b| a & b);
         Some(pc)
     }
@@ -1607,11 +1499,7 @@ impl<'a> Uxn<'a> {
     /// ```
     /// Pushes the result of the bitwise operation `OR`, to the top of the stack.
     #[inline]
-    pub fn ora<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn ora<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_bin!(self, FLAGS, |a, b| a | b);
         Some(pc)
     }
@@ -1625,11 +1513,7 @@ impl<'a> Uxn<'a> {
     /// Pushes the result of the bitwise operation `XOR`, to the top of the
     /// stack.
     #[inline]
-    pub fn eor<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn eor<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         op_bin!(self, FLAGS, |a, b| a ^ b);
         Some(pc)
     }
@@ -1652,11 +1536,7 @@ impl<'a> Uxn<'a> {
     /// #1248 #34 SFT2k    ( 12 48 34 09 20 )
     /// ```
     #[inline]
-    pub fn sft<const FLAGS: u8, D: Device>(
-        &mut self,
-        _: &mut D,
-        pc: u16,
-    ) -> Option<u16> {
+    pub fn sft<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
         let mut s = self.stack_view::<FLAGS>();
         let shift = s.pop_byte();
         let shr = u32::from(shift & 0xF);
