@@ -206,7 +206,7 @@ pub fn run() -> Result<()> {
         footer.style().set_css_text(&format!("width: {width}px"));
     });
 
-    wasm_bindgen_futures::spawn_local(async {
+    wasm_bindgen_futures::spawn_local(async move {
         eframe::WebRunner::new()
             .start(
                 "varvara",
