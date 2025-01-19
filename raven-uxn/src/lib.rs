@@ -20,7 +20,7 @@ const fn ret(flags: u8) -> bool {
 pub const DEV_SIZE: usize = 16;
 
 /// Simple circular stack, with room for 256 items
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Stack {
     data: [u8; 256],
 
@@ -147,17 +147,17 @@ impl Value {
         }
     }
     #[inline]
-    fn wrapping_shr(&self, i: u32) -> Self {
+    fn shr(&self, i: u32) -> Self {
         match self {
-            Value::Short(v) => Value::Short(v.wrapping_shr(i)),
-            Value::Byte(v) => Value::Byte(v.wrapping_shr(i)),
+            Value::Short(v) => Value::Short(v.checked_shr(i).unwrap_or(0)),
+            Value::Byte(v) => Value::Byte(v.checked_shr(i).unwrap_or(0)),
         }
     }
     #[inline]
-    fn wrapping_shl(&self, i: u32) -> Self {
+    fn shl(&self, i: u32) -> Self {
         match self {
-            Value::Short(v) => Value::Short(v.wrapping_shl(i)),
-            Value::Byte(v) => Value::Byte(v.wrapping_shl(i)),
+            Value::Short(v) => Value::Short(v.checked_shl(i).unwrap_or(0)),
+            Value::Byte(v) => Value::Byte(v.checked_shl(i).unwrap_or(0)),
         }
     }
 }
@@ -400,19 +400,43 @@ impl<'a> Uxn<'a> {
     #[inline]
     pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) -> u16 {
         match self.backend {
-            Backend::Interpreter => {
-                loop {
-                    let op = self.next(&mut pc);
-                    let Some(next) = self.op(op, dev, pc) else {
-                        break;
-                    };
-                    pc = next;
-                }
-                pc
-            }
+            Backend::Interpreter => loop {
+                let op = self.next(&mut pc);
+                let Some(next) = self.op(op, dev, pc) else {
+                    break pc;
+                };
+                pc = next;
+            },
             #[cfg(feature = "native")]
             Backend::Native => native::entry(self, dev, pc),
         }
+    }
+
+    /// Runs until the program terminates or we hit a stop condition
+    ///
+    /// Returns the new program counter if the program terminated, or `None` if
+    /// the stop condition was reached.
+    ///
+    /// This function always uses the interpreter, ignoring
+    /// [`self.backend`](Self::backend).
+    #[inline]
+    pub fn run_until<D: Device, F: Fn(&Self, &D, usize) -> bool>(
+        &mut self,
+        dev: &mut D,
+        mut pc: u16,
+        stop: F,
+    ) -> Option<u16> {
+        for i in 0.. {
+            let op = self.next(&mut pc);
+            let Some(next) = self.op(op, dev, pc) else {
+                return Some(pc);
+            };
+            pc = next;
+            if stop(self, dev, i) {
+                return None;
+            }
+        }
+        unreachable!()
     }
 
     /// Converts raw ports memory into a [`Ports`] object
@@ -1638,7 +1662,7 @@ impl<'a> Uxn<'a> {
         let shr = u32::from(shift & 0xF);
         let shl = u32::from(shift >> 4);
         let v = s.pop();
-        s.push(v.wrapping_shr(shr).wrapping_shl(shl));
+        s.push(v.shr(shr).shl(shl));
         Some(pc)
     }
 }
@@ -1728,9 +1752,9 @@ pub use ram::UxnRam;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(test)]
-#[allow(unused, non_upper_case_globals)]
-mod op {
+/// Opcode names and constants
+#[allow(non_upper_case_globals, missing_docs)]
+pub mod op {
     pub const BRK: u8 = 0x0;
     pub const INC: u8 = 0x1;
     pub const POP: u8 = 0x2;

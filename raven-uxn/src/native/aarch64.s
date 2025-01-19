@@ -877,9 +877,9 @@ _NIP2r:
     ldrb w10, [x2, x3]
     rpop
     strb w9, [x2, x3]
-    sub x11, x1, #1
+    sub x11, x3, #1
     and x11, x11, #0xff
-    strb w10, [x2, x31]
+    strb w10, [x2, x11]
     next
 
 _SWP2r:
@@ -889,7 +889,7 @@ _SWP2r:
     strb w12, [x2, x3]
 
     rpeek w11, x9, 1
-    rpeek w12, x10, 2
+    rpeek w12, x10, 3
 
     strb w11, [x2, x10]
     strb w12, [x2, x9]

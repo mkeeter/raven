@@ -20,6 +20,14 @@ The `raven-uxn` crate includes two implementations of the Uxn CPU:
   shims on either side), and runs 40-50% faster than the reference
   implementation
 
+The native interpreter can be checked against the safe interpreter with fuzz
+testing:
+
+```console
+cargo install cargo-fuzz # this only needs to be run once
+cargo +nightly fuzz run --release fuzz-native
+```
+
 --------------------------------------------------------------------------------
 
 The Varvara implementation (`raven-varvara`) includes all peripherals, and has
@@ -37,7 +45,7 @@ The repository includes two applications built on these libraries:
 
 --------------------------------------------------------------------------------
 
-© 2024 Matthew Keeter  
+© 2024-2025 Matthew Keeter  
 Released under the [Mozilla Public License 2.0](https://github.com/mkeeter/fidget/blob/main/LICENSE.txt)
 
 The repository includes ROMs compiled from the `uxnemu` reference

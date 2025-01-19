@@ -6,6 +6,7 @@ members = [
     "raven-cli",
     "raven-gui",
 ]
+exclude = ["fuzz"]
 
 [workspace.dependencies]
 anyhow = "1.0.83"
