@@ -50,7 +50,7 @@ pub fn run() -> Result<()> {
     vm.run(&mut dev, 0x100);
     dev.output(&vm).check()?;
 
-    let (width, height) = dev.output(&vm).size;
+    let size @ (width, height) = dev.output(&vm).size;
     let options = eframe::WebOptions {
         max_size_points: egui::Vec2::new(width as f32, height as f32),
         ..eframe::WebOptions::default()
@@ -215,7 +215,8 @@ pub fn run() -> Result<()> {
                     let mut s = Box::new(Stage::new(
                         vm,
                         dev,
-                        Some(1.0),
+                        size,
+                        1.0,
                         rx,
                         &cc.egui_ctx,
                     ));
