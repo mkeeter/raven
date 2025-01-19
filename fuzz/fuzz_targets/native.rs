@@ -16,9 +16,10 @@ fuzz_target!(|data: &[u8]| {
     }
     assert!(vm_n.reset(data).is_empty());
 
-    // Use the VM-backed evaluator to detect cycles, so that our fuzzer doesn't
-    // get stuck in infinite loops.
-    let Some(pc_v) = vm_v.run_without_cycles(&mut EmptyDevice, 0x100) else {
+    // Use the VM-backed evaluator, halting if we take more than 65K cycles
+    let Some(pc_v) =
+        vm_v.run_until(&mut EmptyDevice, 0x100, |_uxn, _dev, i| i > 65536)
+    else {
         return;
     };
     let pc_n = vm_n.run(&mut EmptyDevice, 0x100);

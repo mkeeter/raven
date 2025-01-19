@@ -878,7 +878,7 @@ _NIP2r:
     ldrb w10, [x2, x3]
     rpop
     strb w9, [x2, x3]
-    sub x11, x1, #1
+    sub x11, x3, #1
     and x11, x11, #0xff
     strb w10, [x2, x11]
     next

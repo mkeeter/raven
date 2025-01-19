@@ -1,5 +1,5 @@
 //! Uxn virtual machine
-#![cfg_attr(not(any(test, feature = "std")), no_std)]
+#![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "native"), forbid(unsafe_code))]
 
@@ -412,30 +412,31 @@ impl<'a> Uxn<'a> {
         }
     }
 
-    /// Runs until the program terminates or a cycle is detected
+    /// Runs until the program terminates or we hit a stop condition
     ///
     /// Returns the new program counter if the program terminated, or `None` if
-    /// a cycle is detected.
-    #[cfg(feature = "fuzz")]
+    /// the stop condition was reached.
+    ///
+    /// This function always uses the interpreter, ignoring
+    /// [`self.backend`](Self::backend).
     #[inline]
-    pub fn run_without_cycles<D: Device>(
+    pub fn run_until<D: Device, F: Fn(&Self, &D, usize) -> bool>(
         &mut self,
         dev: &mut D,
         mut pc: u16,
+        stop: F,
     ) -> Option<u16> {
-        use std::collections::HashSet;
-        let mut seen = HashSet::new();
-        loop {
-            let state = (self.dev, self.ram.to_owned(), self.stack, self.ret);
-            if !seen.insert(state) {
-                break None;
-            }
+        for i in 0.. {
             let op = self.next(&mut pc);
             let Some(next) = self.op(op, dev, pc) else {
-                break Some(pc);
+                return Some(pc);
             };
             pc = next;
+            if stop(self, dev, i) {
+                return None;
+            }
         }
+        unreachable!()
     }
 
     /// Converts raw ports memory into a [`Ports`] object
