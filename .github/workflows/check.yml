@@ -30,7 +30,7 @@ jobs:
       run: sudo apt install libasound2-dev
       shell: bash
     - name: Test
-      run: cargo test --verbose
+      run: cargo test --release --verbose
   clippy:
     strategy:
       matrix:
