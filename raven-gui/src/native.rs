@@ -83,7 +83,8 @@ pub fn run() -> Result<()> {
         ..Default::default()
     };
 
-    let (_tx, rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
+    varvara::spawn_console_worker(move |c| tx.send(crate::Event::Console(c)));
     eframe::run_native(
         "Varvara",
         options,

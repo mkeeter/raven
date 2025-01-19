@@ -24,8 +24,7 @@ pub use audio::SAMPLE_RATE as AUDIO_SAMPLE_RATE;
 pub use controller::Key;
 pub use mouse::MouseState;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub use console::worker as console_worker;
+pub use console::spawn_worker as spawn_console_worker;
 
 use uxn::{Device, Ports, Uxn};
 
