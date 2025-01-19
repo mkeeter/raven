@@ -2119,11 +2119,11 @@ mod test {
 
     #[cfg(not(debug_assertions))]
     mod no_panic {
-        macro_rules! init_vm {
-            ($vm:ident, $data:ident) => {
+        macro_rules! init {
+            ($vm:ident, $data:ident, $op:ident) => {
                 struct NoPanic;
                 extern "C" {
-                    #[link_name = "op_may_panic"]
+                    #[link_name = concat!(stringify!($op), "_may_panic")]
                     fn trigger() -> !;
                 }
                 impl ::core::ops::Drop for NoPanic {
@@ -2150,7 +2150,7 @@ mod test {
                     #[inline(never)]
                     pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
                         let guard = NoPanic;
-                        init_vm!(vm, data);
+                        init!(vm, data, $op);
                         vm.$op::<FLAGS>(0x100);
                         core::mem::forget(guard);
                     }
@@ -2178,7 +2178,7 @@ mod test {
                     #[inline(never)]
                     pub fn no_panic(data: &[u8]) {
                         let guard = NoPanic;
-                        init_vm!(vm, data);
+                        init!(vm, data, $op);
                         vm.$op(0x100);
                         core::mem::forget(guard);
                     }
@@ -2198,7 +2198,7 @@ mod test {
                     #[inline(never)]
                     pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
                         let guard = NoPanic;
-                        init_vm!(vm, data);
+                        init!(vm, data, $op);
                         let mut dev = EmptyDevice;
                         vm.$op::<FLAGS>(&mut dev, 0x100);
                         core::mem::forget(guard);
