@@ -24,7 +24,15 @@ jobs:
     runs-on: ${{ matrix.target }}
     steps:
     - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-test
     - if: runner.os == 'Linux'
       name: Install dependencies
       run: sudo apt install libasound2-dev
@@ -43,7 +51,15 @@ jobs:
     runs-on: ${{ matrix.target }}
     steps:
     - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-clippy
     - if: runner.os == 'Linux'
       name: Install dependencies
       run: sudo apt install libasound2-dev
@@ -53,7 +69,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: Swatinem/rust-cache@v2
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-wasm
     - name: Install wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: Clippy
