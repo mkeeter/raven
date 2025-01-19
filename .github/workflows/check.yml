@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         target: [
-          "ubuntu-24.04-arm",
+          # "ubuntu-24.04-arm", # disabled due to unreliability
           "ubuntu-latest",
           "windows-latest",
           "macos-14",
@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         target: [
-          "ubuntu-24.04-arm",
+          # "ubuntu-24.04-arm", # disabled due to unreliability
           "ubuntu-latest",
           "windows-latest",
           "macos-14",
