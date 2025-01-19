@@ -13,7 +13,7 @@ uxn = { path = "../raven-uxn", package = "raven-uxn", features = ["native"] }
 
 [[bin]]
 name = "fuzz-native"
-path = "fuzz_targets/native.rs"
+path = "src/native.rs"
 test = false
 doc = false
 bench = false
