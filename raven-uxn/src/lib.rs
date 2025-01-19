@@ -20,7 +20,7 @@ const fn ret(flags: u8) -> bool {
 pub const DEV_SIZE: usize = 16;
 
 /// Simple circular stack, with room for 256 items
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Stack {
     data: [u8; 256],
 

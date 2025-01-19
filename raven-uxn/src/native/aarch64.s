@@ -46,7 +46,6 @@
     ldrb \w, [x0, \x]
 .endm
 
-// Loads the n-th byte from the return stack into w; x is a scratch register
 .macro rpeek, w, x, n
     sub \x, x3, \n
     and \x, \x, #0xff
