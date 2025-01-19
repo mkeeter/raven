@@ -2117,99 +2117,97 @@ mod test {
         ";
     }
 
-    macro_rules! init_vm {
-        ($vm:ident, $data:ident) => {
-            let mut ram = UxnRam::new();
-            let mut $vm = Uxn::new(&mut ram, Backend::Interpreter);
-            let _ = $vm.reset($data);
-            for d in $data {
-                $vm.stack.push(Value::Byte(*d));
-                $vm.ret.push(Value::Byte(*d));
-            }
-        };
-    }
-    macro_rules! no_panic {
-        ($op:ident) => {
-            mod $op {
-                use super::*;
-
-                #[inline(never)]
-                pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
-                    let guard = NoPanic;
-                    init_vm!(vm, data);
-                    vm.$op::<FLAGS>(0x100);
-                    core::mem::forget(guard);
-                }
-            }
-            #[test]
-            fn $op() {
-                use $op::no_panic;
-                let data = std::hint::black_box(&[]);
-                no_panic::<0b000>(data);
-                no_panic::<0b001>(data);
-                no_panic::<0b010>(data);
-                no_panic::<0b011>(data);
-                no_panic::<0b100>(data);
-                no_panic::<0b101>(data);
-                no_panic::<0b110>(data);
-                no_panic::<0b111>(data);
-            }
-        };
-    }
-
-    macro_rules! no_panic_modeless {
-        ($op:ident) => {
-            mod $op {
-                use super::*;
-
-                #[inline(never)]
-                pub fn no_panic(data: &[u8]) {
-                    let guard = NoPanic;
-                    init_vm!(vm, data);
-                    vm.$op(0x100);
-                    core::mem::forget(guard);
-                }
-            }
-            #[test]
-            fn $op() {
-                let data = std::hint::black_box(&[]);
-                $op::no_panic(data);
-            }
-        };
-    }
-
-    macro_rules! no_panic_dev {
-        ($op:ident) => {
-            mod $op {
-                use super::*;
-
-                #[inline(never)]
-                pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
-                    let guard = NoPanic;
-                    init_vm!(vm, data);
-                    let mut dev = EmptyDevice;
-                    vm.$op::<FLAGS>(&mut dev, 0x100);
-                    core::mem::forget(guard);
-                }
-            }
-            #[test]
-            fn $op() {
-                use $op::no_panic;
-                let data = std::hint::black_box(&[]);
-                no_panic::<0b000>(data);
-                no_panic::<0b001>(data);
-                no_panic::<0b010>(data);
-                no_panic::<0b011>(data);
-                no_panic::<0b100>(data);
-                no_panic::<0b101>(data);
-                no_panic::<0b110>(data);
-                no_panic::<0b111>(data);
-            }
-        };
-    }
-
     #[cfg(not(debug_assertions))]
     mod no_panic {
+        macro_rules! init_vm {
+            ($vm:ident, $data:ident) => {
+                let mut ram = UxnRam::new();
+                let mut $vm = Uxn::new(&mut ram, Backend::Interpreter);
+                let _ = $vm.reset($data);
+                for d in $data {
+                    $vm.stack.push(Value::Byte(*d));
+                    $vm.ret.push(Value::Byte(*d));
+                }
+            };
+        }
+        macro_rules! no_panic {
+            ($op:ident) => {
+                mod $op {
+                    use super::*;
+
+                    #[inline(never)]
+                    pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
+                        let guard = NoPanic;
+                        init_vm!(vm, data);
+                        vm.$op::<FLAGS>(0x100);
+                        core::mem::forget(guard);
+                    }
+                }
+                #[test]
+                fn $op() {
+                    use $op::no_panic;
+                    let data = std::hint::black_box(&[]);
+                    no_panic::<0b000>(data);
+                    no_panic::<0b001>(data);
+                    no_panic::<0b010>(data);
+                    no_panic::<0b011>(data);
+                    no_panic::<0b100>(data);
+                    no_panic::<0b101>(data);
+                    no_panic::<0b110>(data);
+                    no_panic::<0b111>(data);
+                }
+            };
+        }
+        macro_rules! no_panic_modeless {
+            ($op:ident) => {
+                mod $op {
+                    use super::*;
+
+                    #[inline(never)]
+                    pub fn no_panic(data: &[u8]) {
+                        let guard = NoPanic;
+                        init_vm!(vm, data);
+                        vm.$op(0x100);
+                        core::mem::forget(guard);
+                    }
+                }
+                #[test]
+                fn $op() {
+                    let data = std::hint::black_box(&[]);
+                    $op::no_panic(data);
+                }
+            };
+        }
+        macro_rules! no_panic_dev {
+            ($op:ident) => {
+                mod $op {
+                    use super::*;
+
+                    #[inline(never)]
+                    pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
+                        let guard = NoPanic;
+                        init_vm!(vm, data);
+                        let mut dev = EmptyDevice;
+                        vm.$op::<FLAGS>(&mut dev, 0x100);
+                        core::mem::forget(guard);
+                    }
+                }
+                #[test]
+                fn $op() {
+                    use $op::no_panic;
+                    let data = std::hint::black_box(&[]);
+                    no_panic::<0b000>(data);
+                    no_panic::<0b001>(data);
+                    no_panic::<0b010>(data);
+                    no_panic::<0b011>(data);
+                    no_panic::<0b100>(data);
+                    no_panic::<0b101>(data);
+                    no_panic::<0b110>(data);
+                    no_panic::<0b111>(data);
+                }
+            };
+        }
+
         use super::*;
 
         struct NoPanic;
