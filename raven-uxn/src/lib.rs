@@ -2117,8 +2117,25 @@ mod test {
         ";
     }
 
+    // The optimizer is not strong enough to eliminate panics in debug builds!
     #[cfg(not(debug_assertions))]
     mod no_panic {
+        // Here's the big idea:
+        //
+        // We define a `struct NoPanic` which calls an `extern "C"` function
+        // when dropped.  Importantly, that C function doesn't exist!  We
+        // construct an instance of that `struct` as a guard, then call our
+        // potentially-panicking operation.  After that call completes, we
+        // `forget` the guard.
+        //
+        // If no panics are possible, then the guard is _always_ forgotten, the
+        // C function is never called, and we don't try to link against it.
+        //
+        // However, if panics _are_ possible, then the unwinding has to drop the
+        // guard, which tries to call that C function.  This fails at link time,
+        // because the function doesn't exist.
+        //
+        // This is borrowed from [no-panic](https://github.com/dtolnay/no-panic)
         macro_rules! init {
             ($vm:ident, $data:ident, $op:ident) => {
                 struct NoPanic;
@@ -2142,19 +2159,8 @@ mod test {
                 }
             };
         }
-        macro_rules! no_panic {
+        macro_rules! mode_fns {
             ($op:ident) => {
-                mod $op {
-                    use super::*;
-
-                    #[inline(never)]
-                    pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
-                        let guard = NoPanic;
-                        init!(vm, data, $op);
-                        vm.$op::<FLAGS>(0x100);
-                        core::mem::forget(guard);
-                    }
-                }
                 #[test]
                 fn $op() {
                     use $op::no_panic;
@@ -2168,6 +2174,22 @@ mod test {
                     no_panic::<0b110>(data);
                     no_panic::<0b111>(data);
                 }
+            };
+        }
+        macro_rules! no_panic {
+            ($op:ident) => {
+                mod $op {
+                    use super::*;
+
+                    #[inline(never)]
+                    pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
+                        let guard = NoPanic;
+                        init!(vm, data, $op);
+                        vm.$op::<FLAGS>(0x100);
+                        core::mem::forget(guard);
+                    }
+                }
+                mode_fns!($op);
             };
         }
         macro_rules! no_panic_modeless {
@@ -2204,19 +2226,7 @@ mod test {
                         core::mem::forget(guard);
                     }
                 }
-                #[test]
-                fn $op() {
-                    use $op::no_panic;
-                    let data = std::hint::black_box(&[]);
-                    no_panic::<0b000>(data);
-                    no_panic::<0b001>(data);
-                    no_panic::<0b010>(data);
-                    no_panic::<0b011>(data);
-                    no_panic::<0b100>(data);
-                    no_panic::<0b101>(data);
-                    no_panic::<0b110>(data);
-                    no_panic::<0b111>(data);
-                }
+                mode_fns!($op);
             };
         }
 
