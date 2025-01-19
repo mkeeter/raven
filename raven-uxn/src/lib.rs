@@ -2117,6 +2117,17 @@ mod test {
         ";
     }
 
+    macro_rules! init_vm {
+        ($vm:ident, $data:ident) => {
+            let mut ram = UxnRam::new();
+            let mut $vm = Uxn::new(&mut ram, Backend::Interpreter);
+            let _ = $vm.reset($data);
+            for d in $data {
+                $vm.stack.push(Value::Byte(*d));
+                $vm.ret.push(Value::Byte(*d));
+            }
+        };
+    }
     macro_rules! no_panic {
         ($op:ident) => {
             mod $op {
@@ -2124,23 +2135,8 @@ mod test {
 
                 #[inline(never)]
                 pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
-                    struct NoPanic;
-                    extern "C" {
-                        #[link_name = concat!(stringify!($op), "_may_panic")]
-                        fn trigger() -> !;
-                    }
-                    impl ::core::ops::Drop for NoPanic {
-                        fn drop(&mut self) {
-                            unsafe {
-                                trigger();
-                            }
-                        }
-                    }
                     let guard = NoPanic;
-
-                    let mut ram = UxnRam::new();
-                    let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
-                    let _ = vm.reset(data);
+                    init_vm!(vm, data);
                     vm.$op::<FLAGS>(0x100);
                     core::mem::forget(guard);
                 }
@@ -2161,8 +2157,74 @@ mod test {
         };
     }
 
+    macro_rules! no_panic_modeless {
+        ($op:ident) => {
+            mod $op {
+                use super::*;
+
+                #[inline(never)]
+                pub fn no_panic(data: &[u8]) {
+                    let guard = NoPanic;
+                    init_vm!(vm, data);
+                    vm.$op(0x100);
+                    core::mem::forget(guard);
+                }
+            }
+            #[test]
+            fn $op() {
+                let data = std::hint::black_box(&[]);
+                $op::no_panic(data);
+            }
+        };
+    }
+
+    macro_rules! no_panic_dev {
+        ($op:ident) => {
+            mod $op {
+                use super::*;
+
+                #[inline(never)]
+                pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
+                    let guard = NoPanic;
+                    init_vm!(vm, data);
+                    let mut dev = EmptyDevice;
+                    vm.$op::<FLAGS>(&mut dev, 0x100);
+                    core::mem::forget(guard);
+                }
+            }
+            #[test]
+            fn $op() {
+                use $op::no_panic;
+                let data = std::hint::black_box(&[]);
+                no_panic::<0b000>(data);
+                no_panic::<0b001>(data);
+                no_panic::<0b010>(data);
+                no_panic::<0b011>(data);
+                no_panic::<0b100>(data);
+                no_panic::<0b101>(data);
+                no_panic::<0b110>(data);
+                no_panic::<0b111>(data);
+            }
+        };
+    }
+
+    #[cfg(not(debug_assertions))]
     mod no_panic {
         use super::*;
+
+        struct NoPanic;
+        extern "C" {
+            #[link_name = "op_may_panic"]
+            fn trigger() -> !;
+        }
+        impl ::core::ops::Drop for NoPanic {
+            fn drop(&mut self) {
+                unsafe {
+                    trigger();
+                }
+            }
+        }
+        no_panic_modeless!(brk);
         no_panic!(inc);
         no_panic!(pop);
         no_panic!(nip);
@@ -2184,6 +2246,8 @@ mod test {
         no_panic!(str);
         no_panic!(lda);
         no_panic!(sta);
+        no_panic_dev!(dei);
+        no_panic_dev!(deo);
         no_panic!(add);
         no_panic!(sub);
         no_panic!(mul);
@@ -2192,8 +2256,9 @@ mod test {
         no_panic!(ora);
         no_panic!(eor);
         no_panic!(sft);
-
-        // TODO: tests for
-        // brk, dei, dei, jci, jmi, jsi
+        no_panic_modeless!(jci);
+        no_panic_modeless!(jmi);
+        no_panic_modeless!(jsi);
+        no_panic!(lit); // doesn't use KEEP, but that's fine
     }
 }
