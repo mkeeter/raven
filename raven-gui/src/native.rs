@@ -73,12 +73,15 @@ pub fn run() -> Result<()> {
     dev.output(&vm).check()?;
     dev.send_args(&mut vm, &args.args).check()?;
 
-    let (width, height) = dev.output(&vm).size;
-    info!("creating window with size ({width}, {height})");
+    let size @ (width, height) = dev.output(&vm).size;
+    let scale = args.scale.unwrap_or(if width < 320 { 2.0 } else { 1.0 });
+    info!("creating window with size ({width}, {height}) and scale {scale}");
     let options = eframe::NativeOptions {
         window_builder: Some(Box::new(move |v| {
-            v.with_inner_size(egui::Vec2::new(width as f32, height as f32))
-                .with_resizable(false)
+            v.with_inner_size(
+                egui::Vec2::new(width as f32, height as f32) * scale,
+            )
+            .with_resizable(false)
         })),
         ..Default::default()
     };
@@ -89,7 +92,7 @@ pub fn run() -> Result<()> {
         "Varvara",
         options,
         Box::new(move |cc| {
-            Box::new(Stage::new(vm, dev, args.scale, rx, &cc.egui_ctx))
+            Box::new(Stage::new(vm, dev, size, scale, rx, &cc.egui_ctx))
         }),
     )
     .map_err(|e| anyhow!("got egui error: {e:?}"))

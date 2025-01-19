@@ -47,19 +47,16 @@ pub struct Stage<'a> {
 impl<'a> Stage<'a> {
     pub fn new(
         vm: Uxn<'a>,
-        mut dev: Varvara,
-        scale: Option<f32>,
+        dev: Varvara,
+        size: (u16, u16),
+        scale: f32,
         event_rx: mpsc::Receiver<Event>,
         ctx: &egui::Context,
     ) -> Self {
-        let out = dev.output(&vm);
-
-        let size = out.size;
         let image = egui::ColorImage::new(
             [usize::from(size.0), usize::from(size.1)],
             egui::Color32::BLACK,
         );
-        let scale = scale.unwrap_or(if size.0 < 320 { 2.0 } else { 1.0 });
 
         let texture =
             ctx.load_texture("frame", image, egui::TextureOptions::NEAREST);
@@ -199,7 +196,7 @@ impl eframe::App for Stage<'_> {
 
             let ptr = &i.pointer;
             if let Some(p) = ptr.latest_pos() {
-                self.cursor_pos = Some((p.x, p.y));
+                self.cursor_pos = Some((p.x / self.scale, p.y / self.scale));
             }
 
             let buttons = [
