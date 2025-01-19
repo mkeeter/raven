@@ -15,3 +15,6 @@ static_assertions.workspace = true
 zerocopy.workspace = true
 
 uxn = { path = "../raven-uxn", package = "raven-uxn" }
+
+[dev-dependencies]
+image.workspace = true
