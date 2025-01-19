@@ -2121,6 +2121,18 @@ mod test {
     mod no_panic {
         macro_rules! init_vm {
             ($vm:ident, $data:ident) => {
+                struct NoPanic;
+                extern "C" {
+                    #[link_name = "op_may_panic"]
+                    fn trigger() -> !;
+                }
+                impl ::core::ops::Drop for NoPanic {
+                    fn drop(&mut self) {
+                        unsafe {
+                            trigger();
+                        }
+                    }
+                }
                 let mut ram = UxnRam::new();
                 let mut $vm = Uxn::new(&mut ram, Backend::Interpreter);
                 let _ = $vm.reset($data);
@@ -2210,18 +2222,6 @@ mod test {
 
         use super::*;
 
-        struct NoPanic;
-        extern "C" {
-            #[link_name = "op_may_panic"]
-            fn trigger() -> !;
-        }
-        impl ::core::ops::Drop for NoPanic {
-            fn drop(&mut self) {
-                unsafe {
-                    trigger();
-                }
-            }
-        }
         no_panic_modeless!(brk);
         no_panic!(inc);
         no_panic!(pop);
