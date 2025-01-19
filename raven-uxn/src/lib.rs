@@ -1,7 +1,7 @@
 //! Uxn virtual machine
 #![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
-#![cfg_attr(not(feature = "native"), forbid(unsafe_code))]
+#![cfg_attr(not(any(test, feature = "native")), forbid(unsafe_code))]
 
 #[cfg(feature = "native")]
 mod native;
@@ -1474,7 +1474,7 @@ impl<'a> Uxn<'a> {
     /// ```
     #[inline]
     pub fn div<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        op_bin!(self, FLAGS, |a, b| if b != 0 { a / b } else { 0 });
+        op_bin!(self, FLAGS, |a, b| a.checked_div(b).unwrap_or(0));
         Some(pc)
     }
 
@@ -2115,5 +2115,85 @@ mod test {
             ;cell LDA BRK @cell abcd ( ab )
             #abcd ;cell STA BRK @cell $1 ( ab )
         ";
+    }
+
+    macro_rules! no_panic {
+        ($op:ident) => {
+            mod $op {
+                use super::*;
+
+                #[inline(never)]
+                pub fn no_panic<const FLAGS: u8>(data: &[u8]) {
+                    struct NoPanic;
+                    extern "C" {
+                        #[link_name = concat!(stringify!($op), "_may_panic")]
+                        fn trigger() -> !;
+                    }
+                    impl ::core::ops::Drop for NoPanic {
+                        fn drop(&mut self) {
+                            unsafe {
+                                trigger();
+                            }
+                        }
+                    }
+                    let guard = NoPanic;
+
+                    let mut ram = UxnRam::new();
+                    let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
+                    let _ = vm.reset(data);
+                    vm.$op::<FLAGS>(0x100);
+                    core::mem::forget(guard);
+                }
+            }
+            #[test]
+            fn $op() {
+                use $op::no_panic;
+                let data = std::hint::black_box(&[]);
+                no_panic::<0b000>(data);
+                no_panic::<0b001>(data);
+                no_panic::<0b010>(data);
+                no_panic::<0b011>(data);
+                no_panic::<0b100>(data);
+                no_panic::<0b101>(data);
+                no_panic::<0b110>(data);
+                no_panic::<0b111>(data);
+            }
+        };
+    }
+
+    mod no_panic {
+        use super::*;
+        no_panic!(inc);
+        no_panic!(pop);
+        no_panic!(nip);
+        no_panic!(swp);
+        no_panic!(rot);
+        no_panic!(dup);
+        no_panic!(ovr);
+        no_panic!(equ);
+        no_panic!(neq);
+        no_panic!(gth);
+        no_panic!(lth);
+        no_panic!(jmp);
+        no_panic!(jcn);
+        no_panic!(jsr);
+        no_panic!(sth);
+        no_panic!(ldz);
+        no_panic!(stz);
+        no_panic!(ldr);
+        no_panic!(str);
+        no_panic!(lda);
+        no_panic!(sta);
+        no_panic!(add);
+        no_panic!(sub);
+        no_panic!(mul);
+        no_panic!(div);
+        no_panic!(and);
+        no_panic!(ora);
+        no_panic!(eor);
+        no_panic!(sft);
+
+        // TODO: tests for
+        // brk, dei, dei, jci, jmi, jsi
     }
 }

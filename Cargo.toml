@@ -8,6 +8,10 @@ members = [
 ]
 exclude = ["fuzz"]
 
+[profile.release]
+debug = true
+overflow-checks = true
+
 [workspace.dependencies]
 anyhow = "1.0.83"
 chrono = "0.4.38"
