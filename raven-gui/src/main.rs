@@ -196,7 +196,7 @@ impl eframe::App for Stage<'_> {
 
             let ptr = &i.pointer;
             if let Some(p) = ptr.latest_pos() {
-                self.cursor_pos = Some((p.x, p.y));
+                self.cursor_pos = Some((p.x / self.scale, p.y / self.scale));
             }
 
             let buttons = [
