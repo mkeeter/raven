@@ -43,6 +43,14 @@ The repository includes two applications built on these libraries:
 - `raven-gui` is a full-fledged GUI, which runs both as a native application and
   [on the web](https://mattkeeter.com/projects/raven/demo)
 
+The web demo is built with [`truck`](https://trunkrs.dev/), e.g.
+
+```console
+cargo install --locked trunk # this only needs to be run once
+cd raven-gui
+trunk build --release --public-url=/projects/raven/demo/ # edit this path
+```
+
 --------------------------------------------------------------------------------
 
 © 2024-2025 Matthew Keeter  
