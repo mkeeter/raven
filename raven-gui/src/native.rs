@@ -28,7 +28,7 @@ struct Args {
     native: bool,
 
     /// Arguments to pass into the VM
-    #[arg(last = true)]
+    #[arg(trailing_var_arg = true)]
     args: Vec<String>,
 }
 
