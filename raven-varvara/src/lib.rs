@@ -96,10 +96,7 @@ impl Output<'_> {
             std::process::exit(e);
 
             #[cfg(target_arch = "wasm32")]
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "exit requested",
-            ));
+            return Err(std::io::Error::other("exit requested"));
         }
         Ok(())
     }
