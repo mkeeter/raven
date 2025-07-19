@@ -417,8 +417,8 @@ impl<'a> Uxn<'a> {
     /// Returns the new program counter if the program terminated, or `None` if
     /// the stop condition was reached.
     ///
-    /// This function always uses the interpreter, ignoring
-    /// [`self.backend`](Self::backend).
+    /// This function always uses the interpreter, ignoring the selected
+    /// backend.
     #[inline]
     pub fn run_until<D: Device, F: Fn(&Self, &D, usize) -> bool>(
         &mut self,

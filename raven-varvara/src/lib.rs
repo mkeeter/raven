@@ -96,10 +96,7 @@ impl Output<'_> {
             std::process::exit(e);
 
             #[cfg(target_arch = "wasm32")]
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "exit requested",
-            ));
+            return Err(std::io::Error::other("exit requested"));
         }
         Ok(())
     }
@@ -107,17 +104,17 @@ impl Output<'_> {
 
 /// Handle to the Varvara system
 pub struct Varvara {
-    system: system::System,
-    console: console::Console,
-    datetime: datetime::Datetime,
-    audio: audio::Audio,
-    screen: screen::Screen,
-    mouse: mouse::Mouse,
-    file: file::File,
-    controller: controller::Controller,
+    pub system: system::System,
+    pub console: console::Console,
+    pub datetime: datetime::Datetime,
+    pub audio: audio::Audio,
+    pub screen: screen::Screen,
+    pub mouse: mouse::Mouse,
+    pub file: file::File,
+    pub controller: controller::Controller,
 
     /// Flags indicating if we've already printed a warning about a missing dev
-    already_warned: [bool; 16],
+    pub already_warned: [bool; 16],
 }
 
 impl Default for Varvara {
