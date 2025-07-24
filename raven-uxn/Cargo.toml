@@ -5,7 +5,7 @@ edition = "2021"
 license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
 description = "Uxn CPU interpreter"
-authors = ["Matt Keeter <matt.j.keeter@gmail.com"]
+authors = ["Matt Keeter <matt.j.keeter@gmail.com>"]
 readme = "../README.md"
 
 [dependencies]

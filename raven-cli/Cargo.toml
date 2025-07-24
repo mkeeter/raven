@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 repository = "https://github.com/mkeeter/raven"
 description = "Simple Uxn + Varvara CLI"
-authors = ["Matt Keeter <matt.j.keeter@gmail.com"]
+authors = ["Matt Keeter <matt.j.keeter@gmail.com>"]
 readme = "../README.md"
 
 [dependencies]
