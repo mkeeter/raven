@@ -1,3 +1,8 @@
+impl Default for Console {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 use crate::{Event, EventData};
 use std::mem::offset_of;
 use uxn::{Ports, Uxn};
@@ -6,6 +11,8 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 pub struct Console {
     stdout: Vec<u8>,
     stderr: Vec<u8>,
+    stdout_listeners: Vec<Box<dyn FnMut(u8) + Send>>,
+    stderr_listeners: Vec<Box<dyn FnMut(u8) + Send>>,
 }
 
 #[derive(AsBytes, FromZeroes, FromBytes)]
@@ -71,17 +78,39 @@ impl Console {
         Self {
             stdout: vec![],
             stderr: vec![],
+            stdout_listeners: vec![],
+            stderr_listeners: vec![],
         }
     }
 
+    /// Register a callback to receive bytes written to stderr
+    pub fn register_stderr_listener<F>(&mut self, listener: F)
+    where
+        F: FnMut(u8) + Send + 'static,
+    {
+        self.stderr_listeners.push(Box::new(listener));
+    }
+    /// Register a callback to receive bytes written to stdout
+    pub fn register_stdout_listener<F>(&mut self, listener: F)
+    where
+        F: FnMut(u8) + Send + 'static,
+    {
+        self.stdout_listeners.push(Box::new(listener));
+    }
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
         let v = vm.dev::<ConsolePorts>();
         match target {
             ConsolePorts::WRITE => {
                 self.stdout.push(v.write);
+                for listener in &mut self.stdout_listeners {
+                    listener(v.write);
+                }
             }
             ConsolePorts::ERROR => {
                 self.stderr.push(v.error);
+                for listener in &mut self.stderr_listeners {
+                    listener(v.error);
+                }
             }
             _ => (),
         }

@@ -30,7 +30,7 @@ use uxn::{Device, Ports, Uxn};
 
 /// Write to execute before calling the event vector
 #[derive(Copy, Clone, Debug)]
-struct EventData {
+pub struct EventData {
     addr: u8,
     value: u8,
     clear: bool,
@@ -38,7 +38,7 @@ struct EventData {
 
 /// Internal events, accumulated by devices then applied to the CPU
 #[derive(Copy, Clone, Debug)]
-struct Event {
+pub struct Event {
     /// Tuple of `(address, value)` to write in in device memory
     pub data: Option<EventData>,
 
@@ -104,17 +104,25 @@ impl Output<'_> {
 
 /// Handle to the Varvara system
 pub struct Varvara {
-    system: system::System,
-    console: console::Console,
-    datetime: datetime::Datetime,
-    audio: audio::Audio,
-    screen: screen::Screen,
-    mouse: mouse::Mouse,
-    file: file::File,
-    controller: controller::Controller,
+    /// System device (timers, exit, etc)
+    pub system: system::System,
+    /// Console device (stdout, stderr, args)
+    pub console: console::Console,
+    /// Datetime device (clock, date)
+    pub datetime: datetime::Datetime,
+    /// Audio device (sound output)
+    pub audio: audio::Audio,
+    /// Screen device (framebuffer, size)
+    pub screen: screen::Screen,
+    /// Mouse device (position, buttons, scroll)
+    pub mouse: mouse::Mouse,
+    /// File device (file I/O)
+    pub file: file::File,
+    /// Controller device (keyboard input)
+    pub controller: controller::Controller,
 
     /// Flags indicating if we've already printed a warning about a missing dev
-    already_warned: [bool; 16],
+    pub already_warned: [bool; 16],
 }
 
 impl Default for Varvara {

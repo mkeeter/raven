@@ -22,7 +22,7 @@ impl Ports for MousePorts {
 
 /// Stored mouse state
 #[derive(Default)]
-pub(crate) struct Mouse {
+pub struct Mouse {
     /// Current position
     pos: (f32, f32),
 

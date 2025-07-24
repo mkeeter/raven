@@ -105,6 +105,12 @@ pub struct File {
     missing_files: HashSet<String>,
 }
 
+impl Default for File {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl File {
     pub fn new() -> Self {
         Self {

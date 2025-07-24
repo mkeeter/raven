@@ -144,6 +144,12 @@ pub struct Screen {
     colors: [u32; 4],
 }
 
+impl Default for Screen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Screen {
     pub fn new() -> Self {
         const WIDTH: u16 = 512;

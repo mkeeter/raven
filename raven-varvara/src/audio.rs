@@ -346,6 +346,12 @@ pub struct Audio {
     muted: Arc<AtomicBool>,
 }
 
+impl Default for Audio {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Audio {
     pub fn new() -> Self {
         let muted = Arc::new(AtomicBool::new(false));
