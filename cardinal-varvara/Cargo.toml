@@ -1,11 +1,11 @@
 [package]
-name = "raven-varvara"
+name = "cardinal-varvara"
 version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
-repository = "https://github.com/mkeeter/raven"
+repository = "https://github.com/davehorner/cardinal"
 description = "Varvara Ordinator"
-authors = ["Matt Keeter <matt.j.keeter@gmail.com"]
+authors = ["David Horner", "Matt Keeter <matt.j.keeter@gmail.com>"]
 readme = "../README.md"
 
 [dependencies]
@@ -14,7 +14,7 @@ log.workspace = true
 static_assertions.workspace = true
 zerocopy.workspace = true
 
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.1" }
+uxn = { path = "../cardinal-uxn", package = "cardinal-uxn", version = "0.1" }
 
 [dev-dependencies]
 image.workspace = true

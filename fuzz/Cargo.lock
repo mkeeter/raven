@@ -30,7 +30,7 @@ name = "fuzz"
 version = "0.0.0"
 dependencies = [
  "libfuzzer-sys",
- "raven-uxn",
+ "cardinal-uxn",
 ]
 
 [[package]]
@@ -77,7 +77,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "raven-uxn"
+name = "cardinal-uxn"
 version = "0.1.0"
 dependencies = [
  "zerocopy",

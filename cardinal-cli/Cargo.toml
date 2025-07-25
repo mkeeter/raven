@@ -1,0 +1,22 @@
+[package]
+name = "cardinal-cli"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/davehorner/cardinal"
+description = "Simple Uxn + Varvara CLI"
+authors = ["David Horner", "Matt Keeter <matt.j.keeter@gmail.com>"]
+readme = "../README.md"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+env_logger.workspace = true
+log.workspace = true
+
+varvara = { path = "../cardinal-varvara", package = "cardinal-varvara" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+uxn = { path = "../cardinal-uxn", package = "cardinal-uxn", features = ["native"] }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+uxn = { path = "../cardinal-uxn", package = "cardinal-uxn" }

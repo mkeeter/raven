@@ -1,5 +1,5 @@
 use image::{DynamicImage, ImageBuffer, ImageReader, Rgba};
-use raven_varvara::Varvara;
+use cardinal_varvara::Varvara;
 use std::io::Read;
 use std::path::Path;
 use uxn::{Backend, Uxn, UxnRam};
@@ -23,14 +23,14 @@ fn get_snapshot(rom: &[u8]) -> Result<Snapshot, std::io::Error> {
     // Do some input!
     dev.mouse(
         &mut vm,
-        raven_varvara::MouseState {
+        cardinal_varvara::MouseState {
             pos: (size.0 as f32 / 2.0, size.1 as f32 / 2.0),
             buttons: 1,
             scroll: (0.0, 0.0),
         },
     );
-    dev.pressed(&mut vm, raven_varvara::Key::Right, false);
-    dev.pressed(&mut vm, raven_varvara::Key::Char(b'a'), false);
+    dev.pressed(&mut vm, cardinal_varvara::Key::Right, false);
+    dev.pressed(&mut vm, cardinal_varvara::Key::Char(b'a'), false);
     for _ in 0..60 {
         dev.redraw(&mut vm);
     }

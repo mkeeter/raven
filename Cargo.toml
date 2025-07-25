@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "raven-uxn",
-    "raven-varvara",
-    "raven-cli",
-    "raven-gui",
+    "cardinal-uxn",
+    "cardinal-varvara",
+    "cardinal-cli",
+    "cardinal-gui",
 ]
 exclude = ["fuzz"]
 

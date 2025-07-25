@@ -1,5 +1,5 @@
 # Design
-The `raven-varvara` crate is independent of any specific GUI / windowing
+The `cardinal-varvara` crate is independent of any specific GUI / windowing
 implementation.  Instead, the application _using_ the crate is responsible for
 running the event loop, sending keyboard / mouse state, and drawing the returned
 frames.  This makes the library very flexible!
@@ -16,7 +16,7 @@ _then_ the caller is responsible for printing those lines
 The [reference implementation](https://git.sr.ht/~rabbits/uxn/tree/main/item/src/devices/audio.c)
 is very different from the
 [specification](https://wiki.xxiivv.com/site/varvara.html#audio);
-`raven-varvara` attempt to match the behavior of the reference implementation.
+`cardinal-varvara` attempt to match the behavior of the reference implementation.
 
 ## Controller
 ### Implementation notes

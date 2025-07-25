@@ -1,13 +1,18 @@
-**Raven** is an independent re-implementation of the
+**Cardinal** is a fork of Raven an independent re-implementation of the
 [Uxn CPU](https://wiki.xxiivv.com/site/uxn.html)
 and
 [Varvara Ordinator](https://wiki.xxiivv.com/site/varvara.html).
 
-For details, see [the project writeup](https://mattkeeter.com/projects/raven).
+
+The Uxn/Varvara ecosystem is a **personal computing stack**.
+
+Cardinal is my personal stack for the Uxn/Varvara ecosystem.
+
+For details on project origins, see [Raven's project writeup](https://mattkeeter.com/projects/cardinal).
 
 --------------------------------------------------------------------------------
 
-The `raven-uxn` crate includes two implementations of the Uxn CPU:
+The `cardinal-uxn` crate includes two implementations of the Uxn CPU:
 
 - The safe interpreter is a `#[no_std]` crate written in 100% safe Rust, with a
   single dependency (`zerocopy`).  It is 10-20% faster than
@@ -30,7 +35,7 @@ cargo +nightly fuzz run --release fuzz-native
 
 --------------------------------------------------------------------------------
 
-The Varvara implementation (`raven-varvara`) includes all peripherals, and has
+The Varvara implementation (`cardinal-varvara`) includes all peripherals, and has
 been tested on many of the
 [flagship applications](https://wiki.xxiivv.com/site/roms.html)
 (Left, Orca, Noodle, Potato).
@@ -39,22 +44,25 @@ been tested on many of the
 
 The repository includes two applications built on these libraries:
 
-- `raven-cli` is a command-line application to run console-based ROMs
-- `raven-gui` is a full-fledged GUI, which runs both as a native application and
-  [on the web](https://mattkeeter.com/projects/raven/demo)
+- `cardinal-cli` is a command-line application to run console-based ROMs
+- `cardinal-gui` is a full-fledged GUI, which runs both as a native application and
+  [Raven on the web](https://mattkeeter.com/projects/cardinal/demo)
 
 The web demo is built with [`truck`](https://trunkrs.dev/), e.g.
 
 ```console
 cargo install --locked trunk # this only needs to be run once
-cd raven-gui
-trunk build --release --public-url=/projects/raven/demo/ # edit this path
+cd cardinal-gui
+trunk build --release --public-url=/projects/cardinal/demo/ # edit this path
 ```
 
 --------------------------------------------------------------------------------
 
-© 2024-2025 Matthew Keeter  
-Released under the [Mozilla Public License 2.0](https://github.com/mkeeter/fidget/blob/main/LICENSE.txt)
+July 2025 Changes
+- stdout and stderr callbacks
+
+© 2024-2025 Matthew Keeter, David Horner
+Released under the [Mozilla Public License 2.0](/LICENSE.txt)
 
 The repository includes ROMs compiled from the `uxnemu` reference
 implementation, which are © Devine Lu Linvega and released under the MIT
