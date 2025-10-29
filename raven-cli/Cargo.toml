@@ -20,3 +20,7 @@ uxn = { path = "../raven-uxn", package = "raven-uxn", features = ["native"] }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 uxn = { path = "../raven-uxn", package = "raven-uxn" }
+
+[dev-dependencies]
+regex = "1.12.2"
+assert_cmd = "2.1.0"

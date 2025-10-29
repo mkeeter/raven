@@ -138,7 +138,18 @@ impl Device for Varvara {
             // Default case
             t => self.warn_missing(t),
         }
-        !self.system.should_exit()
+        // Normally we stop running if `system.should_exit()` is true. For
+        // debugging we also allow a short-circuit: if the System reported a
+        // state write (`saw_state_write`) then don't terminate immediately
+        // here so the runner's `run_until` predicate can inspect the VM and
+        // stop at that moment. This avoids the device `deo` returning false
+        // (which would make the CPU terminate immediately before the
+        // predicate can run).
+        let mut keep_running = !self.system.should_exit();
+        if self.system.saw_state_write.is_some() {
+            keep_running = true;
+        }
+        keep_running
     }
     fn dei(&mut self, vm: &mut Uxn, target: u8) {
         match target & 0xF0 {

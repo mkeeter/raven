@@ -6,6 +6,10 @@ use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
 pub struct System {
     exit: Option<i32>,
     banks: [Box<[u8; 65536]>; 15],
+    /// Debug flag: set when the ROM writes a non-zero System/state value.
+    /// This is used by the runner to stop execution exactly at the moment
+    /// the ROM requested an exit so we can inspect PC/stack state.
+    pub saw_state_write: Option<u8>,
 }
 
 impl Default for System {
@@ -80,7 +84,7 @@ mod expansion {
 impl System {
     pub fn new() -> Self {
         let banks = [(); 15].map(|_| Box::new([0u8; 65536]));
-        Self { banks, exit: None }
+        Self { banks, exit: None, saw_state_write: None }
     }
 
     /// Resets the peripheral, loading the given data into expansion memory
@@ -92,6 +96,7 @@ impl System {
             b[n..].fill(0u8);
         }
         self.exit = None;
+        self.saw_state_write = None;
     }
 
     pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
@@ -184,6 +189,15 @@ impl System {
             }
             SystemPorts::STATE => {
                 if v.state != 0 {
+                    // Log the exact state value the ROM wrote so we can trace
+                    // why it requested an exit. This is a lightweight
+                    // instrumentation to aid debugging; it will be removed
+                    // once the root cause is identified.
+                    log::info!("[SYSTEM] System/state written: 0x{:02X}", v.state);
+                    // Record the write for the runner to detect and pause
+                    // before the normal exit handling occurs.
+                    self.saw_state_write = Some(v.state);
+                    // Also set the exit code to preserve expected behavior
                     self.exit = Some((v.state & !0x80) as i32);
                 }
             }
