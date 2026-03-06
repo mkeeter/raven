@@ -181,6 +181,8 @@ pub fn run() -> Result<()> {
         .ok_or_else(|| anyhow!("could not find audio-check"))?
         .dyn_into::<web_sys::HtmlElement>()
         .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
+
+    #[expect(unused_assignments)] // audio must stay alive in parent context
     let a = Closure::<dyn FnMut()>::new(move || {
         if let Some(d) = audio_data.take() {
             info!("setting up audio");
@@ -197,6 +199,7 @@ pub fn run() -> Result<()> {
             error!("error setting muted flag");
         }
     });
+
     audio_check.set_onclick(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
