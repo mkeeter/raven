@@ -150,16 +150,14 @@ ENTRY x86_64_entry
     mov qword ptr [rsp + 0x30], rsi
     mov qword ptr [rsp + 0x38], rcx
 
-    // Save VM ptr and DeviceHandle ptr (passed on original stack, now at rsp+0x98+8 and +0x98+16
-    // after our sub; but they were at [rsp+8] and [rsp+16] before the sub and pushes)
-    // Actually they were at [original_rsp+8] and [original_rsp+16] before the call.
-    // After call: ret addr at [orig-8], args on stack at [orig+8] and [orig+16].
-    // After 6 pushes + sub 0x98: current_rsp = orig - 8 - 48 - 0x98 = orig - 0xd0
-    // So [orig+8]  = [rsp + 0xd0 + 8]  = [rsp + 0xd8]
-    //    [orig+16] = [rsp + 0xd0 + 16] = [rsp + 0xe0]
-    mov rax, qword ptr [rsp + 0xd8]
+    // Save VM ptr and DeviceHandle ptr (7th and 8th stack args).
+    // At x86_64_entry: [rsp_entry+8]=vm, [rsp_entry+16]=dev.
+    // After 6 pushes (0x30) + sub 0x98: total displacement = 0xc8.
+    // vm at [rsp + 0xc8 + 8] = [rsp + 0xd0]
+    // dev at [rsp + 0xc8 + 16] = [rsp + 0xd8]
+    mov rax, qword ptr [rsp + 0xd0]
     mov qword ptr [rsp + 0x40], rax
-    mov rax, qword ptr [rsp + 0xe0]
+    mov rax, qword ptr [rsp + 0xd8]
     mov qword ptr [rsp + 0x48], rax
 
     // Load interpreter registers from arguments
@@ -454,8 +452,8 @@ _JCI:
     next
 
 _INC2:
-    movzx eax, byte ptr [rbx + r12]   // low byte
-    peek ecx, 1                        // high byte
+    peek ecx, 1                        // high byte (peek first; rax clobbered)
+    movzx eax, byte ptr [rbx + r12]   // low byte (loaded after peek)
     shl ecx, 8
     or eax, ecx
     inc eax
@@ -473,14 +471,14 @@ _POP2:
     next
 
 _NIP2:
-    movzx eax, byte ptr [rbx + r12]   // top low
+    movzx eax, byte ptr [rbx + r12]   // b_lo (top)
     stk_pop
-    movzx ecx, byte ptr [rbx + r12]   // top high
+    movzx ecx, byte ptr [rbx + r12]   // b_hi (second)
     stk_pop
-    mov byte ptr [rbx + r12], cl
+    mov byte ptr [rbx + r12], al      // b_lo at new top (a_lo position)
     lea rdx, [r12 - 1]
     and rdx, 0xff
-    mov byte ptr [rbx + rdx], al
+    mov byte ptr [rbx + rdx], cl      // b_hi below (a_hi position)
     next
 
 _SWP2:
@@ -1136,14 +1134,14 @@ _POP2r:
     next
 
 _NIP2r:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // b_lo (top)
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    movzx ecx, byte ptr [r13 + r14]   // b_hi (second)
     rpop
-    mov byte ptr [r13 + r14], cl
+    mov byte ptr [r13 + r14], al      // b_lo at new top
     lea rdx, [r14 - 1]
     and rdx, 0xff
-    mov byte ptr [r13 + rdx], al
+    mov byte ptr [r13 + rdx], cl      // b_hi below
     next
 
 _SWP2r:
@@ -1746,8 +1744,8 @@ _LIT2:
     next
 
 _INC2k:
-    movzx eax, byte ptr [rbx + r12]
-    peek ecx, 1
+    peek ecx, 1                        // high byte (peek first; rax clobbered)
+    movzx eax, byte ptr [rbx + r12]   // low byte (loaded after peek)
     shl ecx, 8
     or eax, ecx
     inc eax
@@ -1763,10 +1761,10 @@ _POP2k:
     next
 
 _NIP2k:
-    movzx eax, byte ptr [rbx + r12]
-    peek ecx, 1
-    stk_push cl
-    stk_push al
+    peek ecx, 1                        // b_hi (peek first; rax clobbered)
+    movzx eax, byte ptr [rbx + r12]   // b_lo (loaded after peek)
+    stk_push cl                        // push b_hi
+    stk_push al                        // push b_lo
     next
 
 _SWP2k:
@@ -2330,8 +2328,8 @@ _LIT2r:
     next
 
 _INC2kr:
-    movzx eax, byte ptr [r13 + r14]
-    rpeek ecx, 1
+    rpeek ecx, 1                        // high byte (rpeek first; rax clobbered)
+    movzx eax, byte ptr [r13 + r14]    // low byte (loaded after rpeek)
     shl ecx, 8
     or eax, ecx
     inc eax
@@ -2346,10 +2344,10 @@ _POP2kr:
     next
 
 _NIP2kr:
-    movzx eax, byte ptr [r13 + r14]
-    rpeek ecx, 1
-    rpush cl
-    rpush al
+    rpeek ecx, 1                       // b_hi (rpeek first; rax clobbered)
+    movzx eax, byte ptr [r13 + r14]   // b_lo (loaded after rpeek)
+    rpush cl                           // push b_hi
+    rpush al                           // push b_lo
     next
 
 _SWP2kr:
