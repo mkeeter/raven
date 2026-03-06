@@ -673,8 +673,8 @@ _STR2:
     next
 
 _LDA2:
-    movzx eax, byte ptr [rbx + r12]   // addr low
-    peek ecx, 1                        // addr high
+    peek ecx, 1                        // addr high (peek first; rax clobbered)
+    movzx eax, byte ptr [rbx + r12]   // addr low (loaded after peek)
     shl ecx, 8
     or eax, ecx
     movzx ecx, byte ptr [r15 + rax]
@@ -1115,8 +1115,8 @@ _JSI:
     next
 
 _INC2r:
-    movzx eax, byte ptr [r13 + r14]
-    rpeek ecx, 1
+    rpeek ecx, 1                       // high byte (rpeek first; rax clobbered)
+    movzx eax, byte ptr [r13 + r14]   // low byte (loaded after rpeek)
     shl ecx, 8
     or eax, ecx
     inc eax
@@ -1637,8 +1637,8 @@ _STRk:
     next
 
 _LDAk:
-    movzx eax, byte ptr [rbx + r12]
-    peek ecx, 1
+    peek ecx, 1                        // addr_hi (peek first; rax clobbered)
+    movzx eax, byte ptr [rbx + r12]   // addr_lo (loaded after peek)
     shl ecx, 8
     or eax, ecx
     movzx eax, byte ptr [r15 + rax]
