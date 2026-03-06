@@ -125,7 +125,7 @@
 //   r9  = pc (u16, zero-extended in 32-bit arg)
 //   [rsp+8]  = VM ptr
 //   [rsp+16] = DeviceHandle ptr
-ENTRY x86_64_entry
+ENTRY interpreter_entry
     // Prologue: save callee-saved registers and build frame
     // We need 0x90 bytes of local space (aligned to 16 after 8-byte ret addr)
     push rbx

@@ -6,7 +6,7 @@
 // x5 - program counter (u16), offset of the next value in RAM
 // x6 - VM pointer (&mut Uxn)
 // x7 - Device handle pointer (&DeviceHandle)
-// x8 - Jump table pointer (loaded in aarch64_entry)
+// x8 - Jump table pointer (loaded in interpreter_entry)
 // x9-15 - scratch registers
 //
 // We do not use any callee-saved registers (besides x29 / x30)
@@ -81,7 +81,7 @@
     ldrb w3, [x12]
 .endm
 
-ENTRY aarch64_entry
+ENTRY interpreter_entry
     sub sp, sp, #0x200          // make room in the stack
     stp   x29, x30, [sp, 0x0]   // store stack and frame pointer
     mov   x29, sp

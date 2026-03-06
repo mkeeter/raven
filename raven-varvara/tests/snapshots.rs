@@ -9,9 +9,12 @@ struct Snapshot {
     size: (u16, u16),
 }
 
-fn get_snapshot(rom: &[u8]) -> Result<Snapshot, std::io::Error> {
+fn get_snapshot(
+    rom: &[u8],
+    backend: Backend,
+) -> Result<Snapshot, std::io::Error> {
     let mut ram = UxnRam::new();
-    let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
+    let mut vm = Uxn::new(&mut ram, backend);
     let mut dev = Varvara::new();
     let data = vm.reset(rom);
     dev.reset(data);
@@ -48,7 +51,7 @@ fn get_snapshot(rom: &[u8]) -> Result<Snapshot, std::io::Error> {
     })
 }
 
-fn run_and_check(name: &str) {
+fn run_and_check(name: &str, backend: Backend) {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
         .expect("CARGO_MANIFEST_DIR not set");
     let rom_path = Path::new(&manifest_dir)
@@ -60,7 +63,7 @@ fn run_and_check(name: &str) {
         .expect("could not open ROM file")
         .read_to_end(&mut rom)
         .expect("failed to read ROM");
-    let snapshot = get_snapshot(&rom).expect("ROM execution failed");
+    let snapshot = get_snapshot(&rom, backend).expect("ROM execution failed");
 
     let our_image = ImageBuffer::<Rgba<u8>, _>::from_raw(
         snapshot.size.0 as u32,
@@ -120,48 +123,31 @@ fn run_and_check(name: &str) {
 mod snapshots {
     use super::*;
 
-    #[test]
-    fn audio() {
-        run_and_check("audio");
+    macro_rules! snapshot_test {
+        ($name:ident, $backend:path) => {
+            #[test]
+            fn $name() {
+                run_and_check(stringify!($name), $backend);
+            }
+        };
     }
-
-    #[test]
-    fn controller() {
-        run_and_check("controller");
+    macro_rules! snapshot_tests {
+        ($backend:path) => {
+            snapshot_test!(audio, $backend);
+            snapshot_test!(controller, $backend);
+            snapshot_test!(piano, $backend);
+            snapshot_test!(mandelbrot, $backend);
+            snapshot_test!(screen_auto, $backend);
+            snapshot_test!(screen_blending, $backend);
+            snapshot_test!(screen_bounds, $backend);
+            snapshot_test!(screen_pixel, $backend);
+            snapshot_test!(screen, $backend);
+        };
     }
+    snapshot_tests!(Backend::Interpreter);
 
-    #[test]
-    fn piano() {
-        run_and_check("piano");
-    }
-
-    #[test]
-    fn mandelbrot() {
-        run_and_check("mandelbrot");
-    }
-
-    #[test]
-    fn screen_auto() {
-        run_and_check("screen.auto");
-    }
-
-    #[test]
-    fn screen_blending() {
-        run_and_check("screen.blending");
-    }
-
-    #[test]
-    fn screen_bounds() {
-        run_and_check("screen.bounds");
-    }
-
-    #[test]
-    fn screen_pixel() {
-        run_and_check("screen.pixel");
-    }
-
-    #[test]
-    fn screen() {
-        run_and_check("screen");
+    mod native {
+        use super::*;
+        snapshot_tests!(Backend::Native);
     }
 }
