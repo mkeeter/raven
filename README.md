@@ -53,7 +53,7 @@ trunk build --release --public-url=/projects/raven/demo/ # edit this path
 
 --------------------------------------------------------------------------------
 
-© 2024-2025 Matthew Keeter  
+© 2024-2026 Matthew Keeter  
 Released under the [Mozilla Public License 2.0](https://github.com/mkeeter/fidget/blob/main/LICENSE.txt)
 
 The repository includes ROMs compiled from the `uxnemu` reference
