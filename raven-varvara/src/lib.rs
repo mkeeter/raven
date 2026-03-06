@@ -217,7 +217,7 @@ impl Varvara {
     /// This is not idempotent; the output is taken from various accumulators
     /// and will be empty if this is called multiple times.
     #[must_use]
-    pub fn output(&mut self, vm: &Uxn) -> Output {
+    pub fn output(&mut self, vm: &Uxn) -> Output<'_> {
         Output {
             size: self.screen.size(),
             frame: self.screen.frame(vm),
@@ -232,7 +232,7 @@ impl Varvara {
     ///
     /// Leaves the console type set to `stdin`, and returns the current output
     /// state of the system
-    pub fn send_args(&mut self, vm: &mut Uxn, args: &[String]) -> Output {
+    pub fn send_args(&mut self, vm: &mut Uxn, args: &[String]) -> Output<'_> {
         for (i, a) in args.iter().enumerate() {
             self.console.set_type(vm, console::Type::Argument);
             for c in a.bytes() {

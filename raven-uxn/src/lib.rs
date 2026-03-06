@@ -361,7 +361,7 @@ impl<'a> Uxn<'a> {
     }
 
     #[inline]
-    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
+    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.ret
         } else {
@@ -371,7 +371,7 @@ impl<'a> Uxn<'a> {
     }
 
     #[inline]
-    fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<FLAGS> {
+    fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.stack
         } else {
