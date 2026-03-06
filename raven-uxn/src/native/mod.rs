@@ -1,6 +1,11 @@
 use crate::{Device, Uxn};
 
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(target_arch = "aarch64")]
+mod aarch64;
+#[cfg(target_arch = "x86_64")]
+mod x86_64;
+
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
 compile_error!("no native implementation for this platform");
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,50 +94,14 @@ extern "C" fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-struct DeviceHandle<'a>(&'a mut dyn Device);
+pub(crate) struct DeviceHandle<'a>(pub &'a mut dyn Device);
 
 pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     let mut h = DeviceHandle(dev);
-
-    // SAFETY: do you trust me?
-    unsafe {
-        aarch64_entry(
-            vm.stack.data.as_mut_ptr(),
-            &mut vm.stack.index as *mut _,
-            vm.ret.data.as_mut_ptr(),
-            &mut vm.ret.index as *mut _,
-            (*vm.ram).as_mut_ptr(),
-            pc,
-            vm as *mut _,
-            &mut h as *mut _,
-        )
-    }
-}
-
-#[cfg(target_os = "macos")]
-core::arch::global_asm!(concat!(
-    include_str!("aarch64_macos.s"),
-    include_str!("aarch64.s")
-));
-
-#[cfg(target_os = "linux")]
-core::arch::global_asm!(concat!(
-    include_str!("aarch64_linux.s"),
-    include_str!("aarch64.s")
-));
-
-extern "C" {
-    #[allow(improper_ctypes)]
-    fn aarch64_entry(
-        stack: *mut u8,
-        stack_index: *mut u8,
-        ret: *mut u8,
-        ret_index: *mut u8,
-        ram: *mut u8,
-        pc: u16,
-        vm: *mut Uxn,
-        dev: *mut DeviceHandle,
-    ) -> u16;
+    #[cfg(target_arch = "aarch64")]
+    return aarch64::entry(vm, &mut h, pc);
+    #[cfg(target_arch = "x86_64")]
+    return x86_64::entry(vm, &mut h, pc);
 }
 
 #[cfg(all(feature = "alloc", test))]
