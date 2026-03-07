@@ -13,17 +13,18 @@
 // a scratch register for dispatch.
 //
 // Stack frame layout (offsets from rsp after prologue):
-//   [rsp+0x00]  saved rbx
-//   [rsp+0x08]  saved rbp
-//   [rsp+0x10]  saved r12
-//   [rsp+0x18]  saved r13
+//   [rsp+0x58]  DeviceHandle pointer (from caller)
+//   [rsp+0x50]  VM DeviceHandle pointer (from caller)
+//   [rsp+0x48]  return address (from caller)
+//   [rsp+0x40]  saved rbx
+//   [rsp+0x38]  saved rbp
+//   [rsp+0x30]  saved r12
+//   [rsp+0x28]  saved r13
 //   [rsp+0x20]  saved r14
-//   [rsp+0x28]  saved r15
-//   [rsp+0x30]  saved stack_index pointer (from entry arg)
-//   [rsp+0x38]  saved ret_index pointer (from entry arg)
-//   [rsp+0x40]  VM pointer
-//   [rsp+0x48]  device handle pointer
-//   [rsp+0x50]  (16-byte alignment padding / return address already on stack)
+//   [rsp+0x18]  saved r15
+//   [rsp+0x10]  saved stack_index pointer (from entry arg)
+//   [rsp+0x08]  saved ret_index pointer (from entry arg)
+//   [rsp+0x00]  alignment
 //
 // Scratch registers (not preserved across instructions, but saved in precall):
 //   rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11
@@ -81,22 +82,22 @@
 // C calling convention: arg1=rdi (VM ptr), arg2=rsi (DeviceHandle ptr)
 .macro precall
     // Write stack indices back through the pointers saved at entry
-    mov rax, qword ptr [rsp + 0x30]   // stack_index pointer
+    mov rax, qword ptr [rsp + 0x08]   // stack_index pointer
     mov byte ptr [rax], r12b
-    mov rax, qword ptr [rsp + 0x38]   // ret_index pointer
+    mov rax, qword ptr [rsp + 0x10]   // ret_index pointer
     mov byte ptr [rax], r14b
 
     // Set up args: VM ptr and DeviceHandle ptr
-    mov rdi, qword ptr [rsp + 0x40]
-    mov rsi, qword ptr [rsp + 0x48]
+    mov rdi, qword ptr [rsp + 0x50]
+    mov rsi, qword ptr [rsp + 0x58]
 .endm
 
 // Restore all interpreter state after a C call
 .macro postcall
     // Reload stack indices (DEI/DEO may have modified them)
-    mov rax, qword ptr [rsp + 0x30]
+    mov rax, qword ptr [rsp + 0x08]
     movzx r12, byte ptr [rax]
-    mov rax, qword ptr [rsp + 0x38]
+    mov rax, qword ptr [rsp + 0x10]
     movzx r14, byte ptr [rax]
 .endm
 
@@ -119,31 +120,11 @@ ENTRY interpreter_entry
     push r13
     push r14
     push r15
-    // rsp is now 8-byte aligned (6 pushes = 48 bytes, ret addr = 8, total 56)
-    // Allocate space: 0x58 bytes to get 16-byte aligned + locals
-    // After 6 pushes + ret addr: rsp % 16 = (original_rsp - 8 - 48) % 16
-    // = original_rsp was 16-aligned at call, so rsp now = orig - 56, which is
-    // 8-byte aligned but not 16. We need sub to make it 16-aligned.
-    // sub 8 more bytes = 64 total shift → 16-aligned. But we need more space.
-    // Let's allocate 0x50 bytes (80): 56 + 80 = 136 = 8*17, not 16-aligned
-    // Actually: orig_rsp aligned → after call (push ret addr) rsp = orig-8
-    // After 6 pushes: rsp = orig-56. 56 mod 16 = 8. Sub 8 → 16-aligned.
-    // We need at least 0x90 bytes of locals. Sub 0x98 (152, mult of 16, +8 for align)
-    sub rsp, 0x98
+    sub rsp, 0x18
 
     // Save entry-time stack index pointers (rsi=stack_idx_ptr, rcx=ret_idx_ptr)
-    mov qword ptr [rsp + 0x30], rsi
-    mov qword ptr [rsp + 0x38], rcx
-
-    // Save VM ptr and DeviceHandle ptr (7th and 8th stack args).
-    // At x86_64_entry: [rsp_entry+8]=vm, [rsp_entry+16]=dev.
-    // After 6 pushes (0x30) + sub 0x98: total displacement = 0xc8.
-    // vm at [rsp + 0xc8 + 8] = [rsp + 0xd0]
-    // dev at [rsp + 0xc8 + 16] = [rsp + 0xd8]
-    mov rax, qword ptr [rsp + 0xd0]
-    mov qword ptr [rsp + 0x40], rax
-    mov rax, qword ptr [rsp + 0xd8]
-    mov qword ptr [rsp + 0x48], rax
+    mov qword ptr [rsp + 0x08], rsi
+    mov qword ptr [rsp + 0x10], rcx
 
     // Load interpreter registers from arguments
     mov rbx, rdi                    // stack data ptr
@@ -157,16 +138,16 @@ ENTRY interpreter_entry
 
 _BRK:
     // Write stack indices back through saved pointers
-    mov rax, qword ptr [rsp + 0x30]
+    mov rax, qword ptr [rsp + 0x08]
     mov byte ptr [rax], r12b
-    mov rax, qword ptr [rsp + 0x38]
+    mov rax, qword ptr [rsp + 0x10]
     mov byte ptr [rax], r14b
 
     // Return PC in rax
     movzx eax, bp
 
     // Epilogue
-    add rsp, 0x98
+    add rsp, 0x18
     pop r15
     pop r14
     pop r13
