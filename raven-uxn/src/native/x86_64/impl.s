@@ -829,7 +829,8 @@ _LTHr:
 _JMPr:
     movsx rax, byte ptr [r13 + r14]
     rpop
-    add bp, ax
+    add rbp, rax
+    and rbp, 0xffff
     next
 
 _JCNr:
@@ -839,7 +840,8 @@ _JCNr:
     rpop
     test ecx, ecx
     jz 1f
-    add bp, ax
+    add rbp, rax
+    and rbp, 0xffff
 1:
     next
 
