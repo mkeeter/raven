@@ -375,7 +375,16 @@ _DEO:
     next
 .endm
 
-.macro binary_op_div
+_ADD:
+    binary_op add
+
+_SUB:
+    binary_op sub
+
+_MUL:
+    binary_op imul
+
+_DIV:
     movzx eax, byte ptr [rbx + r12]   // b (divisor), top
     stk_pop
     movzx ecx, byte ptr [rbx + r12]   // a (dividend), second
@@ -390,24 +399,6 @@ _DEO:
 2:
     mov byte ptr [rbx + r12], al
     next
-.endm
-
-_ADD:
-    binary_op add
-
-_SUB:
-    movzx eax, byte ptr [rbx + r12]   // b (top)
-    stk_pop
-    movzx ecx, byte ptr [rbx + r12]   // a (second)
-    sub ecx, eax
-    mov byte ptr [rbx + r12], cl
-    next
-
-_MUL:
-    binary_op imul
-
-_DIV:
-    binary_op_div
 
 _AND:
     binary_op and
@@ -738,7 +729,16 @@ _DEO2:
     next
 .endm
 
-.macro binary_op2_div
+_ADD2:
+    binary_op2 add
+
+_SUB2:
+    binary_op2 sub
+
+_MUL2:
+    binary_op2 imul
+
+_DIV2:
     movzx eax, byte ptr [rbx + r12]
     stk_pop
     movzx ecx, byte ptr [rbx + r12]
@@ -771,41 +771,6 @@ _DEO2:
     mov byte ptr [rbx + r12], al      // store result_hi at current pos
     stk_push r8b                       // push result_lo on top
     next
-.endm
-
-.macro binary_op2_sub
-    movzx eax, byte ptr [rbx + r12]
-    stk_pop
-    movzx ecx, byte ptr [rbx + r12]
-    stk_pop
-    shl ecx, 8
-    or eax, ecx                        // b (top short)
-
-    movzx ecx, byte ptr [rbx + r12]
-    stk_pop
-    movzx edx, byte ptr [rbx + r12]
-    shl edx, 8
-    or ecx, edx                        // a (second short)
-
-    sub ecx, eax                       // result in ecx
-    movzx r8d, cl                      // save result_lo
-    shr ecx, 8
-    mov byte ptr [rbx + r12], cl      // store result_hi at current pos
-    stk_push r8b                       // push result_lo on top
-    next
-.endm
-
-_ADD2:
-    binary_op2 add
-
-_SUB2:
-    binary_op2_sub
-
-_MUL2:
-    binary_op2 imul
-
-_DIV2:
-    binary_op2_div
 
 _AND2:
     binary_op2 and
@@ -1040,7 +1005,16 @@ _DEOr:
     next
 .endm
 
-.macro binary_opr_div
+_ADDr:
+    binary_opr add
+
+_SUBr:
+    binary_opr sub
+
+_MULr:
+    binary_opr imul
+
+_DIVr:
     movzx eax, byte ptr [r13 + r14]   // b (divisor), top
     rpop
     movzx ecx, byte ptr [r13 + r14]   // a (dividend), second
@@ -1055,24 +1029,6 @@ _DEOr:
 2:
     mov byte ptr [r13 + r14], al
     next
-.endm
-
-_ADDr:
-    binary_opr add
-
-_SUBr:
-    movzx eax, byte ptr [r13 + r14]
-    rpop
-    movzx ecx, byte ptr [r13 + r14]
-    sub ecx, eax
-    mov byte ptr [r13 + r14], cl
-    next
-
-_MULr:
-    binary_opr imul
-
-_DIVr:
-    binary_opr_div
 
 _ANDr:
     binary_opr and
@@ -1399,7 +1355,16 @@ _DEO2r:
     next
 .endm
 
-.macro binary_op2r_div
+_ADD2r:
+    binary_op2r add
+
+_SUB2r:
+    binary_op2r sub
+
+_MUL2r:
+    binary_op2r imul
+
+_DIV2r:
     movzx eax, byte ptr [r13 + r14]
     rpop
     movzx ecx, byte ptr [r13 + r14]
@@ -1431,41 +1396,6 @@ _DEO2r:
     mov byte ptr [r13 + r14], al      // store result_hi at current pos
     rpush r8b                          // push result_lo on top
     next
-.endm
-
-.macro binary_op2r_sub
-    movzx eax, byte ptr [r13 + r14]
-    rpop
-    movzx ecx, byte ptr [r13 + r14]
-    rpop
-    shl ecx, 8
-    or eax, ecx                        // b
-
-    movzx ecx, byte ptr [r13 + r14]
-    rpop
-    movzx edx, byte ptr [r13 + r14]
-    shl edx, 8
-    or ecx, edx                        // a
-
-    sub ecx, eax                       // result in ecx
-    movzx r8d, cl                      // save result_lo
-    shr ecx, 8
-    mov byte ptr [r13 + r14], cl      // store result_hi at current pos
-    rpush r8b                          // push result_lo on top
-    next
-.endm
-
-_ADD2r:
-    binary_op2r add
-
-_SUB2r:
-    binary_op2r_sub
-
-_MUL2r:
-    binary_op2r imul
-
-_DIV2r:
-    binary_op2r_div
 
 _AND2r:
     binary_op2r and
@@ -1675,7 +1605,16 @@ _DEOk:
     next
 .endm
 
-.macro binary_opk_div
+_ADDk:
+    binary_opk add
+
+_SUBk:
+    binary_opk sub
+
+_MULk:
+    binary_opk imul
+
+_DIVk:
     peek ecx, 1                        // a (dividend; peek first, rax clobbered)
     movzx eax, byte ptr [rbx + r12]   // b (divisor; loaded after peek)
     xchg eax, ecx                      // eax = a, ecx = b
@@ -1689,27 +1628,6 @@ _DEOk:
 2:
     stk_push al
     next
-.endm
-
-.macro binary_opk_sub
-    peek ecx, 1                        // a (peek first; rax clobbered)
-    movzx eax, byte ptr [rbx + r12]   // b (loaded after peek)
-    sub ecx, eax                       // a - b
-    stk_push cl
-    next
-.endm
-
-_ADDk:
-    binary_opk add
-
-_SUBk:
-    binary_opk_sub
-
-_MULk:
-    binary_opk imul
-
-_DIVk:
-    binary_opk_div
 
 _ANDk:
     binary_opk and
@@ -1989,7 +1907,16 @@ _DEO2k:
     next
 .endm
 
-.macro binary_op2k_div
+_ADD2k:
+    binary_op2k add
+
+_SUB2k:
+    binary_op2k sub
+
+_MUL2k:
+    binary_op2k imul
+
+_DIV2k:
     peek ecx, 1                        // b_hi (peek first; rax clobbered)
     movzx eax, byte ptr [rbx + r12]   // b_lo (loaded after peek)
     shl ecx, 8
@@ -2019,39 +1946,6 @@ _DEO2k:
     stk_push al                        // push result_hi first
     stk_push r8b                       // push result_lo on top
     next
-.endm
-
-.macro binary_op2k_sub
-    peek ecx, 1                        // b_hi (peek first; rax clobbered)
-    movzx eax, byte ptr [rbx + r12]   // b_lo (loaded after peek)
-    shl ecx, 8
-    or eax, ecx                        // b
-    mov r8d, eax                       // save b
-
-    peek ecx, 2                        // a_lo
-    peek edx, 3                        // a_hi
-    shl edx, 8
-    or ecx, edx                        // a
-
-    sub ecx, r8d                       // a - b → ecx
-    movzx r8d, cl                      // save result_lo
-    shr ecx, 8
-    stk_push cl                        // push result_hi first
-    stk_push r8b                       // push result_lo on top
-    next
-.endm
-
-_ADD2k:
-    binary_op2k add
-
-_SUB2k:
-    binary_op2k_sub
-
-_MUL2k:
-    binary_op2k imul
-
-_DIV2k:
-    binary_op2k_div
 
 _AND2k:
     binary_op2k and
@@ -2572,7 +2466,16 @@ _DEO2kr:
     next
 .endm
 
-.macro binary_op2kr_div
+_ADD2kr:
+    binary_op2kr add
+
+_SUB2kr:
+    binary_op2kr sub
+
+_MUL2kr:
+    binary_op2kr imul
+
+_DIV2kr:
     rpeek ecx, 1                       // b_hi (rpeek first; rax clobbered)
     movzx eax, byte ptr [r13 + r14]   // b_lo (loaded after rpeek)
     shl ecx, 8
@@ -2602,39 +2505,6 @@ _DEO2kr:
     rpush al                           // push result_hi first
     rpush r8b                          // push result_lo on top
     next
-.endm
-
-.macro binary_op2kr_sub
-    rpeek ecx, 1                       // b_hi (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b_lo (loaded after rpeek)
-    shl ecx, 8
-    or eax, ecx                        // b
-    mov r8d, eax                       // save b
-
-    rpeek ecx, 2                       // a_lo
-    rpeek edx, 3                       // a_hi
-    shl edx, 8
-    or ecx, edx                        // a
-
-    sub ecx, r8d                       // a - b → ecx
-    movzx r8d, cl                      // save result_lo
-    shr ecx, 8
-    rpush cl                           // push result_hi first
-    rpush r8b                          // push result_lo on top
-    next
-.endm
-
-_ADD2kr:
-    binary_op2kr add
-
-_SUB2kr:
-    binary_op2kr_sub
-
-_MUL2kr:
-    binary_op2kr imul
-
-_DIV2kr:
-    binary_op2kr_div
 
 _AND2kr:
     binary_op2kr and
