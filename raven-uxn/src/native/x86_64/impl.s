@@ -86,14 +86,6 @@
     mov rax, qword ptr [rsp + 0x38]   // ret_index pointer
     mov byte ptr [rax], r14b
 
-    // Save interpreter registers
-    mov qword ptr [rsp + 0x58], rbx
-    mov qword ptr [rsp + 0x60], r12
-    mov qword ptr [rsp + 0x68], r13
-    mov qword ptr [rsp + 0x70], r14
-    mov qword ptr [rsp + 0x78], r15
-    mov qword ptr [rsp + 0x80], rbp
-
     // Set up args: VM ptr and DeviceHandle ptr
     mov rdi, qword ptr [rsp + 0x40]
     mov rsi, qword ptr [rsp + 0x48]
@@ -101,13 +93,6 @@
 
 // Restore all interpreter state after a C call
 .macro postcall
-    mov rbx, qword ptr [rsp + 0x58]
-    mov r12,  qword ptr [rsp + 0x60]
-    mov r13,  qword ptr [rsp + 0x68]
-    mov r14,  qword ptr [rsp + 0x70]
-    mov r15,  qword ptr [rsp + 0x78]
-    mov rbp,  qword ptr [rsp + 0x80]
-
     // Reload stack indices (DEI/DEO may have modified them)
     mov rax, qword ptr [rsp + 0x30]
     movzx r12, byte ptr [rax]
