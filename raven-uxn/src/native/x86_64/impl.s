@@ -2150,19 +2150,11 @@ _DEOkr:
     next
 .endm
 
-.macro binary_opkr_sub
-    rpeek ecx, 1                       // a (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b (loaded after rpeek)
-    sub ecx, eax                       // a - b
-    rpush cl
-    next
-.endm
-
 _ADDkr:
     binary_opkr add
 
 _SUBkr:
-    binary_opkr_sub
+    binary_opkr sub
 
 _MULkr:
     binary_opkr imul
