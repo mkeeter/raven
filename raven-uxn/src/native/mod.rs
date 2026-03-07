@@ -12,41 +12,41 @@ compile_error!("no native implementation for this platform");
 // Stubs for DEO calls
 
 #[no_mangle]
-extern "C" fn deo_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b000>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b001>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b010>(dev.0, 0).is_some()
 }
 #[no_mangle]
-extern "C" fn deo_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b011>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b100>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b101>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b110>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.deo::<0b111>(dev.0, 0).is_some()
 }
 
@@ -54,41 +54,41 @@ extern "C" fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
 // Stubs for DEI calls
 
 #[no_mangle]
-extern "C" fn dei_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b000>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b001>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b010>(dev.0, 0).is_some()
 }
 #[no_mangle]
-extern "C" fn dei_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b011>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b100>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b101>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b110>(dev.0, 0).is_some()
 }
 
 #[no_mangle]
-extern "C" fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+extern "sysv64" fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
     vm.dei::<0b111>(dev.0, 0).is_some()
 }
 
@@ -114,7 +114,7 @@ pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     }
 }
 
-extern "C" {
+extern "sysv64" {
     #[allow(improper_ctypes)]
     fn interpreter_entry(
         stack: *mut u8,
