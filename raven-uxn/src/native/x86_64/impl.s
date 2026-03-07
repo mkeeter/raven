@@ -370,10 +370,9 @@ _MUL:
     binary_op imul
 
 _DIV:
-    movzx eax, byte ptr [rbx + r12]   // b (divisor), top
+    movzx ecx, byte ptr [rbx + r12]   // b (divisor), top
     stk_pop
-    movzx ecx, byte ptr [rbx + r12]   // a (dividend), second
-    xchg eax, ecx                      // eax = a (dividend), ecx = b (divisor)
+    movzx eax, byte ptr [rbx + r12]   // a (dividend), second
     movzx eax, al
     test cl, cl
     jz 1f
@@ -1000,10 +999,9 @@ _MULr:
     binary_opr imul
 
 _DIVr:
-    movzx eax, byte ptr [r13 + r14]   // b (divisor), top
+    movzx ecx, byte ptr [r13 + r14]   // b (divisor), top
     rpop
-    movzx ecx, byte ptr [r13 + r14]   // a (dividend), second
-    xchg eax, ecx                      // eax = a, ecx = b
+    movzx eax, byte ptr [r13 + r14]   // a (dividend), second
     movzx eax, al
     test cl, cl
     jz 1f
@@ -1600,9 +1598,8 @@ _MULk:
     binary_opk imul
 
 _DIVk:
-    peek ecx, 1                        // a (dividend; peek first, rax clobbered)
-    movzx eax, byte ptr [rbx + r12]   // b (divisor; loaded after peek)
-    xchg eax, ecx                      // eax = a, ecx = b
+    peek eax, 1                        // a (dividend; peek first, rax clobbered)
+    movzx ecx, byte ptr [rbx + r12]   // b (divisor; loaded after peek)
     movzx eax, al
     test cl, cl
     jz 1f
@@ -2139,9 +2136,8 @@ _DEOkr:
 .endm
 
 .macro binary_opkr_div
-    rpeek ecx, 1                       // a (dividend; rpeek first, rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b (divisor; loaded after rpeek)
-    xchg eax, ecx                      // eax = a, ecx = b
+    rpeek eax, 1                       // a (dividend; rpeek first, rax clobbered)
+    movzx ecx, byte ptr [r13 + r14]   // b (divisor; loaded after rpeek)
     movzx eax, al
     test cl, cl
     jz 1f
