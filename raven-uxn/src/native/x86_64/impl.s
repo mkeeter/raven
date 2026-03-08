@@ -343,10 +343,9 @@ _MUL:
     binary_op imul
 
 _DIV:
-    movzx ecx, byte ptr [rbx + r12]   // b (divisor), top
+    mov cl, byte ptr [rbx + r12]   // b (divisor), top
     stk_pop
-    movzx eax, byte ptr [rbx + r12]   // a (dividend), second
-    movzx eax, al
+    mov al, byte ptr [rbx + r12]   // a (dividend), second
     test cl, cl
     jz 1f
     div cl
@@ -380,15 +379,15 @@ _SFT:
     next
 
 _JCI:
-    movzx eax, byte ptr [r15 + rbp]   // offset high byte
+    mov al, byte ptr [r15 + rbp]   // offset high byte
     inc bp
-    movzx ecx, byte ptr [r15 + rbp]   // offset low byte
+    movzx cx, byte ptr [r15 + rbp]   // offset low byte
     inc bp
-    shl eax, 8
-    or eax, ecx                        // 16-bit offset
-    movzx edx, byte ptr [rbx + r12]   // condition
+    shl ax, 8
+    or ax, cx                        // 16-bit offset
+    mov dl, byte ptr [rbx + r12]   // condition
     stk_pop
-    test edx, edx
+    test dl, dl
     jz 1f
     // sign-extend 16-bit offset to 64 bits and add
     add bp, ax
@@ -397,9 +396,9 @@ _JCI:
 
 _INC2:
     peek ecx, 1                       // high byte (peek first; r11 is addr)
-    movzx eax, byte ptr [rbx + r12]   // low byte (loaded after peek)
-    shl ecx, 8
-    or eax, ecx
+    movzx ax, byte ptr [rbx + r12]   // low byte (loaded after peek)
+    shl cx, 8
+    or ax, cx
     inc ax
     mov byte ptr [rbx + r12], al
     shr eax, 8
@@ -631,17 +630,17 @@ _DEO2:
     next
 
 .macro binary_op2 insn
-    movzx eax, byte ptr [rbx + r12]
+    movzx ax, byte ptr [rbx + r12]
     stk_pop
-    movzx ecx, byte ptr [rbx + r12]
+    mov cl, byte ptr [rbx + r12]
     stk_pop
     shl ecx, 8
-    or eax, ecx                        // b (top short)
+    or ax, cx                        // b (top short)
 
-    movzx ecx, byte ptr [rbx + r12]
-    peek edx, 1
+    movzx cx, byte ptr [rbx + r12]
+    peek dx, 1
     shl edx, 8
-    or ecx, edx                        // a (second short)
+    or cx, dx                        // a (second short)
 
     \insn ecx, eax                     // result in ecx
     mov byte ptr [rbx + r12], cl      // store result_hi at current pos
@@ -660,37 +659,32 @@ _MUL2:
     binary_op2 imul
 
 _DIV2:
-    movzx eax, byte ptr [rbx + r12]
+    movzx r9d, byte ptr [rbx + r12]
     stk_pop
     movzx ecx, byte ptr [rbx + r12]
     stk_pop
     shl ecx, 8
-    or eax, ecx                        // b (divisor, top short)
+    or r9d, ecx                        // r9w = b (divisor)
 
-    movzx ecx, byte ptr [rbx + r12]
+    movzx eax, byte ptr [rbx + r12]
     stk_pop
     movzx edx, byte ptr [rbx + r12]
     shl edx, 8
-    or ecx, edx                        // a (dividend, second short)
+    or eax, edx                        // eax = a (dividend), already zero-extended
 
     // 16-bit unsigned divide: a / b
-    push rax                           // save divisor (b) onto x86 stack
-    mov eax, ecx                       // dividend (a) in eax
-    movzx eax, ax
     xor edx, edx
-    pop rcx                            // restore divisor into ecx
-    movzx ecx, cx
-    test cx, cx
+    test r9w, r9w
     jz 1f
-    div cx                             // ax = a / b
+    div r9w                            // ax = a / b
     jmp 2f
 1:
     xor eax, eax                       // div by zero → 0
 2:
     movzx r8d, al                      // save result_lo
     shr eax, 8
-    mov byte ptr [rbx + r12], al      // store result_hi at current pos
-    stk_push r8b                       // push result_lo on top
+    mov byte ptr [rbx + r12], al      // store result_hi
+    stk_push r8b
     next
 
 _AND2:
@@ -756,15 +750,15 @@ _NIPr:
     next
 
 _SWPr:
-    rpeek ecx, 1                       // a (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b (loaded after rpeek)
+    rpeek ecx, 1                      // a (rpeek first; rax clobbered)
+    mov al, byte ptr [r13 + r14]      // b (loaded after rpeek)
     mov byte ptr [r13 + r14], cl      // store a at top
     mov byte ptr [r13 + r11], al      // store b at second
     next
 
 _ROTr:
     rpeek_ ecx, 1, r10                // b → ecx (rpeek first; rax clobbered)
-    movzx r8d, byte ptr [r13 + r14]   // c → eax
+    mov r8b, byte ptr [r13 + r14]   // c → eax
     rpeek edx, 2                      // a → edx (clobbers rax; ecx=b, r8d=c still valid)
     mov byte ptr [r13 + r14], dl      // top = a
     mov byte ptr [r13 + r10], r8b     // second = c
@@ -772,7 +766,7 @@ _ROTr:
     next
 
 _DUPr:
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     rpush al
     next
 
@@ -782,10 +776,10 @@ _OVRr:
     next
 
 .macro compare_opr setcc_op
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     rpop
-    movzx ecx, byte ptr [r13 + r14]
-    cmp ecx, eax
+    mov cl, byte ptr [r13 + r14]
+    cmp cl, al
     \setcc_op al
     mov byte ptr [r13 + r14], al
     next
