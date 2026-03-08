@@ -1809,6 +1809,7 @@ dependencies = [
 name = "raven-uxn"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "zerocopy 0.7.34",
 ]
 

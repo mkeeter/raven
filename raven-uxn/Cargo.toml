@@ -15,3 +15,10 @@ zerocopy.workspace = true
 alloc = []
 default = ["alloc"]
 native = []
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "fibonacci"
+harness = false
