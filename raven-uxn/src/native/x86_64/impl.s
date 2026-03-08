@@ -32,34 +32,29 @@
 // Advance PC, fetch opcode, dispatch via jump table
 .macro next
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     lea rcx, [rip + JUMP_TABLE]
     jmp qword ptr [rcx + rax*8]
 .endm
 
 // Stack operations (work stack: rbx=data, r12=index)
 .macro stk_pop
-    dec r12
-    and r12, 0xff
+    dec r12b
 .endm
 
 .macro rpop
-    dec r14
-    and r14, 0xff
+    dec r14b
 .endm
 
 // push reg8 onto work stack
 .macro stk_push reg
-    inc r12
-    and r12, 0xff
+    inc r12b
     mov byte ptr [rbx + r12], \reg
 .endm
 
 // push reg8 onto return stack
 .macro rpush reg
-    inc r14
-    and r14, 0xff
+    inc r14b
     mov byte ptr [r13 + r14], \reg
 .endm
 
@@ -386,11 +381,9 @@ _SFT:
 
 _JCI:
     movzx eax, byte ptr [r15 + rbp]   // offset high byte
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     movzx ecx, byte ptr [r15 + rbp]   // offset low byte
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     shl eax, 8
     or eax, ecx                        // 16-bit offset
     movzx edx, byte ptr [rbx + r12]   // condition
@@ -578,8 +571,7 @@ _LDR2:
     and rax, 0xffff
     movzx ecx, byte ptr [r15 + rax]
     mov byte ptr [rbx + r12], cl
-    inc rax
-    and rax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
     next
@@ -594,8 +586,7 @@ _STR2:
     lea rax, [rbp + rax]
     and rax, 0xffff
     mov byte ptr [r15 + rax], dl
-    inc rax
-    and rax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -735,16 +726,13 @@ _SFT2:
 
 _JMI:
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     movzx ecx, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     shl eax, 8
     or eax, ecx                        // 16-bit offset
     movsx rax, ax                      // sign-extend
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 // ============================================================
@@ -972,11 +960,9 @@ _SFTr:
 
 _JSI:
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     movzx ecx, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     shl eax, 8
     or eax, ecx                        // 16-bit offset
     mov edx, ebp
@@ -984,8 +970,7 @@ _JSI:
     rpush dl
     rpush bpl
     movsx rax, ax
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _INC2r:
@@ -1164,8 +1149,7 @@ _LDR2r:
     and rax, 0xffff
     movzx ecx, byte ptr [r15 + rax]
     mov byte ptr [r13 + r14], cl
-    inc rax
-    and rax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
     next
@@ -1180,8 +1164,7 @@ _STR2r:
     lea rax, [rbp + rax]
     and rax, 0xffff
     mov byte ptr [r15 + rax], dl
-    inc rax
-    and rax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -1327,8 +1310,7 @@ _SFT2r:
 
 _LIT:
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     stk_push al
     next
 
@@ -1540,12 +1522,10 @@ _SFTk:
 
 _LIT2:
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     stk_push al
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     stk_push al
     next
 
@@ -1713,8 +1693,7 @@ _LDR2k:
     and rax, 0xffff
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
-    inc rax
-    and rax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
     next
@@ -1726,8 +1705,7 @@ _STR2k:
     lea rax, [rbp + rax]
     and rax, 0xffff
     mov byte ptr [r15 + rax], dl
-    inc rax
-    and rax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -2074,12 +2052,10 @@ _SFTkr:
 
 _LIT2r:
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     rpush al
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     rpush al
     next
 
@@ -2194,12 +2170,10 @@ _JCN2kr:
     movzx eax, byte ptr [r13 + r14]   // addr_lo (loaded after rpeek)
     shl ecx, 8
     or eax, ecx                        // addr in eax
-    mov r8d, eax                       // save addr (next rpeek clobbers rax)
     rpeek edx, 2                       // condition (clobbers rax)
     test edx, edx
     jz 1f
-    mov rbp, r8
-    and rbp, 0xffff
+    mov bp, ax
 1:
     next
 
@@ -2246,8 +2220,7 @@ _LDR2kr:
     and rax, 0xffff
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
-    inc rax
-    and rax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
     next
@@ -2259,8 +2232,7 @@ _STR2kr:
     lea rax, [rbp + rax]
     and rax, 0xffff
     mov byte ptr [r15 + rax], dl
-    inc rax
-    and rax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -2281,13 +2253,11 @@ _STA2kr:
     movzx eax, byte ptr [r13 + r14]   // addr_lo (loaded after rpeek)
     shl ecx, 8
     or eax, ecx                        // full addr in eax
-    mov r8d, eax                       // save addr (next rpeeks clobber rax)
     rpeek ecx, 2                       // val_lo (clobbers rax; r8d=addr ok)
     rpeek edx, 3                       // val_hi (clobbers rax; ecx=val_lo, r8d=addr ok)
-    mov byte ptr [r15 + r8], dl
-    inc r8d
-    and r8d, 0xffff
-    mov byte ptr [r15 + r8], cl
+    mov byte ptr [r15 + rax], dl
+    inc ax
+    mov byte ptr [r15 + rax], cl
     next
 
 _DEI2kr:
