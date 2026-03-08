@@ -501,7 +501,7 @@ impl<'a> Uxn<'a> {
         &mut self.ret
     }
 
-    /// Resets system memory and loads the given ROM
+    /// Resets system memory and loads the given ROM at address `0x100`
     ///
     /// Returns trailing ROM data (or an empty slice), which should be loaded
     /// into extension memory.
@@ -1929,8 +1929,11 @@ pub mod op {
 
 /// Hand-crafted recursive Fibonacci bytecode, for tests and benchmarks
 ///
-/// After moving this to RAM, set the recursion depth by editing `ram[1]`
+/// After using [`Uxn::reset`] to load this into to RAM (at address 0x100), set
+/// the recursion depth by editing `ram[0x101]`.  This uses absolute jumps and
+/// will not work at other addresses.
 #[rustfmt::skip]
+#[doc(hidden)]
 pub const FIB: &[u8] = &[
     op::LIT, 0,     // load the argument (replace this)
     op::LIT, 1,     // jump amount
@@ -1950,10 +1953,10 @@ pub const FIB: &[u8] = &[
     op::LIT, 255, op::ADD,      // ( n-1 )
     op::DUP,                    // ( n-1 n-1 )
     op::LIT, 255, op::ADD,      // ( n-1 n-2 )
-    op::LIT2, 0,6, op::JSR2,    // recursive call
+    op::LIT2, 1,6, op::JSR2,    // recursive call
                                 // ( n-1 fib(n-2) )
     op::ROT,                    // ( fib(n-2) n-1 )
-    op::LIT2, 0,6, op::JSR2,    // recursive call
+    op::LIT2, 1,6, op::JSR2,    // recursive call
                                 // ( fib(n-2) fib(n-1) )
     op::ADD2,                   // ( fib(n) )
     op::JMP2r,
@@ -2155,10 +2158,10 @@ mod test {
         let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
 
         let mut uxn_fib = |i| {
-            vm.ram[..FIB.len()].copy_from_slice(FIB);
-            vm.ram[1] = i;
+            let _ = vm.reset(FIB);
+            vm.ram_write_byte(0x101, i);
             let mut dev = EmptyDevice;
-            vm.run(&mut dev, 0);
+            vm.run(&mut dev, 0x100);
             vm.stack_view::<0b001>().pop_short()
         };
 
@@ -2171,7 +2174,11 @@ mod test {
         };
 
         for i in 0..24 {
-            assert_eq!(fib(i) as u16, uxn_fib(i), "failed to compute fib({i})");
+            assert_eq!(
+                u16::try_from(fib(i)).unwrap(),
+                uxn_fib(i),
+                "failed to compute fib({i})"
+            );
         }
     }
 
