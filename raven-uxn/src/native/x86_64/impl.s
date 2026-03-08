@@ -829,8 +829,7 @@ _LTHr:
 _JMPr:
     movsx rax, byte ptr [r13 + r14]
     rpop
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _JCNr:
@@ -840,8 +839,7 @@ _JCNr:
     rpop
     test ecx, ecx
     jz 1f
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
 1:
     next
 
@@ -852,8 +850,7 @@ _JSRr:
     shr ecx, 8
     stk_push cl
     stk_push bpl
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _STHr:
@@ -1422,8 +1419,7 @@ _LTHk:
 
 _JMPk:
     movsx rax, byte ptr [rbx + r12]
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _JCNk:
@@ -1431,8 +1427,7 @@ _JCNk:
     movsx eax, byte ptr [rbx + r12]   // offset (signed, loaded after peek)
     test ecx, ecx
     jz 1f
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
 1:
     next
 
@@ -1442,8 +1437,7 @@ _JSRk:
     shr ecx, 8
     rpush cl
     rpush bpl
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _STHk:
@@ -1687,12 +1681,10 @@ _JCN2k:
     movzx eax, byte ptr [rbx + r12]   // addr_lo (loaded after peek)
     shl ecx, 8
     or eax, ecx                        // addr in eax
-    mov r8d, eax                       // save addr (next peek clobbers rax)
-    peek edx, 2                        // condition (clobbers rax)
+    peek edx, 2                        // condition
     test edx, edx
     jz 1f
-    mov rbp, r8
-    and rbp, 0xffff
+    mov rbp, rax
 1:
     next
 
