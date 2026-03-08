@@ -412,8 +412,7 @@ _INC2:
     movzx eax, byte ptr [rbx + r12]   // low byte (loaded after peek)
     shl ecx, 8
     or eax, ecx
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [rbx + r12], al
     shr eax, 8
     mov byte ptr [rbx + r11], al
@@ -562,8 +561,7 @@ _LDZ2:
     stk_pop
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
     next
@@ -576,8 +574,7 @@ _STZ2:
     movzx edx, byte ptr [rbx + r12]   // low byte
     stk_pop
     mov byte ptr [r15 + rax], dl
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -615,8 +612,7 @@ _LDA2:
     or eax, ecx
     movzx ecx, byte ptr [r15 + rax]
     mov byte ptr [rbx + r11], cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     mov byte ptr [rbx + r12], cl
     next
@@ -633,8 +629,7 @@ _STA2:
     movzx edx, byte ptr [rbx + r12]   // high value
     stk_pop
     mov byte ptr [r15 + rax], dl
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -1004,8 +999,7 @@ _INC2r:
     movzx eax, byte ptr [r13 + r14]   // low byte (loaded after rpeek)
     shl ecx, 8
     or eax, ecx
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [r13 + r14], al
     shr eax, 8
     mov byte ptr [r13 + r11], al
@@ -1154,8 +1148,7 @@ _LDZ2r:
     rpop
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
     next
@@ -1168,8 +1161,7 @@ _STZ2r:
     movzx edx, byte ptr [r13 + r14]
     rpop
     mov byte ptr [r15 + rax], dl
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -1208,8 +1200,7 @@ _LDA2r:
     or eax, ecx
     movzx ecx, byte ptr [r15 + rax]
     mov byte ptr [r13 + r14], cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
     next
@@ -1226,8 +1217,7 @@ _STA2r:
     movzx edx, byte ptr [r13 + r14]
     rpop
     mov byte ptr [r15 + rax], dl
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -1571,8 +1561,7 @@ _INC2k:
     movzx eax, byte ptr [rbx + r12]   // low byte (loaded after peek)
     shl ecx, 8
     or eax, ecx
-    inc eax
-    and eax, 0xffff
+    inc ax
     // push high then low (stack grows upward, push increments first)
     mov ecx, eax
     shr ecx, 8
@@ -1711,8 +1700,7 @@ _LDZ2k:
     movzx eax, byte ptr [rbx + r12]
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
     next
@@ -1722,8 +1710,7 @@ _STZ2k:
     peek edx, 2                        // val_hi (clobbers rax; ecx=val_lo fine)
     movzx eax, byte ptr [rbx + r12]   // addr (loaded after peeks)
     mov byte ptr [r15 + rax], dl      // store val_hi at addr
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl      // store val_lo at addr+1
     next
 
@@ -1758,8 +1745,7 @@ _LDA2k:
     or eax, ecx
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     stk_push cl
     next
@@ -1769,13 +1755,11 @@ _STA2k:
     movzx eax, byte ptr [rbx + r12]   // addr_lo (loaded after peek)
     shl ecx, 8
     or eax, ecx                        // full addr in eax
-    mov r8d, eax                       // save addr (next peeks clobber rax)
     peek ecx, 2                        // val_lo (clobbers rax; r8d=addr fine)
     peek edx, 3                        // val_hi (clobbers rax; ecx=val_lo fine)
-    mov byte ptr [r15 + r8], dl       // store val_hi at addr
-    inc r8d
-    and r8d, 0xffff
-    mov byte ptr [r15 + r8], cl       // store val_lo at addr+1
+    mov byte ptr [r15 + rax], dl       // store val_hi at addr
+    inc ax
+    mov byte ptr [r15 + rax], cl       // store val_lo at addr+1
     next
 
 _DEI2k:
@@ -2115,8 +2099,7 @@ _INC2kr:
     movzx eax, byte ptr [r13 + r14]    // low byte (loaded after rpeek)
     shl ecx, 8
     or eax, ecx
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov ecx, eax
     shr ecx, 8
     rpush cl
@@ -2254,8 +2237,7 @@ _LDZ2kr:
     movzx eax, byte ptr [r13 + r14]
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
     next
@@ -2265,8 +2247,7 @@ _STZ2kr:
     rpeek edx, 2                       // val_hi (clobbers rax; ecx=val_lo ok)
     movzx eax, byte ptr [r13 + r14]   // addr (loaded after rpeeks)
     mov byte ptr [r15 + rax], dl
-    inc eax
-    and eax, 0xffff
+    inc ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -2301,8 +2282,7 @@ _LDA2kr:
     or eax, ecx
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
-    inc eax
-    and eax, 0xffff
+    inc ax
     movzx ecx, byte ptr [r15 + rax]
     rpush cl
     next
