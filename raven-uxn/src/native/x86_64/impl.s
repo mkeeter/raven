@@ -232,8 +232,7 @@ _LTH:
 _JMP:
     movsx rax, byte ptr [rbx + r12]
     stk_pop
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _JCN:
@@ -243,8 +242,7 @@ _JCN:
     stk_pop
     test ecx, ecx
     jz 1f
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
 1:
     next
 
@@ -255,8 +253,7 @@ _JSR:
     shr ecx, 8
     rpush cl                           // push high byte of PC
     rpush bpl                          // push low byte of PC
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _STH:
@@ -401,9 +398,7 @@ _JCI:
     test edx, edx
     jz 1f
     // sign-extend 16-bit offset to 64 bits and add
-    movsx rax, ax
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
 1:
     next
 
@@ -419,8 +414,7 @@ _INC2:
     next
 
 _POP2:
-    sub r12, 2
-    and r12, 0xff
+    sub r12b, 2
     next
 
 _NIP2:
@@ -1006,8 +1000,7 @@ _INC2r:
     next
 
 _POP2r:
-    sub r14, 2
-    and r14, 0xff
+    sub r14b, 2
     next
 
 _NIP2r:
@@ -1869,8 +1862,7 @@ _SFT2k:
 
 _LITr:
     movzx eax, byte ptr [r15 + rbp]
-    inc rbp
-    and rbp, 0xffff
+    inc bp
     rpush al
     next
 
@@ -1944,8 +1936,7 @@ _LTHkr:
 
 _JMPkr:
     movsx rax, byte ptr [r13 + r14]
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _JCNkr:
@@ -1953,8 +1944,7 @@ _JCNkr:
     movsx eax, byte ptr [r13 + r14]   // offset (signed, loaded after rpeek)
     test ecx, ecx
     jz 1f
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
 1:
     next
 
@@ -1964,8 +1954,7 @@ _JSRkr:
     shr ecx, 8
     stk_push cl
     stk_push bpl
-    add rbp, rax
-    and rbp, 0xffff
+    add bp, ax
     next
 
 _STHkr:
