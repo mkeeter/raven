@@ -13,12 +13,11 @@ chrono.workspace = true
 log.workspace = true
 static_assertions.workspace = true
 zerocopy.workspace = true
-
-[target.'cfg(any(target_arch = "aarch64", target_arch = "x86_64"))'.dependencies]
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.1", features = ["native"] }
-
-[target.'cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))'.dependencies]
 uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.1" }
+
+[features]
+default = ["native"]
+native = ["uxn/native"]
 
 [dev-dependencies]
 criterion.workspace = true

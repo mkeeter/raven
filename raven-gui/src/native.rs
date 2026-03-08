@@ -49,10 +49,6 @@ pub fn run() -> Result<()> {
     let mut vm = Uxn::new(
         ram.leak(),
         if args.native {
-            #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
-            anyhow::bail!("no native implementation for this arch");
-
-            #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
             Backend::Native
         } else {
             Backend::Interpreter

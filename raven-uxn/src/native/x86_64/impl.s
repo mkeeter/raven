@@ -397,7 +397,7 @@ _JCI:
 _INC2:
     peek ecx, 1                       // high byte (peek first; r11 is addr)
     movzx ax, byte ptr [rbx + r12]   // low byte (loaded after peek)
-    shl cx, 8
+    shl ecx, 8
     or ax, cx
     inc ax
     mov byte ptr [rbx + r12], al
