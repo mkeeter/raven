@@ -501,7 +501,7 @@ impl<'a> Uxn<'a> {
         &mut self.ret
     }
 
-    /// Resets system memory and loads the given ROM
+    /// Resets system memory and loads the given ROM at address `0x100`
     ///
     /// Returns trailing ROM data (or an empty slice), which should be loaded
     /// into extension memory.
@@ -1927,6 +1927,41 @@ pub mod op {
     ];
 }
 
+/// Hand-crafted recursive Fibonacci bytecode, for tests and benchmarks
+///
+/// After using [`Uxn::reset`] to load this into to RAM (at address 0x100), set
+/// the recursion depth by editing `ram[0x101]`.  This uses absolute jumps and
+/// will not work at other addresses.
+#[rustfmt::skip]
+#[doc(hidden)]
+pub const FIB: &[u8] = &[
+    op::LIT, 0,     // load the argument (replace this)
+    op::LIT, 1,     // jump amount
+    op::JSR,        // jump into the function
+    op::BRK,
+
+    // Function begins here with a single-byte argument ( n )
+    op::DUP,                    // ( n n )
+    op::LIT, 1,                 // ( n n #01 )
+    op::GTH,                    // ( n n>1 )
+    op::JCI, 0,5,               // ( n ) skip return if non-zero
+    op::POP,                    // ( )
+    op::LIT2, 0,1,              // ( #0001 )
+    op::JMP2r,                  // return
+
+    // recursive section
+    op::LIT, 255, op::ADD,      // ( n-1 )
+    op::DUP,                    // ( n-1 n-1 )
+    op::LIT, 255, op::ADD,      // ( n-1 n-2 )
+    op::LIT2, 1,6, op::JSR2,    // recursive call
+                                // ( n-1 fib(n-2) )
+    op::ROT,                    // ( fib(n-2) n-1 )
+    op::LIT2, 1,6, op::JSR2,    // recursive call
+                                // ( fib(n-2) fib(n-1) )
+    op::ADD2,                   // ( fib(n) )
+    op::JMP2r,
+];
+
 #[cfg(all(feature = "alloc", test))]
 mod test {
     use super::*;
@@ -2115,6 +2150,36 @@ mod test {
             ;cell LDA BRK @cell abcd ( ab )
             #abcd ;cell STA BRK @cell $1 ( ab )
         ";
+    }
+
+    #[test]
+    fn fib() {
+        let mut ram = UxnRam::new();
+        let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
+
+        let mut uxn_fib = |i| {
+            let _ = vm.reset(FIB);
+            vm.ram_write_byte(0x101, i);
+            let mut dev = EmptyDevice;
+            vm.run(&mut dev, 0x100);
+            vm.stack_view::<0b001>().pop_short()
+        };
+
+        let fib = |i| -> u32 {
+            let (mut a, mut b) = (1, 1);
+            for _ in 2..=i {
+                (a, b) = (b, a + b)
+            }
+            b
+        };
+
+        for i in 0..24 {
+            assert_eq!(
+                u16::try_from(fib(i)).unwrap(),
+                uxn_fib(i),
+                "failed to compute fib({i})"
+            );
+        }
     }
 
     // The optimizer is not strong enough to eliminate panics in debug builds!
