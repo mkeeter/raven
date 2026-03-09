@@ -21,7 +21,7 @@ fn bench_startup(c: &mut Criterion, rom: &[u8], backend: Backend, name: &str) {
             let mut dev = Varvara::new();
             let remaining = vm.reset(rom);
             dev.reset(remaining);
-            vm.run(&mut dev, 0x100);
+            std::hint::black_box(vm.run(&mut dev, 0x100));
         });
     });
 }

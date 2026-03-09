@@ -9,7 +9,7 @@ fn bench_fib(c: &mut Criterion, backend: Backend, name: &str) {
             let mut dev = raven_uxn::EmptyDevice;
             let _ = vm.reset(FIB);
             vm.ram_write_byte(0x101, 23);
-            vm.run(&mut dev, 0x100);
+            std::hint::black_box(vm.run(&mut dev, 0x100));
         });
     });
 }
