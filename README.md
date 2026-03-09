@@ -28,6 +28,10 @@ cargo install cargo-fuzz # this only needs to be run once
 cargo +nightly fuzz run --release fuzz-native
 ```
 
+Performance can be tested with `cargo bench`, which runs
+[Criterion.rs](https://criterion-rs.github.io/)-based benchmarks
+for recursive Fibonacci computation and Mandelbrot fractal rendering.
+
 --------------------------------------------------------------------------------
 
 The Varvara implementation (`raven-varvara`) includes all peripherals, and has
