@@ -65,19 +65,15 @@
 .endm
 
 .macro peekb reg, n
-    peekb_ \reg, \n, r11
+    lea r11, [r12 - \n]
+    and r11, 0xff
+    mov \reg, byte ptr [rbx + r11]
 .endm
 
 .macro peek_ reg, n, tmp
     lea \tmp, [r12 - \n]
     and \tmp, 0xff
     movzx \reg, byte ptr [rbx + \tmp]
-.endm
-
-.macro peekb_ reg, n, tmp
-    lea \tmp, [r12 - \n]
-    and \tmp, 0xff
-    mov \reg, byte ptr [rbx + \tmp]
 .endm
 
 // rpeek: load byte from return stack at offset n below top
@@ -89,6 +85,12 @@
     lea \tmp, [r14 - \n]
     and \tmp, 0xff
     movzx \reg, byte ptr [r13 + \tmp]
+.endm
+
+.macro rpeekb reg, n
+    lea r11, [r14 - \n]
+    and r11, 0xff
+    mov \reg, byte ptr [r13 + r11]
 .endm
 
 // Save all interpreter state to the stack frame and set up args for C call
@@ -755,8 +757,8 @@ _NIPr:
     next
 
 _SWPr:
-    rpeek ecx, 1                      // a (rpeek first; rax clobbered)
-    mov al, byte ptr [r13 + r14]      // b (loaded after rpeek)
+    rpeekb cl, 1                      // a (rpeekb first; r11 is new address)
+    mov al, byte ptr [r13 + r14]      // b (loaded after rpeekb)
     mov byte ptr [r13 + r14], cl      // store a at top
     mov byte ptr [r13 + r11], al      // store b at second
     next
@@ -764,9 +766,9 @@ _SWPr:
 _ROTr:
     // a b c -- b c a  (c=top)
     mov r8b, byte ptr [r13 + r14]     // c → r8b
-    rpeek ecx, 1                      // b → cl (r11 = r14-1)
+    rpeekb cl, 1                      // b → cl (r11 = r14-1)
     mov byte ptr [r13 + r11], r8b     // second = c
-    rpeek edx, 2                      // a → dl (r11 = r14-2)
+    rpeekb dl, 2                      // a → dl (r11 = r14-2)
     mov byte ptr [r13 + r11], cl      // third = b
     mov byte ptr [r13 + r14], dl      // top = a
     next
@@ -777,7 +779,7 @@ _DUPr:
     next
 
 _OVRr:
-    rpeek eax, 1
+    rpeekb al, 1
     rpush al
     next
 
@@ -1026,15 +1028,15 @@ _ROT2r:
     next
 
 _DUP2r:
-    rpeek ecx, 1                       // hi (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // lo (loaded after rpeek)
+    rpeekb cl, 1                       // hi
+    mov al, byte ptr [r13 + r14]       // lo (loaded after rpeekb)
     rpush cl                           // push hi
     rpush al                           // push lo
     next
 
 _OVR2r:
-    rpeek ecx, 3                       // a_hi (rpeek first; rax clobbered)
-    rpeek eax, 2                       // a_lo (rpeek second; ecx=a_hi still valid)
+    rpeekb cl, 3                       // a_hi (rpeekb first)
+    rpeekb al, 2                       // a_lo (rpeekb second; ecx=a_hi still valid)
     rpush cl                           // push a_hi
     rpush al                           // push a_lo
     next
@@ -1838,32 +1840,32 @@ _NIPkr:
     next
 
 _SWPkr:
-    rpeek ecx, 1                       // a (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b (loaded after rpeek)
+    rpeekb cl, 1                       // a
+    mov al, byte ptr [r13 + r14]       // b (loaded after rpeekb)
     rpush al                           // push b
     rpush cl                           // push a (now a is on top)
     next
 
 _ROTkr:
     // a b c -- a b c b c a (push b, c, a)
-    rpeek ecx, 1                       // b (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // c (loaded after rpeek)
+    rpeekb cl, 1                       // b (peek first)
+    mov al, byte ptr [r13 + r14]       // c (loaded after rpeekb)
     rpush cl                           // push b
     rpush al                           // push c
-    rpeek eax, 4                       // a (r14 now +2, so rpeek 4 = orig rpeek 2 = a)
+    rpeekb al, 4                       // a (r14 now +2, so rpeekb 4 = orig rpeekb 2 = a)
     rpush al                           // push a (on top)
     next
 
 _DUPkr:
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     rpush al
     rpush al
     next
 
 _OVRkr:
     // a b -- a b a b a  (push a, b, a)
-    rpeek ecx, 1                       // a (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b (loaded after rpeek)
+    rpeekb cl, 1                       // a (peek first)
+    mov al, byte ptr [r13 + r14]       // b (loaded after rpeekb)
     rpush cl                           // push a
     rpush al                           // push b
     rpush cl                           // push a again
@@ -1926,8 +1928,8 @@ _LDZkr:
     next
 
 _STZkr:
-    rpeek ecx, 1                       // val (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // addr (loaded after rpeek)
+    rpeekb cl, 1                       // val (peek first)
+    movzx eax, byte ptr [r13 + r14]   // addr (loaded after rpeekb)
     mov byte ptr [r15 + rax], cl
     next
 
@@ -1940,8 +1942,8 @@ _LDRkr:
     next
 
 _STRkr:
-    rpeek ecx, 1                       // val (rpeek first; rax clobbered)
-    movsx rax, byte ptr [r13 + r14]   // offset (signed, loaded after rpeek)
+    rpeekb cl, 1                       // val (peek first)
+    movsx rax, byte ptr [r13 + r14]   // offset (signed, loaded after rpeekb)
     lea rax, [rbp + rax]
     and rax, 0xffff
     mov byte ptr [r15 + rax], cl
@@ -1962,7 +1964,7 @@ _STAkr:
     shl ecx, 8
     or eax, ecx                        // full addr
     mov r8d, eax                       // save addr
-    rpeek ecx, 2                       // val (clobbers rax)
+    rpeekb cl, 2                       // val (clobbers rax)
     mov byte ptr [r15 + r8], cl
     next
 
@@ -1996,8 +1998,8 @@ _MULkr:
     binary_opkr imul
 
 _DIVkr:
-    rpeek eax, 1                       // a (dividend; rpeek first, rax clobbered)
-    movzx ecx, byte ptr [r13 + r14]   // b (divisor; loaded after rpeek)
+    rpeekb al, 1                       // a (dividend; peek first)
+    mov cl, byte ptr [r13 + r14]       // b (divisor; loaded after rpeekb)
     test cl, cl
     jz 1f
     div cl
@@ -2018,8 +2020,8 @@ _EORkr:
     binary_opkr xor
 
 _SFTkr:
-    movzx r9d, byte ptr [r13 + r14]   // shift amount in r9d (rpeek clobbers rax)
-    rpeek edx, 1                       // value in dl
+    movzx r9d, byte ptr [r13 + r14]   // shift amount in r9d (rpeekb clobbers rax)
+    rpeekb dl, 1                       // value in dl
     mov ecx, r9d
     and ecx, 0xf                       // right shift count in cl
     shr dl, cl
@@ -2054,8 +2056,8 @@ _POP2kr:
     next
 
 _NIP2kr:
-    rpeek ecx, 1                       // b_hi (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b_lo (loaded after rpeek)
+    rpeekb cl, 1                       // b_hi
+    mov al, byte ptr [r13 + r14]       // b_lo (loaded after rpeekb)
     rpush cl                           // push b_hi
     rpush al                           // push b_lo
     next
@@ -2087,8 +2089,8 @@ _ROT2kr:
     next
 
 _DUP2kr:
-    rpeek ecx, 1                       // hi (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // lo (loaded after rpeek)
+    rpeekb cl, 1                       // hi
+    mov al, byte ptr [r13 + r14]       // lo (loaded after rpeekb)
     rpush cl                           // push hi (1st copy)
     rpush al                           // push lo (1st copy)
     rpush cl                           // push hi (2nd copy)
@@ -2097,10 +2099,10 @@ _DUP2kr:
 
 _OVR2kr:
     // a b -- a b a b a  (6 new rpushes: a_hi, a_lo, b_hi, b_lo, a_hi, a_lo)
-    rpeek ecx, 1                       // b_hi (rpeek first; rax clobbered)
-    rpeek edx, 2                       // a_lo (clobbers rax; ecx=b_hi fine)
-    rpeek esi, 3                       // a_hi (clobbers rax; ecx,edx fine)
-    movzx eax, byte ptr [r13 + r14]   // b_lo (loaded last, after all rpeeks)
+    rpeekb cl, 1                       // b_hi (peek first; rax clobbered)
+    rpeekb dl, 2                       // a_lo (clobbers rax; ecx=b_hi fine)
+    rpeekb sil, 3                      // a_hi (clobbers rax; ecx,edx fine)
+    mov al, byte ptr [r13 + r14]       // b_lo (loaded last, after all rpeekbs)
     rpush sil                          // push a_hi
     rpush dl                           // push a_lo
     rpush cl                           // push b_hi
@@ -2169,8 +2171,8 @@ _JSR2kr:
     next
 
 _STH2kr:
-    rpeek ecx, 1                       // hi (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // lo (loaded after rpeek)
+    rpeekb cl, 1                       // hi
+    mov al, byte ptr [r13 + r14]       // lo (loaded after rpeekb)
     stk_push cl                        // push hi
     stk_push al                        // push lo
     next
@@ -2185,9 +2187,9 @@ _LDZ2kr:
     next
 
 _STZ2kr:
-    rpeek ecx, 1                       // val_lo (rpeek first; rax clobbered)
-    rpeek edx, 2                       // val_hi (clobbers rax; ecx=val_lo ok)
-    movzx eax, byte ptr [r13 + r14]   // addr (loaded after rpeeks)
+    rpeekb cl, 1                       // val_lo (peek first; rax clobbered)
+    rpeekb dl, 2                       // val_hi (clobbers rax; ecx=val_lo ok)
+    movzx eax, byte ptr [r13 + r14]   // addr (loaded after rpeekbs)
     mov byte ptr [r15 + rax], dl
     inc ax
     mov byte ptr [r15 + rax], cl
@@ -2205,9 +2207,9 @@ _LDR2kr:
     next
 
 _STR2kr:
-    rpeek ecx, 1                       // val_lo (rpeek first; rax clobbered)
-    rpeek edx, 2                       // val_hi (clobbers rax; ecx=val_lo ok)
-    movsx rax, byte ptr [r13 + r14]   // offset (loaded after rpeeks)
+    rpeekb cl, 1                       // val_lo (peek first; rax clobbered)
+    rpeekb dl, 2                       // val_hi (clobbers rax; ecx=val_lo ok)
+    movsx rax, byte ptr [r13 + r14]   // offset (loaded after rpeekbs)
     lea rax, [rbp + rax]
     and rax, 0xffff
     mov byte ptr [r15 + rax], dl
@@ -2232,8 +2234,8 @@ _STA2kr:
     movzx eax, byte ptr [r13 + r14]   // addr_lo (loaded after rpeek)
     shl ecx, 8
     or eax, ecx                        // full addr in eax
-    rpeek ecx, 2                       // val_lo (clobbers rax; r8d=addr ok)
-    rpeek edx, 3                       // val_hi (clobbers rax; ecx=val_lo, r8d=addr ok)
+    rpeekb cl, 2                       // val_lo (clobbers rax)
+    rpeekb dl, 3                       // val_hi (clobbers rax; ecx=val_lo ok)
     mov byte ptr [r15 + rax], dl
     inc ax
     mov byte ptr [r15 + rax], cl
