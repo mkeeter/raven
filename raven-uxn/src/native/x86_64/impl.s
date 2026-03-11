@@ -1680,22 +1680,22 @@ _STZ2k:
     next
 
 _LDR2k:
-    movsx rax, byte ptr [rbx + r12]
-    lea rax, [rbp + rax]
-    and rax, 0xffff
-    movzx ecx, byte ptr [r15 + rax]
+    movsx eax, byte ptr [rbx + r12]
+    add ax, bp
+    movzx eax, ax
+    mov cl, byte ptr [r15 + rax]
     stk_push cl
     inc ax
-    movzx ecx, byte ptr [r15 + rax]
+    mov cl, byte ptr [r15 + rax]
     stk_push cl
     next
 
 _STR2k:
-    peek ecx, 1                        // val_lo (peek first; rax clobbered)
-    peek edx, 2                        // val_hi (clobbers rax; ecx=val_lo fine)
-    movsx rax, byte ptr [rbx + r12]   // offset (signed, loaded after peeks)
-    lea rax, [rbp + rax]
-    and rax, 0xffff
+    peekb cl, 1                        // val_lo (peek first; rax clobbered)
+    peekb dl, 2                        // val_hi (clobbers rax; ecx=val_lo fine)
+    movsx eax, byte ptr [rbx + r12]   // offset (signed, loaded after peeks)
+    add ax, bp
+    movzx eax, ax
     mov byte ptr [r15 + rax], dl
     inc ax
     mov byte ptr [r15 + rax], cl
@@ -1706,10 +1706,10 @@ _LDA2k:
     movzx eax, byte ptr [rbx + r12]   // addr_lo (loaded after peek)
     shl ecx, 8
     or eax, ecx
-    movzx ecx, byte ptr [r15 + rax]
+    mov cl, byte ptr [r15 + rax]
     stk_push cl
     inc ax
-    movzx ecx, byte ptr [r15 + rax]
+    mov cl, byte ptr [r15 + rax]
     stk_push cl
     next
 
@@ -1718,8 +1718,8 @@ _STA2k:
     movzx eax, byte ptr [rbx + r12]   // addr_lo (loaded after peek)
     shl ecx, 8
     or eax, ecx                        // full addr in eax
-    peek ecx, 2                        // val_lo (clobbers rax; r8d=addr fine)
-    peek edx, 3                        // val_hi (clobbers rax; ecx=val_lo fine)
+    peekb cl, 2                        // val_lo (clobbers rax; r8d=addr fine)
+    peekb dl, 3                        // val_hi (clobbers rax; ecx=val_lo fine)
     mov byte ptr [r15 + rax], dl       // store val_hi at addr
     inc ax
     mov byte ptr [r15 + rax], cl       // store val_lo at addr+1
@@ -1739,10 +1739,9 @@ _DEO2k:
 
 .macro binary_op2k insn
     peek ecx, 1                        // b_hi (peek first; rax clobbered)
-    movzx eax, byte ptr [rbx + r12]   // b_lo (loaded after peek)
+    movzx r8d, byte ptr [rbx + r12]   // b_lo (loaded after peek)
     shl ecx, 8
-    or eax, ecx                        // b
-    mov r8d, eax                       // save b (next peeks clobber rax/eax)
+    or r8d, ecx                        // b
 
     peek ecx, 2                        // a_lo
     peek edx, 3                        // a_hi
@@ -1750,7 +1749,7 @@ _DEO2k:
     or ecx, edx                        // a
 
     \insn ecx, r8d                     // a OP b → ecx
-    movzx r8d, cl                      // save result_lo
+    mov r8b, cl                      // save result_lo
     shr ecx, 8
     stk_push cl                        // push result_hi first
     stk_push r8b                       // push result_lo on top
@@ -1767,23 +1766,17 @@ _MUL2k:
     binary_op2k imul
 
 _DIV2k:
-    peek ecx, 1                        // b_hi (peek first; rax clobbered)
-    movzx eax, byte ptr [rbx + r12]   // b_lo (loaded after peek)
-    shl ecx, 8
-    or eax, ecx                        // b
-    mov r8d, eax                       // save b (next peeks clobber rax)
+    peek r8d, 1                        // b_hi (into r8d, not ecx)
+    movzx ecx, byte ptr [rbx + r12]   // b_lo
+    shl r8d, 8
+    or ecx, r8d                        // b built directly in ecx
 
-    peek ecx, 2                        // a_lo
+    peek eax, 2                        // a_lo (straight into eax)
     peek edx, 3                        // a_hi
     shl edx, 8
-    or ecx, edx                        // a
+    or eax, edx                        // a
+    xor edx, edx                       // clear high bits for division
 
-    push r8                            // save b (divisor) onto x86 stack
-    mov eax, ecx                       // dividend in eax
-    movzx eax, ax
-    xor edx, edx
-    pop rcx                            // restore divisor into ecx
-    movzx ecx, cx
     test cx, cx
     jz 1f
     div cx                             // ax = a / b
