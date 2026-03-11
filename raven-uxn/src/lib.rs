@@ -449,14 +449,15 @@ impl<'a> Uxn<'a> {
     #[inline]
     pub fn dev_at<D: Ports>(&self, pos: u8) -> &D {
         Self::check_dev_size::<D>();
-        D::ref_from(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
+        D::ref_from_bytes(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
     }
 
     /// Returns a reference to a device located at `pos`
     #[inline]
     pub fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
         Self::check_dev_size::<D>();
-        D::mut_from(&mut self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
+        D::mut_from_bytes(&mut self.dev[usize::from(pos)..][..DEV_SIZE])
+            .unwrap()
     }
 
     /// Returns a mutable reference to the given [`Ports`] object
@@ -1568,7 +1569,11 @@ pub trait Device {
 
 /// Trait for a type which can be cast to a device ports `struct`
 pub trait Ports:
-    zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::FromZeroes
+    zerocopy::IntoBytes
+    + zerocopy::FromBytes
+    + zerocopy::FromZeros
+    + zerocopy::Immutable
+    + zerocopy::KnownLayout
 {
     /// Base address of the port, of the form `0xA0`
     const BASE: u8;

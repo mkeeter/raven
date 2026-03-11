@@ -6,9 +6,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 use uxn::{Ports, Uxn, DEV_SIZE};
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
-#[derive(AsBytes, FromZeroes, FromBytes)]
+#[derive(IntoBytes, FromBytes, KnownLayout, Immutable)]
 #[repr(C)]
 pub struct AudioPorts {
     vector: U16<BigEndian>,
@@ -82,7 +82,9 @@ pub const CHANNELS: usize = 1;
 const CROSSFADE_COUNT: usize = 200;
 
 /// Decoder for the `adsr` port
-#[derive(Copy, Clone, Default, AsBytes, FromZeroes, FromBytes)]
+#[derive(
+    Copy, Clone, Default, IntoBytes, FromBytes, KnownLayout, Immutable,
+)]
 #[repr(C)]
 struct Envelope(U16<BigEndian>);
 impl Envelope {
@@ -112,7 +114,7 @@ impl Envelope {
 }
 
 /// Decoder for the `volume` port
-#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 #[repr(C)]
 struct Volume(u8);
 impl Volume {
@@ -127,9 +129,10 @@ impl Volume {
 }
 
 /// Decoder for the `pitch` port
-#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 #[repr(C)]
-struct Pitch(u8);
+#[doc(hidden)] // this is public because of rust-lang/rust#45713
+pub struct Pitch(u8);
 impl Pitch {
     fn loop_sample(&self) -> bool {
         (self.0 >> 7) == 0
