@@ -749,7 +749,7 @@ _POPr:
     next
 
 _NIPr:
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     rpop
     mov byte ptr [r13 + r14], al
     next
@@ -762,12 +762,13 @@ _SWPr:
     next
 
 _ROTr:
-    rpeek_ ecx, 1, r10                // b → ecx (rpeek first; rax clobbered)
-    mov r8b, byte ptr [r13 + r14]   // c → eax
-    rpeek edx, 2                      // a → edx (clobbers rax; ecx=b, r8d=c still valid)
-    mov byte ptr [r13 + r14], dl      // top = a
-    mov byte ptr [r13 + r10], r8b     // second = c
+    // a b c -- b c a  (c=top)
+    mov r8b, byte ptr [r13 + r14]     // c → r8b
+    rpeek ecx, 1                      // b → cl (r11 = r14-1)
+    mov byte ptr [r13 + r11], r8b     // second = c
+    rpeek edx, 2                      // a → dl (r11 = r14-2)
     mov byte ptr [r13 + r11], cl      // third = b
+    mov byte ptr [r13 + r14], dl      // top = a
     next
 
 _DUPr:
@@ -781,10 +782,10 @@ _OVRr:
     next
 
 .macro compare_opr setcc_op
-    mov al, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // top (b)
     rpop
-    mov cl, byte ptr [r13 + r14]
-    cmp cl, al
+    movzx ecx, byte ptr [r13 + r14]   // second (a)
+    cmp ecx, eax
     \setcc_op al
     mov byte ptr [r13 + r14], al
     next
@@ -809,9 +810,9 @@ _JMPr:
     next
 
 _JCNr:
-    movsx eax, byte ptr [r13 + r14]
+    movsx ax, byte ptr [r13 + r14]    // offset (signed)
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    movzx ecx, byte ptr [r13 + r14]   // condition
     rpop
     test ecx, ecx
     jz 1f
@@ -820,17 +821,17 @@ _JCNr:
     next
 
 _JSRr:
-    movsx eax, byte ptr [r13 + r14]
+    movsx ax, byte ptr [r13 + r14]    // offset (signed)
     rpop
     mov ecx, ebp
     shr ecx, 8
-    stk_push cl
-    stk_push bpl
+    stk_push cl                        // push high byte of PC
+    stk_push bpl                       // push low byte of PC
     add bp, ax
     next
 
 _STHr:
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     rpop
     stk_push al
     next
@@ -838,54 +839,52 @@ _STHr:
 _LDZr:
     movzx eax, byte ptr [r13 + r14]
     rpop
-    movzx eax, byte ptr [r15 + rax]
+    mov al, byte ptr [r15 + rax]
     rpush al
     next
 
 _STZr:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // zero-page address
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    mov cl, byte ptr [r13 + r14]      // value
     rpop
     mov byte ptr [r15 + rax], cl
     next
 
 _LDRr:
-    movsx rax, byte ptr [r13 + r14]
-    add ax, bp
-    movzx eax, ax
+    movsx rax, byte ptr [r13 + r14]   // signed offset
+    add rax, rbp
     mov al, byte ptr [r15 + rax]
-    mov byte ptr [r13 + r14], al
+    mov byte ptr [r13 + r14], al      // overwrite (no pop, just replace)
     next
 
 _STRr:
-    movsx rax, byte ptr [r13 + r14]
+    movsx rax, byte ptr [r13 + r14]   // signed offset
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    mov cl, byte ptr [r13 + r14]      // value
     rpop
-    add ax, bp
-    movzx eax, ax
+    add rax, rbp
     mov byte ptr [r15 + rax], cl
     next
 
 _LDAr:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // low byte of address
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    movzx ecx, byte ptr [r13 + r14]   // high byte
     shl ecx, 8
-    or eax, ecx
-    movzx eax, byte ptr [r15 + rax]
+    or eax, ecx                        // full 16-bit address
+    mov al, byte ptr [r15 + rax]
     mov byte ptr [r13 + r14], al
     next
 
 _STAr:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // addr low
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    movzx ecx, byte ptr [r13 + r14]   // addr high
     rpop
     shl ecx, 8
     or eax, ecx
-    movzx edx, byte ptr [r13 + r14]
+    mov dl, byte ptr [r13 + r14]      // value
     rpop
     mov byte ptr [r15 + rax], dl
     next
@@ -921,16 +920,15 @@ _MULr:
     binary_opr imul
 
 _DIVr:
-    movzx ecx, byte ptr [r13 + r14]   // b (divisor), top
+    mov cl, byte ptr [r13 + r14]      // b (divisor), top
     rpop
-    movzx eax, byte ptr [r13 + r14]   // a (dividend), second
-    movzx eax, al
+    mov al, byte ptr [r13 + r14]      // a (dividend), second
     test cl, cl
     jz 1f
     div cl
     jmp 2f
 1:
-    xor eax, eax
+    xor al, al                         // div by zero → 0
 2:
     mov byte ptr [r13 + r14], al
     next
@@ -1047,15 +1045,14 @@ _OVR2r:
     movzx ecx, byte ptr [r13 + r14]
     rpop
     shl ecx, 8
-    or eax, ecx
+    or eax, ecx                        // b (top short)
     movzx ecx, byte ptr [r13 + r14]
     rpop
     movzx edx, byte ptr [r13 + r14]
     shl edx, 8
-    or ecx, edx
+    or ecx, edx                        // a (second short)
     cmp ecx, eax
     \setcc_op al
-    movzx eax, al
     mov byte ptr [r13 + r14], al
     next
 .endm
@@ -1073,42 +1070,40 @@ _LTH2r:
     compare_op2r setb
 
 _JMP2r:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // low byte
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    movzx ebp, byte ptr [r13 + r14]   // high byte
     rpop
-    shl ecx, 8
-    or eax, ecx
-    mov rbp, rax
+    shl ebp, 8
+    or ebp, eax
     next
 
 _JCN2r:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // addr low
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    movzx ecx, byte ptr [r13 + r14]   // addr high
     rpop
-    movzx edx, byte ptr [r13 + r14]
+    movzx edx, byte ptr [r13 + r14]   // condition
     rpop
-    shl ecx, 8
-    or eax, ecx
     test edx, edx
     jz 1f
+    shl ecx, 8
+    or eax, ecx
     mov rbp, rax
 1:
     next
 
 _JSR2r:
-    movzx eax, byte ptr [r13 + r14]
-    rpop
-    movzx ecx, byte ptr [r13 + r14]
-    rpop
-    shl ecx, 8
-    or eax, ecx
     mov edx, ebp
     shr edx, 8
-    stk_push dl
-    stk_push bpl
-    mov rbp, rax
+    stk_push dl                        // push high byte of PC
+    stk_push bpl                       // push low byte of PC
+    movzx eax, byte ptr [r13 + r14]   // addr low
+    rpop
+    movzx ebp, byte ptr [r13 + r14]   // addr high
+    rpop
+    shl ebp, 8
+    or rbp, rax
     next
 
 _STH2r:
@@ -1123,19 +1118,19 @@ _STH2r:
 _LDZ2r:
     movzx eax, byte ptr [r13 + r14]
     rpop
-    movzx ecx, byte ptr [r15 + rax]
+    mov cl, byte ptr [r15 + rax]
     rpush cl
     inc ax
-    movzx ecx, byte ptr [r15 + rax]
+    mov cl, byte ptr [r15 + rax]
     rpush cl
     next
 
 _STZ2r:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // address
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    mov cl, byte ptr [r13 + r14]      // high byte
     rpop
-    movzx edx, byte ptr [r13 + r14]
+    mov dl, byte ptr [r13 + r14]      // low byte
     rpop
     mov byte ptr [r15 + rax], dl
     inc ax
@@ -1143,22 +1138,22 @@ _STZ2r:
     next
 
 _LDR2r:
-    movsx rax, byte ptr [r13 + r14]
+    movsx eax, byte ptr [r13 + r14]
     add ax, bp
-    movzx eax, ax
-    movzx ecx, byte ptr [r15 + rax]
+    movzx rax, ax
+    mov cl, byte ptr [r15 + rax]
     mov byte ptr [r13 + r14], cl
     inc ax
-    movzx ecx, byte ptr [r15 + rax]
+    mov cl, byte ptr [r15 + rax]
     rpush cl
     next
 
 _STR2r:
-    movsx rax, byte ptr [r13 + r14]
+    movsx eax, byte ptr [r13 + r14]   // signed offset
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    mov cl, byte ptr [r13 + r14]      // high value byte
     rpop
-    movzx edx, byte ptr [r13 + r14]
+    mov dl, byte ptr [r13 + r14]      // low value byte
     rpop
     add ax, bp
     movzx eax, ax
@@ -1168,28 +1163,27 @@ _STR2r:
     next
 
 _LDA2r:
-    movzx eax, byte ptr [r13 + r14]
-    rpop
-    movzx ecx, byte ptr [r13 + r14]
+    rpeek ecx, 1                       // addr high (rpeek first; r11 is new addr)
+    movzx eax, byte ptr [r13 + r14]   // addr low (loaded after rpeek)
     shl ecx, 8
     or eax, ecx
-    movzx ecx, byte ptr [r15 + rax]
-    mov byte ptr [r13 + r14], cl
+    mov cl, byte ptr [r15 + rax]
+    mov byte ptr [r13 + r11], cl
     inc ax
-    movzx ecx, byte ptr [r15 + rax]
-    rpush cl
+    mov cl, byte ptr [r15 + rax]
+    mov byte ptr [r13 + r14], cl
     next
 
 _STA2r:
-    movzx eax, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]   // addr low
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    movzx ecx, byte ptr [r13 + r14]   // addr high
     rpop
     shl ecx, 8
     or eax, ecx
-    movzx ecx, byte ptr [r13 + r14]
+    mov cl, byte ptr [r13 + r14]      // low value
     rpop
-    movzx edx, byte ptr [r13 + r14]
+    mov dl, byte ptr [r13 + r14]      // high value
     rpop
     mov byte ptr [r15 + rax], dl
     inc ax
