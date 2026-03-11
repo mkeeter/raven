@@ -1236,36 +1236,32 @@ _MUL2r:
     binary_op2r imul
 
 _DIV2r:
-    movzx eax, byte ptr [r13 + r14]
+    movzx r9d, byte ptr [r13 + r14]
     rpop
     movzx ecx, byte ptr [r13 + r14]
     rpop
     shl ecx, 8
-    or eax, ecx                        // b (divisor)
+    or r9d, ecx                        // r9w = b (divisor)
 
-    movzx ecx, byte ptr [r13 + r14]
+    movzx eax, byte ptr [r13 + r14]
     rpop
     movzx edx, byte ptr [r13 + r14]
     shl edx, 8
-    or ecx, edx                        // a (dividend)
+    or eax, edx                        // eax = a (dividend), already zero-extended
 
-    push rax
-    mov eax, ecx
-    movzx eax, ax
+    // 16-bit unsigned divide: a / b
     xor edx, edx
-    pop rcx
-    movzx ecx, cx
-    test cx, cx
+    test r9w, r9w
     jz 1f
-    div cx                             // ax = a / b
+    div r9w                            // ax = a / b
     jmp 2f
 1:
-    xor eax, eax
+    xor eax, eax                       // div by zero → 0
 2:
-    movzx r8d, al                      // save result_lo
+    mov r8b, al                        // save result_lo
     shr eax, 8
-    mov byte ptr [r13 + r14], al      // store result_hi at current pos
-    rpush r8b                          // push result_lo on top
+    mov byte ptr [r13 + r14], al      // store result_hi
+    rpush r8b
     next
 
 _AND2r:
@@ -2283,23 +2279,17 @@ _MUL2kr:
     binary_op2kr imul
 
 _DIV2kr:
-    rpeek ecx, 1                       // b_hi (rpeek first; rax clobbered)
-    movzx eax, byte ptr [r13 + r14]   // b_lo (loaded after rpeek)
-    shl ecx, 8
-    or eax, ecx                        // b
-    mov r8d, eax                       // save b (next rpeeks clobber rax)
+    rpeek r8d, 1                       // b_hi (into r8d, not ecx)
+    movzx ecx, byte ptr [r13 + r14]   // b_lo
+    shl r8d, 8
+    or ecx, r8d                        // b built directly in ecx
 
-    rpeek ecx, 2                       // a_lo
+    rpeek eax, 2                       // a_lo (straight into eax)
     rpeek edx, 3                       // a_hi
     shl edx, 8
-    or ecx, edx                        // a
+    or eax, edx                        // a
+    xor edx, edx                       // clear high bits for division
 
-    push r8                            // save b (divisor) onto x86 stack
-    mov eax, ecx                       // dividend in eax
-    movzx eax, ax
-    xor edx, edx
-    pop rcx                            // restore divisor into ecx
-    movzx ecx, cx
     test cx, cx
     jz 1f
     div cx                             // ax = a / b
