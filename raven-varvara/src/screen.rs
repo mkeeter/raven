@@ -1,9 +1,9 @@
 use crate::Event;
 use std::mem::offset_of;
 use uxn::{Ports, Uxn};
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
-#[derive(AsBytes, FromZeroes, FromBytes)]
+#[derive(IntoBytes, KnownLayout, Immutable, FromBytes)]
 #[repr(C)]
 pub struct ScreenPorts {
     vector: U16<BigEndian>,
@@ -56,7 +56,7 @@ enum Layer {
 }
 
 /// Decoder for the `pixel` port
-#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Copy, Clone, IntoBytes, KnownLayout, Immutable, FromBytes)]
 #[repr(C)]
 struct Pixel(u8);
 
@@ -83,9 +83,10 @@ impl Pixel {
 }
 
 /// Decoder for the `sprite` port
-#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Copy, Clone, IntoBytes, KnownLayout, Immutable, FromBytes)]
 #[repr(C)]
-struct Sprite(u8);
+#[doc(hidden)] // this is public because of rust-lang/rust#45713
+pub struct Sprite(u8);
 impl Sprite {
     fn color(&self) -> u8 {
         self.0 & 0b1111
@@ -109,7 +110,7 @@ impl Sprite {
 }
 
 /// Decoder for the `auto` port
-#[derive(Copy, Clone, AsBytes, FromZeroes, FromBytes)]
+#[derive(Copy, Clone, IntoBytes, KnownLayout, Immutable, FromBytes)]
 #[repr(C)]
 struct Auto(u8);
 impl Auto {

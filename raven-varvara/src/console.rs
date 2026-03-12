@@ -1,14 +1,14 @@
 use crate::{Event, EventData};
 use std::mem::offset_of;
 use uxn::{Ports, Uxn};
-use zerocopy::{AsBytes, BigEndian, FromBytes, FromZeroes, U16};
+use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
 pub struct Console {
     stdout: Vec<u8>,
     stderr: Vec<u8>,
 }
 
-#[derive(AsBytes, FromZeroes, FromBytes)]
+#[derive(IntoBytes, KnownLayout, Immutable, FromBytes)]
 #[repr(C)]
 pub struct ConsolePorts {
     vector: U16<BigEndian>,
