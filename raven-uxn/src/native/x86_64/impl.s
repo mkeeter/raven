@@ -292,11 +292,12 @@ _LDR:
     next
 
 _STR:
-    movsx rax, byte ptr [rbx + r12]   // signed offset
+    movsx eax, byte ptr [rbx + r12]   // signed offset
     stk_pop
     mov cl, byte ptr [rbx + r12]   // value
     stk_pop
-    add rax, rbp
+    add ax, bp
+    movzx eax, ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -574,7 +575,7 @@ _STZ2:
 _LDR2:
     movsx eax, byte ptr [rbx + r12]
     add ax, bp
-    movzx rax, ax
+    movzx eax, ax
     mov cl, byte ptr [r15 + rax]
     mov byte ptr [rbx + r12], cl
     inc ax
@@ -1142,7 +1143,7 @@ _STZ2r:
 _LDR2r:
     movsx eax, byte ptr [r13 + r14]
     add ax, bp
-    movzx rax, ax
+    movzx eax, ax
     mov cl, byte ptr [r15 + rax]
     mov byte ptr [r13 + r14], cl
     inc ax
