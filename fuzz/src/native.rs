@@ -1,9 +1,41 @@
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use uxn::{Backend, EmptyDevice, Uxn, UxnRam};
 
-fuzz_target!(|data: &[u8]| {
+#[derive(Arbitrary)]
+struct UxnProgram<'a>(&'a [u8]);
+
+impl std::fmt::Debug for UxnProgram<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)?;
+        let mut lit_count = 0;
+        for &op in self.0.iter() {
+            if lit_count > 0 {
+                write!(f, " {}", op)?;
+                lit_count -= 1;
+            } else {
+                write!(f, " {}", uxn::op::NAMES[usize::from(op)])?;
+                if matches!(op, uxn::op::LIT | uxn::op::LITr) {
+                    lit_count = 1;
+                } else if matches!(
+                    op,
+                    uxn::op::LIT2
+                        | uxn::op::LIT2r
+                        | uxn::op::JCI
+                        | uxn::op::JMI
+                        | uxn::op::JSI
+                ) {
+                    lit_count = 2;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fuzz_target!(|data: UxnProgram| {
     let mut ram_v = UxnRam::new();
     let mut vm_v = Uxn::new(&mut ram_v, Backend::Interpreter);
 
@@ -11,10 +43,10 @@ fuzz_target!(|data: &[u8]| {
     let mut vm_n = Uxn::new(&mut ram_n, Backend::Native);
 
     // Don't load any programs that require auxiliary memory
-    if !vm_v.reset(data).is_empty() {
+    if !vm_v.reset(data.0).is_empty() {
         return;
     }
-    assert!(vm_n.reset(data).is_empty());
+    assert!(vm_n.reset(data.0).is_empty());
 
     // Use the VM-backed evaluator, halting if we take more than 65K cycles
     let Some(pc_v) =
@@ -55,15 +87,6 @@ fuzz_target!(|data: &[u8]| {
         failed = true;
     }
     if failed {
-        print!("Instructions:\n  ");
-        for (i, d) in data.iter().enumerate() {
-            print!(
-                "{}{}",
-                if i == 0 { "" } else { " " },
-                uxn::op::NAMES[usize::from(*d)]
-            );
-        }
-        println!();
-        panic!("mismatch found");
+        panic!("mismatch found"); // debug impl pretty-prints the program
     }
 });
