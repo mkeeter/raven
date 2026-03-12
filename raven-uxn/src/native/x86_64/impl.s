@@ -128,7 +128,7 @@
 //   [rsp+16] = DeviceHandle ptr
 ENTRY interpreter_entry
     // Prologue: save callee-saved registers and build frame
-    // We need 0x90 bytes of local space (aligned to 16 after 8-byte ret addr)
+    // We need 0x18 bytes of local space (aligned to 16 after 8-byte ret addr)
     push rbx
     push rbp
     push r12
