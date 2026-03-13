@@ -184,7 +184,7 @@ _BRK:
     ret
 
 _INC:
-    movzx eax, byte ptr [rbx + r12]
+    mov al, byte ptr [rbx + r12]
     inc al
     mov byte ptr [rbx + r12], al
     next
@@ -436,9 +436,9 @@ _POP2:
     next
 
 _NIP2:
-    movzx eax, byte ptr [rbx + r12]   // b_lo (top)
+    mov al, byte ptr [rbx + r12]      // b_lo (top)
     stk_pop
-    movzx ecx, byte ptr [rbx + r12]   // b_hi (second)
+    mov cl, byte ptr [rbx + r12]      // b_hi (second)
     stk_pop
     mov byte ptr [rbx + r12], al      // b_lo at new top (a_lo position)
     lea rdx, [r12 - 1]
@@ -756,7 +756,7 @@ _JMI:
 // ============================================================
 
 _INCr:
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     inc al
     mov byte ptr [r13 + r14], al
     next
@@ -1004,9 +1004,9 @@ _POP2r:
     next
 
 _NIP2r:
-    movzx eax, byte ptr [r13 + r14]   // b_lo (top)
+    mov al, byte ptr [r13 + r14]      // b_lo (top)
     rpop
-    movzx ecx, byte ptr [r13 + r14]   // b_hi (second)
+    mov cl, byte ptr [r13 + r14]      // b_hi (second)
     rpop
     mov byte ptr [r13 + r14], al      // b_lo at new top
     lea rdx, [r14 - 1]
@@ -1124,9 +1124,9 @@ _JSR2r:
     next
 
 _STH2r:
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    mov cl, byte ptr [r13 + r14]
     rpop
     stk_push cl
     stk_push al
