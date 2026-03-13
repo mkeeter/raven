@@ -349,9 +349,11 @@ _DEO:
     next
 
 .macro binary_op insn
-    movzx eax, byte ptr [rbx + r12]   // top (b)
+    // this looks sketchy, but the math operations use the lower 8 bits
+    // independently, so we can load al and cl then operate on ecx and eax
+    mov al, byte ptr [rbx + r12]   // top (b)
     stk_pop
-    movzx ecx, byte ptr [rbx + r12]   // second (a)
+    mov cl, byte ptr [rbx + r12]   // second (a)
     \insn ecx, eax
     mov byte ptr [rbx + r12], cl
     next
@@ -445,13 +447,13 @@ _NIP2:
     next
 
 _SWP2:
-    peek ecx, 2                        // a_lo
-    movzx eax, byte ptr [rbx + r12]   // b_lo (loaded after peek)
+    peekb cl, 2                        // a_lo
+    mov al, byte ptr [rbx + r12]      // b_lo
     mov byte ptr [rbx + r12], cl      // store a_lo at b_lo's position
     mov byte ptr [rbx + r11], al      // store b_lo at a_lo's position
 
-    peek_ ecx, 3, r10                        // a_hi (peek first; r11 clobbered)
-    peek eax, 1                        // b_hi (peek second; ecx still = a_hi)
+    peekb_ cl, 3, r10                 // a_hi
+    peekb al, 1                        // b_hi
     mov byte ptr [rbx + r11], cl       // store a_hi at b_hi's position
     mov byte ptr [rbx + r10], al      // store b_hi at a_hi's position
     next
@@ -919,9 +921,9 @@ _DEOr:
     next
 
 .macro binary_opr insn
-    movzx eax, byte ptr [r13 + r14]
+    mov al, byte ptr [r13 + r14]
     rpop
-    movzx ecx, byte ptr [r13 + r14]
+    mov cl, byte ptr [r13 + r14]
     \insn ecx, eax
     mov byte ptr [r13 + r14], cl
     next
@@ -1013,13 +1015,13 @@ _NIP2r:
     next
 
 _SWP2r:
-    rpeek ecx, 2                       // a_lo
-    movzx eax, byte ptr [r13 + r14]   // b_lo (loaded after rpeek)
+    rpeekb cl, 2                       // a_lo
+    mov al, byte ptr [r13 + r14]      // b_lo
     mov byte ptr [r13 + r14], cl      // store a_lo at b_lo's position
     mov byte ptr [r13 + r11], al      // store b_lo at a_lo's position
 
-    rpeek_ ecx, 3, r10                       // a_hi
-    rpeek eax, 1                       // b_hi (rpeek second; ecx=a_hi still valid)
+    rpeekb_ cl, 3, r10                // a_hi
+    rpeekb al, 1                       // b_hi
     mov byte ptr [r13 + r11], cl      // store a_hi at b_hi's position
     mov byte ptr [r13 + r10], al      // store b_hi at a_hi's position
     next
@@ -1472,8 +1474,8 @@ _DEOk:
     next
 
 .macro binary_opk insn
-    peek ecx, 1                        // a
-    movzx eax, byte ptr [rbx + r12]    // b
+    peekb cl, 1                        // a
+    mov al, byte ptr [rbx + r12]    // b
     \insn ecx, eax                     // a OP b
     stk_push cl
     next
@@ -1992,9 +1994,9 @@ _DEOkr:
     next
 
 .macro binary_opkr insn
-    rpeek ecx, 1                       // a
-    movzx eax, byte ptr [r13 + r14]   // b (loaded after rpeek)
-    \insn ecx, eax                     // a OP b
+    rpeekb cl, 1                    // a
+    mov al, byte ptr [r13 + r14]    // b
+    \insn ecx, eax                  // a OP b
     rpush cl
     next
 .endm
@@ -2074,28 +2076,28 @@ _NIP2kr:
     next
 
 _SWP2kr:
-    rpeek eax, 1
+    rpeekb al, 1
     rpush al
-    rpeek eax, 1
+    rpeekb al, 1
     rpush al
-    rpeek eax, 5
+    rpeekb al, 5
     rpush al
-    rpeek eax, 5
+    rpeekb al, 5
     rpush al
     next
 
 _ROT2kr:
-    rpeek eax, 3
+    rpeekb al, 3
     rpush al
-    rpeek eax, 3
+    rpeekb al, 3
     rpush al
-    rpeek eax, 3
+    rpeekb al, 3
     rpush al
-    rpeek eax, 3
+    rpeekb al, 3
     rpush al
-    rpeek eax, 9
+    rpeekb al, 9
     rpush al
-    rpeek eax, 9
+    rpeekb al, 9
     rpush al
     next
 
