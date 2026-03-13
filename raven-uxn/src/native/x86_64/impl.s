@@ -237,13 +237,13 @@ _LTH:
     compare_op setb
 
 _JMP:
-    movsx rax, byte ptr [rbx + r12]
+    movsx eax, byte ptr [rbx + r12]
     stk_pop
     add bp, ax
     next
 
 _JCN:
-    movsx ax, byte ptr [rbx + r12]    // offset (signed)
+    movsx eax, byte ptr [rbx + r12]    // offset (signed)
     stk_pop
     movzx ecx, byte ptr [rbx + r12]   // condition
     stk_pop
@@ -254,7 +254,7 @@ _JCN:
     next
 
 _JSR:
-    movsx ax, byte ptr [rbx + r12]    // offset (signed)
+    movsx eax, byte ptr [rbx + r12]    // offset (signed)
     stk_pop
     mov ecx, ebp
     shr ecx, 8
@@ -285,8 +285,9 @@ _STZ:
     next
 
 _LDR:
-    movsx rax, byte ptr [rbx + r12]   // signed offset
-    add rax, rbp
+    movsx eax, byte ptr [rbx + r12]   // signed offset
+    add ax, bp
+    movzx eax, ax
     mov al, byte ptr [r15 + rax]
     mov byte ptr [rbx + r12], al      // overwrite (no pop, just replace)
     next
@@ -733,7 +734,6 @@ _JMI:
     inc bp
     shl eax, 8
     or eax, ecx                        // 16-bit offset
-    movsx rax, ax                      // sign-extend
     add bp, ax
     next
 
@@ -807,13 +807,13 @@ _LTHr:
     compare_opr setb
 
 _JMPr:
-    movsx rax, byte ptr [r13 + r14]
+    movsx eax, byte ptr [r13 + r14]
     rpop
     add bp, ax
     next
 
 _JCNr:
-    movsx ax, byte ptr [r13 + r14]    // offset (signed)
+    movsx eax, byte ptr [r13 + r14]    // offset (signed)
     rpop
     movzx ecx, byte ptr [r13 + r14]   // condition
     rpop
@@ -824,7 +824,7 @@ _JCNr:
     next
 
 _JSRr:
-    movsx ax, byte ptr [r13 + r14]    // offset (signed)
+    movsx eax, byte ptr [r13 + r14]    // offset (signed)
     rpop
     mov ecx, ebp
     shr ecx, 8
@@ -855,18 +855,20 @@ _STZr:
     next
 
 _LDRr:
-    movsx rax, byte ptr [r13 + r14]   // signed offset
-    add rax, rbp
+    movsx eax, byte ptr [r13 + r14]   // signed offset
+    add ax, bp
+    movzx eax, ax
     mov al, byte ptr [r15 + rax]
     mov byte ptr [r13 + r14], al      // overwrite (no pop, just replace)
     next
 
 _STRr:
-    movsx rax, byte ptr [r13 + r14]   // signed offset
+    movsx eax, byte ptr [r13 + r14]   // signed offset
     rpop
     mov cl, byte ptr [r13 + r14]      // value
     rpop
-    add rax, rbp
+    add ax, bp
+    movzx eax, ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -969,7 +971,6 @@ _JSI:
     shr edx, 8
     rpush dl
     rpush bpl
-    movsx rax, ax
     add bp, ax
     next
 
@@ -1374,7 +1375,7 @@ _LTHk:
     compare_opk setb
 
 _JMPk:
-    movsx rax, byte ptr [rbx + r12]
+    movsx eax, byte ptr [rbx + r12]
     add bp, ax
     next
 
@@ -1414,16 +1415,18 @@ _STZk:
     next
 
 _LDRk:
-    movsx rax, byte ptr [rbx + r12]
-    add rax, rbp
+    movsx eax, byte ptr [rbx + r12]
+    add ax, bp
+    movzx eax, ax
     mov al, byte ptr [r15 + rax]
     stk_push al
     next
 
 _STRk:
     peekb cl, 1                        // val (peek first)
-    movsx rax, byte ptr [rbx + r12]   // offset (signed, loaded after peek)
-    add rax, rbp
+    movsx eax, byte ptr [rbx + r12]   // offset (signed, loaded after peek)
+    add ax, bp
+    movzx eax, ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -1891,7 +1894,7 @@ _LTHkr:
     compare_opkr setb
 
 _JMPkr:
-    movsx rax, byte ptr [r13 + r14]
+    movsx eax, byte ptr [r13 + r14]
     add bp, ax
     next
 
@@ -1931,18 +1934,18 @@ _STZkr:
     next
 
 _LDRkr:
-    movsx rax, byte ptr [r13 + r14]
-    lea rax, [rbp + rax]
-    and rax, 0xffff
+    movsx eax, byte ptr [r13 + r14]
+    add ax, bp
+    movzx eax, ax
     movzx eax, byte ptr [r15 + rax]
     rpush al
     next
 
 _STRkr:
     rpeekb cl, 1                       // val (peek first)
-    movsx rax, byte ptr [r13 + r14]   // offset (signed, loaded after rpeekb)
-    lea rax, [rbp + rax]
-    and rax, 0xffff
+    movsx eax, byte ptr [r13 + r14]   // offset (signed, loaded after rpeekb)
+    add ax, bp
+    movzx eax, ax
     mov byte ptr [r15 + rax], cl
     next
 
@@ -2193,22 +2196,22 @@ _STZ2kr:
     next
 
 _LDR2kr:
-    movsx rax, byte ptr [r13 + r14]
-    lea rax, [rbp + rax]
-    and rax, 0xffff
-    movzx ecx, byte ptr [r15 + rax]
+    movsx eax, byte ptr [r13 + r14]
+    add ax, bp
+    movzx eax, ax
+    mov cl, byte ptr [r15 + rax]
     rpush cl
     inc ax
-    movzx ecx, byte ptr [r15 + rax]
+    mov cl, byte ptr [r15 + rax]
     rpush cl
     next
 
 _STR2kr:
     rpeekb cl, 1                       // val_lo (peek first; rax clobbered)
     rpeekb dl, 2                       // val_hi (clobbers rax; ecx=val_lo ok)
-    movsx rax, byte ptr [r13 + r14]   // offset (loaded after rpeekbs)
-    lea rax, [rbp + rax]
-    and rax, 0xffff
+    movsx eax, byte ptr [r13 + r14]   // offset (loaded after rpeekbs)
+    add ax, bp
+    movzx eax, ax
     mov byte ptr [r15 + rax], dl
     inc ax
     mov byte ptr [r15 + rax], cl
