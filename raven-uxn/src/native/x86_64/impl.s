@@ -70,6 +70,12 @@
     mov \reg, byte ptr [rbx + r11]
 .endm
 
+.macro peekb_ reg, n, tmp
+    lea \tmp, [r12 - \n]
+    and \tmp, 0xff
+    mov \reg, byte ptr [rbx + \tmp]
+.endm
+
 .macro peek_ reg, n, tmp
     lea \tmp, [r12 - \n]
     and \tmp, 0xff
@@ -91,6 +97,12 @@
     lea r11, [r14 - \n]
     and r11, 0xff
     mov \reg, byte ptr [r13 + r11]
+.endm
+
+.macro rpeekb_ reg, n, tmp
+    lea \tmp, [r14 - \n]
+    and \tmp, 0xff
+    mov \reg, byte ptr [r13 + \tmp]
 .endm
 
 // Save all interpreter state to the stack frame and set up args for C call
@@ -446,16 +458,16 @@ _SWP2:
 
 _ROT2:
     // a_hi a_lo b_hi b_lo c_hi c_lo -- b_hi b_lo c_hi c_lo a_hi a_lo
-    peek_ ecx, 2, r10                 // b_lo
-    movzx r8d, byte ptr [rbx + r12]   // c_lo (loaded after peek)
-    peek edx, 4                       // a_lo
+    peekb_ cl, 2, r10                  // b_lo
+    mov r8b, byte ptr [rbx + r12]     // c_lo
+    peekb dl, 4                        // a_lo
     mov byte ptr [rbx + r12], dl      // store a_lo at top
     mov byte ptr [rbx + r10], r8b     // store c_lo at second short's lo
     mov byte ptr [rbx + r11], cl      // store b_lo at third short's lo
 
-    peek_ r8d, 1, r10                 // c_hi (peek into eax first)
-    peek_ ecx, 3, r9                  // b_hi
-    peek edx, 5                       // a_hi
+    peekb_ r8b, 1, r10                // c_hi
+    peekb_ cl, 3, r9                   // b_hi
+    peekb dl, 5                        // a_hi
     mov byte ptr [rbx + r10], dl      // store a_hi
     mov byte ptr [rbx + r9], r8b      // store c_hi
     mov byte ptr [rbx + r11], cl      // store b_hi
@@ -1013,17 +1025,16 @@ _SWP2r:
     next
 
 _ROT2r:
-    rpeek_ ecx, 2, r10                       // b_lo
-    movzx eax, byte ptr [r13 + r14]   // c_lo (loaded after rpeek)
-    movzx r8d, al                      // save c_lo in r8b for store below
-    rpeek edx, 4                       // a_lo
+    rpeekb_ cl, 2, r10                // b_lo
+    mov r8b, byte ptr [r13 + r14]     // c_lo
+    rpeekb dl, 4                       // a_lo
     mov byte ptr [r13 + r14], dl      // store a_lo at top
     mov byte ptr [r13 + r10], r8b     // store c_lo
     mov byte ptr [r13 + r11], cl      // store b_lo
 
-    rpeek_ r8d, 1, r10                       // c_hi (rpeek into eax first)
-    rpeek_ ecx, 3, r9                       // b_hi
-    rpeek edx, 5                       // a_hi
+    rpeekb_ r8b, 1, r10               // c_hi
+    rpeekb_ cl, 3, r9                  // b_hi
+    rpeekb dl, 5                       // a_hi
     mov byte ptr [r13 + r10], dl      // store a_hi
     mov byte ptr [r13 + r9], r8b     // store c_hi
     mov byte ptr [r13 + r11], cl      // store b_hi
