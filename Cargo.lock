@@ -1334,6 +1334,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "locked-tripwire"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d18841f136ee0993c6637a1387eb3758acc9fa24d558f540d329b2d8bb901c67"
+
+[[package]]
 name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1784,6 +1790,7 @@ dependencies = [
  "anyhow",
  "clap",
  "env_logger",
+ "locked-tripwire",
  "log",
  "raven-uxn",
  "raven-varvara",
@@ -1799,6 +1806,7 @@ dependencies = [
  "cpal",
  "eframe",
  "env_logger",
+ "locked-tripwire",
  "log",
  "raven-uxn",
  "raven-varvara",
