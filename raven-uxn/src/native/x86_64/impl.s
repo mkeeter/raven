@@ -138,7 +138,8 @@
 //   r9  = pc (u16, zero-extended in 32-bit arg)
 //   [rsp+8]  = VM ptr
 //   [rsp+16] = DeviceHandle ptr
-ENTRY interpreter_entry
+.global interpreter_entry
+interpreter_entry:
     // Prologue: save callee-saved registers and build frame
     // We need 0x18 bytes of local space (aligned to 16 after 8-byte ret addr)
     push rbx
@@ -338,13 +339,13 @@ _STA:
 
 _DEI:
     precall
-    CALL dei_entry
+    call dei_entry
     postcall
     next
 
 _DEO:
     precall
-    CALL deo_entry
+    call deo_entry
     postcall
     next
 
@@ -642,13 +643,13 @@ _STA2:
 
 _DEI2:
     precall
-    CALL dei_2_entry
+    call dei_2_entry
     postcall
     next
 
 _DEO2:
     precall
-    CALL deo_2_entry
+    call deo_2_entry
     postcall
     next
 
@@ -910,13 +911,13 @@ _STAr:
 
 _DEIr:
     precall
-    CALL dei_r_entry
+    call dei_r_entry
     postcall
     next
 
 _DEOr:
     precall
-    CALL deo_r_entry
+    call deo_r_entry
     postcall
     next
 
@@ -1209,13 +1210,13 @@ _STA2r:
 
 _DEI2r:
     precall
-    CALL dei_2r_entry
+    call dei_2r_entry
     postcall
     next
 
 _DEO2r:
     precall
-    CALL deo_2r_entry
+    call deo_2r_entry
     postcall
     next
 
@@ -1463,13 +1464,13 @@ _STAk:
 
 _DEIk:
     precall
-    CALL dei_k_entry
+    call dei_k_entry
     postcall
     next
 
 _DEOk:
     precall
-    CALL deo_k_entry
+    call deo_k_entry
     postcall
     next
 
@@ -1736,13 +1737,13 @@ _STA2k:
 
 _DEI2k:
     precall
-    CALL dei_2k_entry
+    call dei_2k_entry
     postcall
     next
 
 _DEO2k:
     precall
-    CALL deo_2k_entry
+    call deo_2k_entry
     postcall
     next
 
@@ -1983,13 +1984,13 @@ _STAkr:
 
 _DEIkr:
     precall
-    CALL dei_kr_entry
+    call dei_kr_entry
     postcall
     next
 
 _DEOkr:
     precall
-    CALL deo_kr_entry
+    call deo_kr_entry
     postcall
     next
 
@@ -2256,13 +2257,13 @@ _STA2kr:
 
 _DEI2kr:
     precall
-    CALL dei_2kr_entry
+    call dei_2kr_entry
     postcall
     next
 
 _DEO2kr:
     precall
-    CALL deo_2kr_entry
+    call deo_2kr_entry
     postcall
     next
 
