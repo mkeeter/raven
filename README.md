@@ -7,7 +7,7 @@ For details, see [the project writeup](https://mattkeeter.com/projects/raven).
 
 --------------------------------------------------------------------------------
 
-The `raven-uxn` crate includes two implementations of the Uxn CPU:
+The `raven-uxn` crate includes three implementations of the Uxn CPU:
 
 - The safe interpreter is a `#[no_std]` crate written in 100% safe Rust, with a
   single dependency (`zerocopy`).  It is 10-20% faster than
@@ -16,9 +16,10 @@ The `raven-uxn` crate includes two implementations of the Uxn CPU:
   [`fib.tal`](https://git.sr.ht/~rabbits/uxn/tree/main/item/projects/examples/exercises/fib.tal),
   and
   [`mandelbrot.tal`](https://git.sr.ht/~rabbits/uxn/tree/main/item/projects/examples/demos/mandelbrot.tal)
-- The unsafe ("native") interpreter is written in `aarch64` assembly (with Rust
-  shims on either side), and runs 40-50% faster than the reference
-  implementation
+- The unsafe ("native") interpreters are written in `aarch64` and `x86-64`
+  assembly (with Rust shims on either side), and run *significantly* faster
+  than the reference implementation (40-50% faster for AArch64, 2× faster for
+  x86)
 
 The native interpreter can be checked against the safe interpreter with fuzz
 testing:
