@@ -19,7 +19,7 @@ jobs:
           # "ubuntu-24.04-arm", # disabled due to unreliability
           "ubuntu-latest",
           "windows-latest",
-          "macos-14",
+          "macos-latest",
         ]
     runs-on: ${{ matrix.target }}
     steps:
@@ -32,13 +32,43 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-test
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-test
     - if: runner.os == 'Linux'
       name: Install dependencies
       run: sudo apt install libasound2-dev
       shell: bash
     - name: Test
       run: cargo test --release --verbose
+  fuzz:
+    strategy:
+      matrix:
+        target: [
+          # "ubuntu-24.04-arm", # disabled due to unreliability
+          "ubuntu-latest",
+          # "windows-latest", # disabled due to rust-fuzz/libfuzzer#126
+          "macos-latest",
+        ]
+    runs-on: ${{ matrix.target }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          fuzz/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('fuzz/Cargo.lock') }}-fuzz
+    - if: runner.os == 'Linux'
+      name: Install dependencies
+      run: sudo apt install libasound2-dev
+      shell: bash
+    - name: Install cargo-fuzz
+      run: which cargo-fuzz || cargo install cargo-fuzz
+      shell: bash
+    - name: Test
+      run: cargo +nightly fuzz run -O fuzz-native -- -max_total_time=60
   clippy:
     strategy:
       matrix:
@@ -46,7 +76,7 @@ jobs:
           # "ubuntu-24.04-arm", # disabled due to unreliability
           "ubuntu-latest",
           "windows-latest",
-          "macos-14",
+          "macos-latest",
         ]
     runs-on: ${{ matrix.target }}
     steps:
@@ -59,7 +89,7 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-clippy
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-clippy
     - if: runner.os == 'Linux'
       name: Install dependencies
       run: sudo apt install libasound2-dev
@@ -77,7 +107,7 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-wasm
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}-wasm
     - name: Install wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: Clippy
