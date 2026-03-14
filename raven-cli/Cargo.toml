@@ -1,6 +1,6 @@
 [package]
 name = "raven-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 repository = "https://github.com/mkeeter/raven"
 description = "Simple Uxn + Varvara CLI"
@@ -13,10 +13,5 @@ clap.workspace = true
 env_logger.workspace = true
 log.workspace = true
 
-varvara = { path = "../raven-varvara", package = "raven-varvara" }
-
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-uxn = { path = "../raven-uxn", package = "raven-uxn", features = ["native"] }
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
 uxn = { path = "../raven-uxn", package = "raven-uxn" }
+varvara = { path = "../raven-varvara", package = "raven-varvara" }

@@ -1779,7 +1779,7 @@ dependencies = [
 
 [[package]]
 name = "raven-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1791,7 +1791,7 @@ dependencies = [
 
 [[package]]
 name = "raven-gui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1807,7 +1807,7 @@ dependencies = [
 
 [[package]]
 name = "raven-uxn"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "criterion",
  "zerocopy 0.8.42",
@@ -1815,7 +1815,7 @@ dependencies = [
 
 [[package]]
 name = "raven-varvara"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "criterion",

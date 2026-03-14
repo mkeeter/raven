@@ -29,7 +29,7 @@ fn bench_startup(c: &mut Criterion, rom: &[u8], backend: Backend, name: &str) {
 fn mandelbrot_benchmark(c: &mut Criterion) {
     let rom = load_rom();
     bench_startup(c, &rom, Backend::Interpreter, "mandelbrot/interpreter");
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(feature = "native")]
     bench_startup(c, &rom, Backend::Native, "mandelbrot/native");
 }
 

@@ -1,3 +1,4 @@
 /target
 /*.s
+/*.rom
 raven-gui/dist
