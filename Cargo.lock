@@ -1787,6 +1787,7 @@ dependencies = [
  "log",
  "raven-uxn",
  "raven-varvara",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -1803,6 +1804,7 @@ dependencies = [
  "raven-varvara",
  "wasm-bindgen-futures",
  "web-sys",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -1810,6 +1812,7 @@ name = "raven-uxn"
 version = "0.2.0"
 dependencies = [
  "criterion",
+ "workspace-hack",
  "zerocopy 0.8.42",
 ]
 
@@ -1823,6 +1826,7 @@ dependencies = [
  "log",
  "raven-uxn",
  "static_assertions",
+ "workspace-hack",
  "zerocopy 0.8.42",
 ]
 
@@ -2767,6 +2771,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f593a95398737aeed53e489c785df13f3618e41dbcd6718c6addbf1395aa6876"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "anstream",
+ "bitflags 2.5.0",
+ "bytemuck",
+ "clap",
+ "clap_builder",
+ "either",
+ "libc",
+ "log",
+ "memchr",
+ "num-traits",
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "regex-automata",
+ "regex-syntax",
+ "syn",
+ "winapi",
+ "windows-sys 0.52.0",
+ "zerocopy 0.8.42",
 ]
 
 [[package]]

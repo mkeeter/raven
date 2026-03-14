@@ -5,6 +5,7 @@ members = [
     "raven-varvara",
     "raven-cli",
     "raven-gui",
+    "workspace-hack",
 ]
 exclude = ["fuzz"]
 
