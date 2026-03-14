@@ -11,3 +11,9 @@ core::arch::global_asm!(concat!(
     include_str!("impl.s"),
     include_str!("../jump_table.s"),
 ));
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+compile_error!(
+    "unsupported target OS for AArch64 interpreter; \
+     you may want to diable the 'native' feature"
+);
