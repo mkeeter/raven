@@ -1,5 +1,5 @@
 // Assembly fragment for a page-aligned jump table
-.section .data
+.data
 .balign 4096
 .global JUMP_TABLE
 JUMP_TABLE:
