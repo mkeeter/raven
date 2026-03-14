@@ -13,7 +13,7 @@ chrono.workspace = true
 log.workspace = true
 static_assertions.workspace = true
 zerocopy.workspace = true
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2" }
+uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2", default-features = false, features = ["alloc"] }
 
 [features]
 default = ["native"]

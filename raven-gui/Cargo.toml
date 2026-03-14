@@ -13,8 +13,6 @@ eframe.workspace = true
 env_logger.workspace = true
 log.workspace = true
 
-uxn = { path = "../raven-uxn", package = "raven-uxn" }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clap.workspace = true
 cpal.workspace = true
@@ -25,7 +23,9 @@ web-sys.workspace = true
 cpal = { workspace = true, features = ["wasm-bindgen"] }
 
 [target.'cfg(any(target_arch = "aarch64", target_arch = "x86_64"))'.dependencies]
+uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2" }
 varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.2" }
 
 [target.'cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))'.dependencies]
+uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2", default-features = false }
 varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.2", default-features = false }
