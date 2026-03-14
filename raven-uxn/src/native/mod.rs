@@ -8,89 +8,114 @@ mod x86_64;
 #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
 compile_error!("no native implementation for this platform");
 
+// Helper macro to select the ABI based on platform
+macro_rules! define_extern_fns {
+    (
+        $(
+            $(#[$attr:meta])*
+            $vis:vis fn $name:ident($($arg:ident : $ty:ty),*) -> $ret:ty $body:block
+        )*
+    ) => {
+        $(
+            #[cfg(not(target_os = "windows"))]
+            $(#[$attr])*
+            $vis extern "C" fn $name($($arg: $ty),*) -> $ret $body
+
+            #[cfg(target_os = "windows")]
+            $(#[$attr])*
+            $vis extern "sysv64" fn $name($($arg: $ty),*) -> $ret $body
+        )*
+    };
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Stubs for DEO calls
 
-#[no_mangle]
-extern "sysv64" fn deo_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b000>(dev.0, 0).is_some()
-}
+define_extern_fns!(
+    #[no_mangle]
+    fn deo_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b000>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn deo_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b001>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn deo_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b001>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn deo_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b010>(dev.0, 0).is_some()
-}
-#[no_mangle]
-extern "sysv64" fn deo_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b011>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn deo_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b010>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn deo_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b100>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn deo_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b011>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn deo_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b101>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn deo_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b100>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn deo_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b110>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn deo_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b101>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.deo::<0b111>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn deo_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b110>(dev.0, 0).is_some()
+    }
+
+    #[no_mangle]
+    fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b111>(dev.0, 0).is_some()
+    }
+);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Stubs for DEI calls
 
-#[no_mangle]
-extern "sysv64" fn dei_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b000>(dev.0, 0).is_some()
-}
+define_extern_fns!(
+    #[no_mangle]
+    fn dei_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b000>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn dei_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b001>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn dei_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b001>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn dei_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b010>(dev.0, 0).is_some()
-}
-#[no_mangle]
-extern "sysv64" fn dei_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b011>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn dei_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b010>(dev.0, 0).is_some()
+    }
+    #[no_mangle]
+    fn dei_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b011>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn dei_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b100>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn dei_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b100>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn dei_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b101>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn dei_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b101>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn dei_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b110>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn dei_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b110>(dev.0, 0).is_some()
+    }
 
-#[no_mangle]
-extern "sysv64" fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-    vm.dei::<0b111>(dev.0, 0).is_some()
-}
+    #[no_mangle]
+    fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b111>(dev.0, 0).is_some()
+    }
+);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -114,7 +139,33 @@ pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
     }
 }
 
-extern "sysv64" {
+// Helper macro to declare the entry point with appropriate ABI
+macro_rules! declare_extern_fns {
+    (
+        $(
+            $(#[$attr:meta])*
+            fn $name:ident($($arg:ident : $ty:ty),* $(,)?) -> $ret:ty;
+        )*
+    ) => {
+        #[cfg(not(target_os = "windows"))]
+        extern "C" {
+            $(
+                $(#[$attr])*
+                fn $name($($arg: $ty),*) -> $ret;
+            )*
+        }
+
+        #[cfg(target_os = "windows")]
+        extern "sysv64" {
+            $(
+                $(#[$attr])*
+                fn $name($($arg: $ty),*) -> $ret;
+            )*
+        }
+    };
+}
+
+declare_extern_fns!(
     #[allow(improper_ctypes)]
     fn interpreter_entry(
         stack: *mut u8,
@@ -126,7 +177,7 @@ extern "sysv64" {
         vm: *mut Uxn,
         dev: *mut DeviceHandle,
     ) -> u16;
-}
+);
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
