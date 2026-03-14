@@ -682,12 +682,12 @@ _MUL2:
     binary_op2 imul
 
 _DIV2:
-    movzx r9d, byte ptr [rbx + r12]
-    stk_pop
     movzx ecx, byte ptr [rbx + r12]
     stk_pop
-    shl ecx, 8
-    or r9d, ecx                         // r9w = b (divisor)
+    movzx r9d, byte ptr [rbx + r12]
+    stk_pop
+    shl r9d, 8
+    or ecx, r9d                         // ecx = b (divisor)
 
     movzx eax, byte ptr [rbx + r12]
     stk_pop
@@ -697,9 +697,9 @@ _DIV2:
 
     // 16-bit unsigned divide: a / b
     xor edx, edx
-    test r9w, r9w
+    test cx, cx
     jz 1f
-    div r9w                             // ax = a / b
+    div cx                              // ax = a / b
     jmp 2f
 1:
     xor eax, eax                        // div by zero → 0
@@ -1251,12 +1251,12 @@ _MUL2r:
     binary_op2r imul
 
 _DIV2r:
-    movzx r9d, byte ptr [r13 + r14]
-    rpop
     movzx ecx, byte ptr [r13 + r14]
     rpop
-    shl ecx, 8
-    or r9d, ecx                         // r9w = b (divisor)
+    movzx r9d, byte ptr [r13 + r14]
+    rpop
+    shl r9d, 8
+    or ecx, r9d                         // r9w = b (divisor)
 
     movzx eax, byte ptr [r13 + r14]
     rpop
@@ -1266,9 +1266,9 @@ _DIV2r:
 
     // 16-bit unsigned divide: a / b
     xor edx, edx
-    test r9w, r9w
+    test ecx, ecx
     jz 1f
-    div r9w                             // ax = a / b
+    div ecx                             // ax = a / b
     jmp 2f
 1:
     xor eax, eax                        // div by zero → 0
