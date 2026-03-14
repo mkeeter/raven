@@ -15,5 +15,5 @@ core::arch::global_asm!(concat!(
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 compile_error!(
     "unsupported target OS for AArch64 interpreter; \
-     you may want to diable the 'native' feature"
+     you may want to disable the 'native' feature"
 );

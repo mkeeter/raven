@@ -12,8 +12,8 @@ readme = "../README.md"
 zerocopy.workspace = true
 
 [features]
+default = ["alloc", "native"]
 alloc = []
-default = ["alloc"]
 native = []
 
 [dev-dependencies]

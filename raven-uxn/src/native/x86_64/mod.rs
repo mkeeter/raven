@@ -7,5 +7,5 @@ core::arch::global_asm!(concat!(
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
 compile_error!(
     "unsupported target OS for x86-64 interpreter; \
-     you may want to diable the 'native' feature"
+     you may want to disable the 'native' feature"
 );
