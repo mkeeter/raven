@@ -146,6 +146,7 @@ mod snapshots {
     }
     snapshot_tests!(Backend::Interpreter);
 
+    #[cfg(feature = "native")]
     mod native {
         use super::*;
         snapshot_tests!(Backend::Native);
