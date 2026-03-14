@@ -14,6 +14,7 @@ log.workspace = true
 static_assertions.workspace = true
 zerocopy.workspace = true
 uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2", default-features = false, features = ["alloc"] }
+workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [features]
 default = ["native"]
