@@ -2,6 +2,7 @@
 name = "raven-gui"
 version = "0.2.0"
 edition = "2021"
+license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
 description = "Simple GUI for a Uxn + Varvara system"
 authors = ["Matt Keeter <matt.j.keeter@gmail.com>"]
@@ -11,6 +12,7 @@ readme = "../README.md"
 anyhow.workspace = true
 eframe.workspace = true
 env_logger.workspace = true
+locked-tripwire.workspace = true
 log.workspace = true
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
