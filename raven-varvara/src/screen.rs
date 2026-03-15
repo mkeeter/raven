@@ -149,7 +149,7 @@ impl Screen {
     pub fn new() -> Self {
         const WIDTH: u16 = 512;
         const HEIGHT: u16 = 320;
-        let size = WIDTH as usize * WIDTH as usize;
+        let size = WIDTH as usize * HEIGHT as usize;
         let buffer = vec![0; size * 4];
         let pixels = vec![ScreenPixel::default(); size];
         Self {
