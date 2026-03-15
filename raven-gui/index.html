@@ -18,15 +18,12 @@
         body {
             margin-left: 20px;
         }
-        div#box {
-            position: relative;
-            outline: 1px solid #bbb;
-        }
         div {
             margin-bottom: 10px;
         }
         canvas {
             display: block;
+            margin-bottom: 10px;
         }
         #examples {
             float: left;
@@ -57,14 +54,8 @@
 </head>
 
 <body>
-    <!--
-        canvas-in-div is required because egui will float the canvas to the
-        top of its container; see https://github.com/emilk/egui/discussions/746
-    -->
     <h1><code>raven-varvara</code> demo</h1>
-    <div id="box" style="width: 512px; height: 320px">
-        <canvas id="varvara" style="width: 512px; height: 320px"></canvas>
-    </div>
+    <canvas id="varvara" style="width: 512px; height: 320px"></canvas>
     <div id="footer">
         <div id="examples">
             <select name="Examples" id="example-selector">
@@ -93,5 +84,4 @@
         </div>
     </div>
 </body>
-
 </html>
