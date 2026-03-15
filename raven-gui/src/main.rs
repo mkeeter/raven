@@ -286,9 +286,7 @@ pub fn audio_setup(
     let Some(supported_config) = supported_configs_range
         .filter(|c| usize::from(c.channels()) == AUDIO_CHANNELS)
         .filter(|c| c.sample_format() == cpal::SampleFormat::F32)
-        .find_map(|c| {
-            c.try_with_sample_rate(cpal::SampleRate(AUDIO_SAMPLE_RATE))
-        })
+        .find_map(|c| c.try_with_sample_rate(AUDIO_SAMPLE_RATE))
     else {
         error!(
             "could not find supported audio config ({} channels, {} Hz, f32)",
@@ -300,15 +298,15 @@ pub fn audio_setup(
                 error!(
                     "  channels: {}, sample_rate: {} Hz, {}",
                     c.channels(),
-                    c.min_sample_rate().0,
+                    c.min_sample_rate(),
                     c.sample_format(),
                 );
             } else {
                 error!(
                     "  channels: {}, sample_rate: {} - {} Hz, {}",
                     c.channels(),
-                    c.min_sample_rate().0,
-                    c.max_sample_rate().0,
+                    c.min_sample_rate(),
+                    c.max_sample_rate(),
                     c.sample_format(),
                 );
             }

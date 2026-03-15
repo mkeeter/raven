@@ -5,6 +5,7 @@
 [package]
 name = "workspace-hack"
 version = "0.1.0"
+edition = "2021"
 description = "workspace-hack package, managed by hakari"
 # You can choose to publish this crate: see https://docs.rs/cargo-hakari/latest/cargo_hakari/publishing.
 publish = false
@@ -14,14 +15,13 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-anstream = { version = "0.6" }
 bytemuck = { version = "1", default-features = false, features = ["derive", "extern_crate_alloc"] }
 clap = { version = "4", features = ["derive"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "help", "std", "suggestions", "usage"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 num-traits = { version = "0.2" }
 regex = { version = "1", default-features = false, features = ["perf", "std"] }
-regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal"] }
+regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std"] }
 zerocopy = { version = "0.8", default-features = false, features = ["derive", "simd"] }
 
 [build-dependencies]
@@ -30,42 +30,32 @@ quote = { version = "1" }
 syn = { version = "2", features = ["full"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
+bitflags = { version = "2", default-features = false, features = ["std"] }
 memchr = { version = "2" }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2" }
+syn = { version = "2", default-features = false, features = ["extra-traits", "fold", "visit"] }
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
-either = { version = "1", default-features = false, features = ["use_std"] }
-libc = { version = "0.2" }
-regex = { version = "1", default-features = false, features = ["unicode-perl"] }
-regex-automata = { version = "0.4", default-features = false, features = ["unicode-perl", "unicode-word-boundary"] }
-regex-syntax = { version = "0.8", default-features = false, features = ["std", "unicode-perl"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
-bitflags = { version = "2", default-features = false, features = ["std"] }
-either = { version = "1", default-features = false, features = ["use_std"] }
-libc = { version = "0.2" }
-regex = { version = "1", default-features = false, features = ["perf", "std", "unicode-perl"] }
-regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode-perl", "unicode-word-boundary"] }
-regex-syntax = { version = "0.8", default-features = false, features = ["std", "unicode-perl"] }
-syn = { version = "2", default-features = false, features = ["extra-traits", "visit-mut"] }
+syn = { version = "2", default-features = false, features = ["extra-traits", "fold", "visit"] }
 
 [target.wasm32-unknown-unknown.dependencies]
-once_cell = { version = "1" }
+once_cell = { version = "1", default-features = false, features = ["alloc"] }
 
 [target.wasm32-unknown-unknown.build-dependencies]
-log = { version = "0.4", default-features = false, features = ["std"] }
-once_cell = { version = "1" }
-syn = { version = "2", default-features = false, features = ["visit"] }
+syn = { version = "2", default-features = false, features = ["extra-traits", "visit", "visit-mut"] }
 
 [target.x86_64-pc-windows-msvc.dependencies]
 winapi = { version = "0.3", default-features = false, features = ["sysinfoapi", "winuser"] }
-windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_SystemInformation"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_SystemInformation"] }
 
 [target.x86_64-pc-windows-msvc.build-dependencies]
 log = { version = "0.4", default-features = false, features = ["std"] }
+syn = { version = "2", default-features = false, features = ["extra-traits", "fold", "visit"] }
 
 ### END HAKARI SECTION

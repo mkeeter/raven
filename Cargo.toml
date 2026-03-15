@@ -17,7 +17,7 @@ overflow-checks = true
 anyhow = "1.0.83"
 chrono = "0.4.38"
 clap = { version = "4.5.4", features = ["derive"] }
-cpal = "0.15.3"
+cpal = "0.17.3"
 criterion = { version = "0.8", default-features = false }
 eframe = { version = "0.27", default-features = false, features = [ "default_fonts", "glow"] }
 env_logger = "0.11.3"
