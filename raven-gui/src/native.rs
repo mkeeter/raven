@@ -88,7 +88,7 @@ pub fn run() -> Result<()> {
         "Varvara",
         options,
         Box::new(move |cc| {
-            Box::new(Stage::new(vm, dev, size, scale, rx, &cc.egui_ctx))
+            Ok(Box::new(Stage::new(vm, dev, size, scale, rx, &cc.egui_ctx)))
         }),
     )
     .map_err(|e| anyhow!("got egui error: {e:?}"))

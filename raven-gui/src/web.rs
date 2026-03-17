@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use eframe::{
-    egui,
     wasm_bindgen::{closure::Closure, JsCast},
     web_sys,
 };
@@ -51,23 +50,10 @@ pub fn run() -> Result<()> {
     dev.output(&vm).check()?;
 
     let size @ (width, height) = dev.output(&vm).size;
-    let options = eframe::WebOptions {
-        max_size_points: egui::Vec2::new(width as f32, height as f32),
-        ..eframe::WebOptions::default()
-    };
-
     info!("setting size to {width}, {height}");
     let document = window
         .document()
         .ok_or_else(|| anyhow!("could not get document"))?;
-    let div = document
-        .get_element_by_id("box")
-        .ok_or_else(|| anyhow!("could not find box div"))?;
-    let div = div
-        .dyn_into::<web_sys::HtmlElement>()
-        .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
-    div.style()
-        .set_css_text(&format!("width: {width}px; height: {height}px"));
     let footer = document
         .get_element_by_id("footer")
         .ok_or_else(|| anyhow!("could not find footer div"))?;
@@ -75,6 +61,15 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::HtmlElement>()
         .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
     footer.style().set_css_text(&format!("width: {width}px"));
+    let canvas = document
+        .get_element_by_id("varvara")
+        .ok_or_else(|| anyhow!("could not find varvara canvas"))?
+        .dyn_into::<web_sys::HtmlCanvasElement>()
+        .map_err(|e| anyhow!("could not cast to HtmlCanvasElement: {e:?}"))?;
+    // Set initial style
+    canvas
+        .style()
+        .set_css_text(&format!("width: {width}px; height: {height}px"));
 
     let sel = document
         .get_element_by_id("example-selector")
@@ -203,8 +198,10 @@ pub fn run() -> Result<()> {
     audio_check.set_onclick(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
+    let canvas_ = canvas.clone();
     let resize_closure = Box::new(move |width: u16, height: u16| {
-        div.style()
+        canvas_
+            .style()
             .set_css_text(&format!("width: {width}px; height: {height}px"));
         footer.style().set_css_text(&format!("width: {width}px"));
     });
@@ -212,8 +209,8 @@ pub fn run() -> Result<()> {
     wasm_bindgen_futures::spawn_local(async move {
         eframe::WebRunner::new()
             .start(
-                "varvara",
-                options,
+                canvas,
+                eframe::WebOptions::default(),
                 Box::new(move |cc| {
                     let mut s = Box::new(Stage::new(
                         vm,
@@ -224,7 +221,7 @@ pub fn run() -> Result<()> {
                         &cc.egui_ctx,
                     ));
                     s.set_resize_callback(resize_closure);
-                    s
+                    Ok(s)
                 }),
             )
             .await

@@ -53,9 +53,11 @@ impl<'a> Stage<'a> {
         event_rx: mpsc::Receiver<Event>,
         ctx: &egui::Context,
     ) -> Self {
+        let width = usize::from(size.0);
+        let height = usize::from(size.1);
         let image = egui::ColorImage::new(
-            [usize::from(size.0), usize::from(size.1)],
-            egui::Color32::BLACK,
+            [width, height],
+            vec![egui::Color32::BLACK; width * height],
         );
 
         let texture =
@@ -175,9 +177,10 @@ impl eframe::App for Stage<'_> {
                             }
                         }
                     }
-                    egui::Event::Scroll(s) => {
-                        self.scroll.0 += s.x;
-                        self.scroll.1 -= s.y;
+                    egui::Event::MouseWheel { delta, .. } => {
+                        // TODO should we handle `unit` here?
+                        self.scroll.0 += delta.x;
+                        self.scroll.1 -= delta.y;
                     }
                     _ => (),
                 }
@@ -238,13 +241,17 @@ impl eframe::App for Stage<'_> {
         }
 
         // TODO reduce allocation here?
-        let mut image = egui::ColorImage::new(
+        let pixels = out
+            .frame
+            .chunks(4)
+            .map(|i| {
+                egui::Color32::from_rgba_unmultiplied(i[2], i[1], i[0], i[3])
+            })
+            .collect::<Vec<_>>();
+        let image = egui::ColorImage::new(
             [out.size.0 as usize, out.size.1 as usize],
-            egui::Color32::BLACK,
+            pixels,
         );
-        for (i, o) in out.frame.chunks(4).zip(image.pixels.iter_mut()) {
-            *o = egui::Color32::from_rgba_unmultiplied(i[2], i[1], i[0], i[3]);
-        }
         self.texture.set(image, egui::TextureOptions::NEAREST);
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -286,9 +293,7 @@ pub fn audio_setup(
     let Some(supported_config) = supported_configs_range
         .filter(|c| usize::from(c.channels()) == AUDIO_CHANNELS)
         .filter(|c| c.sample_format() == cpal::SampleFormat::F32)
-        .find_map(|c| {
-            c.try_with_sample_rate(cpal::SampleRate(AUDIO_SAMPLE_RATE))
-        })
+        .find_map(|c| c.try_with_sample_rate(AUDIO_SAMPLE_RATE))
     else {
         error!(
             "could not find supported audio config ({} channels, {} Hz, f32)",
@@ -300,15 +305,15 @@ pub fn audio_setup(
                 error!(
                     "  channels: {}, sample_rate: {} Hz, {}",
                     c.channels(),
-                    c.min_sample_rate().0,
+                    c.min_sample_rate(),
                     c.sample_format(),
                 );
             } else {
                 error!(
                     "  channels: {}, sample_rate: {} - {} Hz, {}",
                     c.channels(),
-                    c.min_sample_rate().0,
-                    c.max_sample_rate().0,
+                    c.min_sample_rate(),
+                    c.max_sample_rate(),
                     c.sample_format(),
                 );
             }
