@@ -1,7 +1,7 @@
 use uxn::Uxn;
-use varvara::{Key, MouseState, Varvara, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
+use varvara::{AUDIO_CHANNELS, AUDIO_SAMPLE_RATE, Key, MouseState, Varvara};
 
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
 use anyhow::Result;
 use cpal::traits::StreamTrait;

@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use eframe::{
-    wasm_bindgen::{closure::Closure, JsCast},
+    wasm_bindgen::{JsCast, closure::Closure},
     web_sys,
 };
 use log::{error, info};
@@ -8,7 +8,7 @@ use std::sync::mpsc;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys::Uint8Array;
 
-use crate::{audio_setup, Event, Stage};
+use crate::{Event, Stage, audio_setup};
 use uxn::{Backend, Uxn, UxnRam};
 use varvara::Varvara;
 

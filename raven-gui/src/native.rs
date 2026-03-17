@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use std::{io::Read, sync::mpsc};
 
 use uxn::{Backend, Uxn, UxnRam};
@@ -10,7 +10,7 @@ use log::info;
 
 use clap::Parser;
 
-use crate::{audio_setup, Stage};
+use crate::{Stage, audio_setup};
 
 /// Uxn runner
 #[derive(Parser)]

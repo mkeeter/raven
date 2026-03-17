@@ -4,7 +4,7 @@ use std::{
     io::{Read, Write},
     mem::offset_of,
 };
-use uxn::{Ports, Uxn, DEV_SIZE};
+use uxn::{DEV_SIZE, Ports, Uxn};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
 #[derive(IntoBytes, KnownLayout, Immutable, FromBytes)]

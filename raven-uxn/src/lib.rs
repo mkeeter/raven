@@ -1405,11 +1405,7 @@ impl<'a> Uxn<'a> {
                 run &= dev.deo(self, i);
             }
         }
-        if run {
-            Some(pc)
-        } else {
-            None
-        }
+        if run { Some(pc) } else { None }
     }
 
     /// Add
@@ -2209,7 +2205,7 @@ mod test {
         macro_rules! init {
             ($vm:ident, $data:ident, $op:ident) => {
                 struct NoPanic;
-                extern "C" {
+                unsafe extern "C" {
                     #[link_name = concat!(stringify!($op), "_may_panic")]
                     fn trigger() -> !;
                 }

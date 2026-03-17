@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use raven_uxn::{Backend, Uxn, UxnRam, FIB};
+use criterion::{Criterion, criterion_group, criterion_main};
+use raven_uxn::{Backend, FIB, Uxn, UxnRam};
 
 fn bench_fib(c: &mut Criterion, backend: Backend, name: &str) {
     c.bench_function(name, |b| {

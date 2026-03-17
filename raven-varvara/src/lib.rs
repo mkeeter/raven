@@ -17,9 +17,9 @@ mod system;
 /// Audio handler implementation
 mod audio;
 
-pub use audio::StreamData;
 pub use audio::CHANNELS as AUDIO_CHANNELS;
 pub use audio::SAMPLE_RATE as AUDIO_SAMPLE_RATE;
+pub use audio::StreamData;
 
 pub use controller::Key;
 pub use mouse::MouseState;
@@ -302,10 +302,10 @@ impl Varvara {
                 vm.write_dev_mem(d.addr, d.value);
             }
             vm.run(self, e.vector);
-            if let Some(d) = e.data {
-                if d.clear {
-                    vm.write_dev_mem(d.addr, 0);
-                }
+            if let Some(d) = e.data
+                && d.clear
+            {
+                vm.write_dev_mem(d.addr, 0);
             }
         }
     }

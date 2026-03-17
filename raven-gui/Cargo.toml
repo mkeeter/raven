@@ -1,7 +1,7 @@
 [package]
 name = "raven-gui"
 version = "0.2.0"
-edition = "2021"
+edition = "2024"
 license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
 description = "Simple GUI for a Uxn + Varvara system"

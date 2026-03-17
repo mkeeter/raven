@@ -42,11 +42,7 @@ struct ScreenPixel {
 
 impl ScreenPixel {
     fn get(&self) -> u8 {
-        if self.fg != 0 {
-            self.fg
-        } else {
-            self.bg
-        }
+        if self.fg != 0 { self.fg } else { self.bg }
     }
 }
 
