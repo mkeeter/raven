@@ -40,6 +40,8 @@ syn = { version = "2", default-features = false, features = ["extra-traits", "fo
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
+half = { version = "2" }
+image = { version = "0.25", default-features = false, features = ["png", "tiff"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
 syn = { version = "2", default-features = false, features = ["extra-traits", "fold", "visit"] }
@@ -51,8 +53,8 @@ once_cell = { version = "1", default-features = false, features = ["alloc"] }
 syn = { version = "2", default-features = false, features = ["extra-traits", "visit", "visit-mut"] }
 
 [target.x86_64-pc-windows-msvc.dependencies]
-winapi = { version = "0.3", default-features = false, features = ["sysinfoapi", "winuser"] }
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_Console", "Win32_System_SystemInformation"] }
+image = { version = "0.25", default-features = false, features = ["bmp", "png"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Console", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [target.x86_64-pc-windows-msvc.build-dependencies]
 log = { version = "0.4", default-features = false, features = ["std"] }
