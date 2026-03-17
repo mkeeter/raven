@@ -12,17 +12,16 @@ compile_error!("no native implementation for this platform");
 macro_rules! define_extern_fns {
     (
         $(
-            $(#[$attr:meta])*
             $vis:vis fn $name:ident($($arg:ident : $ty:ty),*) -> $ret:ty $body:block
         )*
     ) => {
         $(
             #[cfg(not(target_os = "windows"))]
-            $(#[$attr])*
+            #[unsafe(no_mangle)]
             $vis extern "C" fn $name($($arg: $ty),*) -> $ret $body
 
             #[cfg(target_os = "windows")]
-            $(#[$attr])*
+            #[unsafe(no_mangle)]
             $vis extern "sysv64" fn $name($($arg: $ty),*) -> $ret $body
         )*
     };
@@ -32,42 +31,34 @@ macro_rules! define_extern_fns {
 // Stubs for DEO calls
 
 define_extern_fns!(
-    #[no_mangle]
     fn deo_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b000>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn deo_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b001>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn deo_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b010>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn deo_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b011>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn deo_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b100>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn deo_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b101>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn deo_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b110>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.deo::<0b111>(dev.0, 0).is_some()
     }
@@ -77,41 +68,33 @@ define_extern_fns!(
 // Stubs for DEI calls
 
 define_extern_fns!(
-    #[no_mangle]
     fn dei_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b000>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn dei_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b001>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn dei_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b010>(dev.0, 0).is_some()
     }
-    #[no_mangle]
     fn dei_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b011>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn dei_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b100>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn dei_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b101>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn dei_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b110>(dev.0, 0).is_some()
     }
 
-    #[no_mangle]
     fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
         vm.dei::<0b111>(dev.0, 0).is_some()
     }
@@ -148,7 +131,7 @@ macro_rules! declare_extern_fns {
         )*
     ) => {
         #[cfg(not(target_os = "windows"))]
-        extern "C" {
+        unsafe extern "C" {
             $(
                 $(#[$attr])*
                 fn $name($($arg: $ty),*) -> $ret;
@@ -156,7 +139,7 @@ macro_rules! declare_extern_fns {
         }
 
         #[cfg(target_os = "windows")]
-        extern "sysv64" {
+        unsafe extern "sysv64" {
             $(
                 $(#[$attr])*
                 fn $name($($arg: $ty),*) -> $ret;
@@ -181,7 +164,7 @@ declare_extern_fns!(
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
-    use crate::{op::*, Backend, EmptyDevice, Uxn, UxnRam};
+    use crate::{Backend, EmptyDevice, Uxn, UxnRam, op::*};
 
     fn run_and_compare(cmd: &[u8]) {
         run_and_compare_all(cmd, false, false);

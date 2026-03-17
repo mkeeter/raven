@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use raven_varvara::Varvara;
 use std::path::Path;
 use uxn::{Backend, Uxn, UxnRam};

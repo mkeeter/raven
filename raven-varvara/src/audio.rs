@@ -5,7 +5,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     sync::{Arc, Mutex},
 };
-use uxn::{Ports, Uxn, DEV_SIZE};
+use uxn::{DEV_SIZE, Ports, Uxn};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
 #[derive(IntoBytes, FromBytes, KnownLayout, Immutable)]
