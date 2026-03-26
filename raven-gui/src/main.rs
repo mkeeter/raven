@@ -97,7 +97,7 @@ impl<'a> Stage<'a> {
 }
 
 impl eframe::App for Stage<'_> {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         while let Ok(e) = self.event_rx.try_recv() {
             match e {
                 Event::LoadRom(data) => {
@@ -115,8 +115,8 @@ impl eframe::App for Stage<'_> {
         }
 
         // Repaint at vsync rate (60 FPS)
-        ctx.request_repaint();
-        ctx.input(|i| {
+        ui.request_repaint();
+        ui.input(|i| {
             while i.time >= self.next_frame {
                 // Screen callback (limited to 60 FPS).  We want to err on the
                 // side of redrawing early, rather than missing frames.
@@ -227,14 +227,14 @@ impl eframe::App for Stage<'_> {
 
         // Update our GUI based on current state
         if out.hide_mouse {
-            ctx.set_cursor_icon(egui::CursorIcon::None);
+            ui.set_cursor_icon(egui::CursorIcon::None);
         }
         if self.size != out.size {
             info!("resizing window to {:?}", out.size);
             self.size = out.size;
             let size = egui::Vec2::new(out.size.0 as f32, out.size.1 as f32)
                 * self.scale;
-            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
+            ui.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
             if let Some(f) = self.resized.as_mut() {
                 f(out.size.0, out.size.1);
             }
@@ -254,7 +254,7 @@ impl eframe::App for Stage<'_> {
         );
         self.texture.set(image, egui::TextureOptions::NEAREST);
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             let mut mesh = egui::Mesh::with_texture(self.texture.id());
             mesh.add_rect_with_uv(
                 egui::Rect {

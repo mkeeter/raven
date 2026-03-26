@@ -15,7 +15,8 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-bytemuck = { version = "1", default-features = false, features = ["derive", "extern_crate_alloc"] }
+anstream = { version = "1" }
+bytemuck = { version = "1", default-features = false, features = ["derive", "extern_crate_alloc", "min_const_generics"] }
 clap = { version = "4", features = ["derive"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "help", "std", "suggestions", "usage"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
