@@ -6,8 +6,11 @@
 <head>
     <title>raven-varvara demo</title>
 
-    <link data-trunk rel="rust" data-wasm-opt="2" />
-    <base data-trunk-public-url />
+    <script type="module">
+        // HASH values in paths are patched in dist
+        import init from './raven-gui.JSHASH.js';
+        await init('./raven-gui.WAHASH.wasm');
+    </script>
     <style>
         html {
             /* Remove touch delay: */
