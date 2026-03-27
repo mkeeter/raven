@@ -164,7 +164,7 @@ declare_extern_fns!(
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
-    use crate::{Backend, EmptyDevice, Uxn, UxnRam, op::*};
+    use crate::{Backend, EmptyDevice, Uxn, UxnMem, op::*};
 
     fn run_and_compare(cmd: &[u8]) {
         run_and_compare_all(cmd, false, false);
@@ -235,19 +235,19 @@ mod test {
         }
 
         let mut dev = EmptyDevice;
-        let mut ram_native = UxnRam::new();
-        let mut ram_interp = UxnRam::new();
+        let mut mem_native = UxnMem::boxed();
+        let mut mem_interp = UxnMem::boxed();
         if fill_ram {
-            for i in 0..ram_native.len() {
-                ram_native[i] = i as u8;
-                ram_interp[i] = i as u8;
+            for i in 0..mem_native.ram.len() {
+                mem_native.ram[i] = i as u8;
+                mem_interp.ram[i] = i as u8;
             }
         }
-        let mut vm_native = Uxn::new(&mut ram_native, Backend::Native);
+        let mut vm_native = Uxn::new(&mut mem_native, Backend::Native);
         let r = vm_native.reset(&cmd);
         assert!(r.is_empty());
 
-        let mut vm_interp = Uxn::new(&mut ram_interp, Backend::Interpreter);
+        let mut vm_interp = Uxn::new(&mut mem_interp, Backend::Interpreter);
         let r = vm_interp.reset(&cmd);
         assert!(r.is_empty());
 

@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnMem};
 use varvara::Varvara;
 
 use anyhow::{Context, Result};
@@ -37,9 +37,9 @@ fn main() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
-    let mut ram = UxnRam::new();
+    let mut mem = UxnMem::boxed();
     let mut vm = Uxn::new(
-        &mut ram,
+        &mut mem,
         if args.native {
             Backend::Native
         } else {

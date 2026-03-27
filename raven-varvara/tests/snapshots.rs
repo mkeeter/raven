@@ -2,7 +2,7 @@ use image::{DynamicImage, ImageBuffer, ImageReader, Rgba};
 use raven_varvara::Varvara;
 use std::io::Read;
 use std::path::Path;
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnMem};
 
 struct Snapshot {
     pixels: Vec<u8>,
@@ -13,8 +13,8 @@ fn get_snapshot(
     rom: &[u8],
     backend: Backend,
 ) -> Result<Snapshot, std::io::Error> {
-    let mut ram = UxnRam::new();
-    let mut vm = Uxn::new(&mut ram, backend);
+    let mut mem = UxnMem::boxed();
+    let mut vm = Uxn::new(&mut mem, backend);
     let mut dev = Varvara::new();
     let data = vm.reset(rom);
     dev.reset(data);

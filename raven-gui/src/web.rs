@@ -9,7 +9,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys::Uint8Array;
 
 use crate::{Event, Stage, audio_setup};
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnMem};
 use varvara::Varvara;
 
 pub fn run() -> Result<()> {
@@ -39,8 +39,8 @@ pub fn run() -> Result<()> {
         .map(|(_name, data)| *data)
         .unwrap_or(include_bytes!("../../roms/controller.rom"));
 
-    let ram = UxnRam::new();
-    let mut vm = Uxn::new(ram.leak(), Backend::Interpreter);
+    let mem = UxnMem::boxed();
+    let mut vm = Uxn::new(Box::leak(mem), Backend::Interpreter);
     let mut dev = Varvara::new();
     let extra = vm.reset(rom);
     dev.reset(extra);

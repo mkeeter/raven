@@ -3,6 +3,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(not(any(test, feature = "native")), forbid(unsafe_code))]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 #[cfg(feature = "native")]
 mod native;
 
@@ -20,14 +23,28 @@ const fn ret(flags: u8) -> bool {
 pub const DEV_SIZE: usize = 16;
 
 /// Simple circular stack, with room for 256 items
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct Stack {
-    data: [u8; 256],
+#[derive(Debug, Eq, PartialEq)]
+pub struct Stack<'a> {
+    data: &'a mut [u8; 256],
 
     /// The index points to the last occupied slot, and increases on `push`
     ///
     /// If the buffer is empty or full, it points to `u8::MAX`.
     index: u8,
+}
+
+impl<'a> Stack<'a> {
+    fn new(data: &'a mut [u8; 256]) -> Self {
+        Self {
+            data,
+            index: u8::MAX,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.data.fill(0u8);
+        self.index = u8::MAX;
+    }
 }
 
 /// Uxn evaluation backend
@@ -46,15 +63,15 @@ pub enum Backend {
 /// This type expects the user to perform all of their `pop()` calls first,
 /// followed by any `push(..)` calls.  `pop()` will either adjust the true index
 /// or a virtual index, depending on whether `keep` is set.
-struct StackView<'a, const FLAGS: u8> {
-    stack: &'a mut Stack,
+struct StackView<'a, 'b, const FLAGS: u8> {
+    stack: &'a mut Stack<'b>,
 
     /// Virtual index, used in `keep` mode
     offset: u8,
 }
 
-impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
-    fn new(stack: &'a mut Stack) -> Self {
+impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
+    fn new(stack: &'a mut Stack<'b>) -> Self {
         Self { stack, offset: 0 }
     }
 
@@ -123,15 +140,6 @@ impl<'a, const FLAGS: u8> StackView<'a, FLAGS> {
     }
 }
 
-impl Default for Stack {
-    fn default() -> Self {
-        Self {
-            data: [0u8; 256],
-            index: u8::MAX,
-        }
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 enum Value {
     Short(u16),
@@ -171,7 +179,7 @@ impl From<Value> for u16 {
     }
 }
 
-impl Stack {
+impl Stack<'_> {
     #[inline]
     fn pop_byte(&mut self) -> u8 {
         let out = self.data[usize::from(self.index)];
@@ -259,13 +267,13 @@ impl Stack {
 /// The virtual machine itself
 pub struct Uxn<'a> {
     /// Device memory
-    dev: [u8; 256],
+    dev: &'a mut [u8; 256],
     /// 64 KiB of VM memory
     ram: &'a mut [u8; 65536],
     /// 256-byte data stack
-    stack: Stack,
+    stack: Stack<'a>,
     /// 256-byte return stack
-    ret: Stack,
+    ret: Stack<'a>,
 
     /// Preferred evaluation backend
     backend: Backend,
@@ -306,14 +314,52 @@ macro_rules! op_bin {
     }};
 }
 
-impl<'a> Uxn<'a> {
-    /// Build a new `Uxn` with zeroed memory
-    pub fn new(ram: &'a mut [u8; 65536], backend: Backend) -> Self {
+/// Container with all of the memory needed to run a [`Uxn`] CPU
+#[derive(zerocopy::FromZeros)]
+pub struct UxnMem {
+    dev: [u8; 256],
+    stack: [u8; 256],
+    rstack: [u8; 256],
+    ram: [u8; 65536],
+}
+
+impl UxnMem {
+    /// Builds a new set of arrays, which are all zeroed
+    ///
+    /// This builds a large object on the stack, which is inadvisable; you
+    /// should instead place it in static memory or (if the `alloc` feature is
+    /// enabled) use [`UxnMem::boxed`] to build it on the heap instead.
+    #[expect(clippy::new_without_default)]
+    pub const fn new() -> Self {
         Self {
             dev: [0u8; 256],
+            stack: [0u8; 256],
+            rstack: [0u8; 256],
+            ram: [0u8; 65536],
+        }
+    }
+
+    /// Builds a new boxed [`UxnMem`] on the heap
+    #[cfg(feature = "alloc")]
+    pub fn boxed() -> alloc::boxed::Box<Self> {
+        <Self as zerocopy::FromZeros>::new_box_zeroed().unwrap()
+    }
+}
+
+impl<'a> Uxn<'a> {
+    /// Build a new `Uxn` with zeroed memory
+    pub fn new(mem: &'a mut UxnMem, backend: Backend) -> Self {
+        let UxnMem {
+            dev,
+            stack,
+            rstack,
             ram,
-            stack: Stack::default(),
-            ret: Stack::default(),
+        } = mem;
+        Self {
+            dev,
+            ram,
+            stack: Stack::new(stack),
+            ret: Stack::new(rstack),
             backend,
         }
     }
@@ -361,7 +407,7 @@ impl<'a> Uxn<'a> {
     }
 
     #[inline]
-    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, FLAGS> {
+    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, 'a, FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.ret
         } else {
@@ -371,7 +417,7 @@ impl<'a> Uxn<'a> {
     }
 
     #[inline]
-    fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, FLAGS> {
+    fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, 'a, FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.stack
         } else {
@@ -480,25 +526,25 @@ impl<'a> Uxn<'a> {
 
     /// Shared borrow of the working stack
     #[inline]
-    pub fn stack(&self) -> &Stack {
+    pub fn stack(&self) -> &Stack<'a> {
         &self.stack
     }
 
     /// Mutable borrow of the working stack
     #[inline]
-    pub fn stack_mut(&mut self) -> &mut Stack {
+    pub fn stack_mut(&mut self) -> &mut Stack<'a> {
         &mut self.stack
     }
 
     /// Shared borrow of the return stack
     #[inline]
-    pub fn ret(&self) -> &Stack {
+    pub fn ret(&self) -> &Stack<'_> {
         &self.ret
     }
 
     /// Mutable borrow of the return stack
     #[inline]
-    pub fn ret_mut(&mut self) -> &mut Stack {
+    pub fn ret_mut(&mut self) -> &mut Stack<'a> {
         &mut self.ret
     }
 
@@ -510,8 +556,8 @@ impl<'a> Uxn<'a> {
     pub fn reset<'b>(&mut self, rom: &'b [u8]) -> &'b [u8] {
         self.dev.fill(0);
         self.ram.fill(0);
-        self.stack = Stack::default();
-        self.ret = Stack::default();
+        self.stack.reset();
+        self.ret.reset();
         let n = (self.ram.len() - 0x100).min(rom.len());
         self.ram[0x100..][..n].copy_from_slice(&rom[..n]);
         &rom[n..]
@@ -1587,50 +1633,6 @@ impl Device for EmptyDevice {
     }
 }
 
-#[cfg(feature = "alloc")]
-mod ram {
-    extern crate alloc;
-    use alloc::{boxed::Box, vec};
-
-    /// Helper type for building a RAM array of the appropriate size
-    ///
-    /// This is only available if the `"alloc"` feature is enabled
-    pub struct UxnRam(Box<[u8; 65536]>);
-
-    impl UxnRam {
-        /// Builds a new zero-initialized RAM
-        pub fn new() -> Self {
-            UxnRam(vec![0u8; 65536].into_boxed_slice().try_into().unwrap())
-        }
-
-        /// Leaks memory, setting it to a static lifetime
-        pub fn leak(self) -> &'static mut [u8; 65536] {
-            Box::leak(self.0)
-        }
-    }
-
-    impl Default for UxnRam {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl core::ops::Deref for UxnRam {
-        type Target = [u8; 65536];
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-    impl core::ops::DerefMut for UxnRam {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
-        }
-    }
-}
-
-#[cfg(feature = "alloc")]
-pub use ram::UxnRam;
-
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Opcode names and constants
@@ -2022,8 +2024,8 @@ mod test {
     }
 
     fn parse_and_test(s: &str) {
-        let mut ram = UxnRam::new();
-        let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
+        let mut mem = UxnMem::new();
+        let mut vm = Uxn::new(&mut mem, Backend::Interpreter);
         let mut iter = s.split_whitespace();
         let mut op = None;
         let mut dev = EmptyDevice;
@@ -2155,8 +2157,8 @@ mod test {
 
     #[test]
     fn fib() {
-        let mut ram = UxnRam::new();
-        let mut vm = Uxn::new(&mut ram, Backend::Interpreter);
+        let mut mem = UxnMem::boxed();
+        let mut vm = Uxn::new(&mut mem, Backend::Interpreter);
 
         let mut uxn_fib = |i| {
             let _ = vm.reset(FIB);
@@ -2216,7 +2218,7 @@ mod test {
                         }
                     }
                 }
-                let mut ram = UxnRam::new();
+                let mut ram = UxnMem::boxed();
                 let mut $vm = Uxn::new(&mut ram, Backend::Interpreter);
                 let _ = $vm.reset($data);
                 for d in $data {

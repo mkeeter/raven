@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use raven_varvara::Varvara;
 use std::path::Path;
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnMem};
 
 fn load_rom() -> Vec<u8> {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
@@ -16,8 +16,8 @@ fn load_rom() -> Vec<u8> {
 fn bench_startup(c: &mut Criterion, rom: &[u8], backend: Backend, name: &str) {
     c.bench_function(name, |b| {
         b.iter(|| {
-            let mut ram = UxnRam::new();
-            let mut vm = Uxn::new(&mut ram, backend);
+            let mut mem = UxnMem::boxed();
+            let mut vm = Uxn::new(&mut mem, backend);
             let mut dev = Varvara::new();
             let remaining = vm.reset(rom);
             dev.reset(remaining);

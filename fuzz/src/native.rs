@@ -2,7 +2,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use uxn::{Backend, EmptyDevice, Uxn, UxnRam};
+use uxn::{Backend, EmptyDevice, Uxn, UxnMem};
 
 #[derive(Arbitrary)]
 struct UxnProgram<'a>(&'a [u8]);
@@ -36,11 +36,11 @@ impl std::fmt::Debug for UxnProgram<'_> {
 }
 
 fuzz_target!(|data: UxnProgram| {
-    let mut ram_v = UxnRam::new();
-    let mut vm_v = Uxn::new(&mut ram_v, Backend::Interpreter);
+    let mut mem_v = UxnMem::boxed();
+    let mut vm_v = Uxn::new(&mut mem_v, Backend::Interpreter);
 
-    let mut ram_n = UxnRam::new();
-    let mut vm_n = Uxn::new(&mut ram_n, Backend::Native);
+    let mut mem_n = UxnMem::boxed();
+    let mut vm_n = Uxn::new(&mut mem_n, Backend::Native);
 
     // Don't load any programs that require auxiliary memory
     if !vm_v.reset(data.0).is_empty() {

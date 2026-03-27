@@ -1,7 +1,7 @@
 use anyhow::{Context, anyhow};
 use std::{io::Read, sync::mpsc};
 
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnMem};
 use varvara::Varvara;
 
 use anyhow::Result;
@@ -45,9 +45,9 @@ pub fn run() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
-    let ram = UxnRam::new();
+    let mem = UxnMem::boxed();
     let mut vm = Uxn::new(
-        ram.leak(),
+        Box::leak(mem),
         if args.native {
             Backend::Native
         } else {

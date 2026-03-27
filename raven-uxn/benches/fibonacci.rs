@@ -1,10 +1,10 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use raven_uxn::{Backend, FIB, Uxn, UxnRam};
+use raven_uxn::{Backend, FIB, Uxn, UxnMem};
 
 fn bench_fib(c: &mut Criterion, backend: Backend, name: &str) {
     c.bench_function(name, |b| {
         b.iter(|| {
-            let mut ram = UxnRam::new();
+            let mut ram = UxnMem::boxed();
             let mut vm = Uxn::new(&mut ram, backend);
             let mut dev = raven_uxn::EmptyDevice;
             let _ = vm.reset(FIB);
