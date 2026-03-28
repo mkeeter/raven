@@ -27,6 +27,7 @@ testing:
 ```console
 cargo install cargo-fuzz # this only needs to be run once
 cargo +nightly fuzz run --release fuzz-native
+# alternatively, run `just fuzz`
 ```
 
 Performance can be tested with `cargo bench`, which runs

@@ -8,6 +8,10 @@ PKG_WA   := PKG_DIR / "raven-gui.opt.wasm"
 DIST_DIR := GUI_DIR / "dist"
 CUT8 := ".{56}$" # regex to strip the trailing 56 characters
 
+# Run `cargo fuzz` to test the native implementation
+fuzz:
+    cargo +nightly fuzz run -O fuzz-native --
+
 # Build a web application in `raven-gui/dist`
 dist:
     cargo build --release -praven-gui --target wasm32-unknown-unknown
