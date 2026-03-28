@@ -71,6 +71,7 @@ struct StackView<'a, 'b, const FLAGS: u8> {
 }
 
 impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
+    #[inline(always)]
     fn new(stack: &'a mut Stack<'b>) -> Self {
         Self { stack, offset: 0 }
     }
@@ -82,7 +83,7 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
     ///
     /// If `self.keep` is set, then only the view offset ([`StackView::offset`])
     /// is changed; otherwise, the stack index ([`Stack::index`]) is changed.
-    #[inline]
+    #[inline(always)]
     fn pop(&mut self) -> Value {
         if short(FLAGS) {
             Value::Short(self.pop_short())
@@ -91,6 +92,7 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
         }
     }
 
+    #[inline(always)]
     fn pop_byte(&mut self) -> u8 {
         if keep(FLAGS) {
             let v = self.stack.peek_byte_at(self.offset);
@@ -101,6 +103,7 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
         }
     }
 
+    #[inline(always)]
     fn pop_short(&mut self) -> u16 {
         if keep(FLAGS) {
             let v = self.stack.peek_short_at(self.offset);
@@ -111,15 +114,18 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
         }
     }
 
+    #[inline(always)]
     fn push(&mut self, v: Value) {
         self.stack.push(v);
     }
 
+    #[inline(always)]
     fn reserve(&mut self, n: u8) {
         self.stack.reserve(n);
     }
 
     /// Replaces the top item on the stack with the given value
+    #[inline(always)]
     fn emplace(&mut self, v: Value) {
         match v {
             Value::Short(v) => {
@@ -131,10 +137,12 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
         }
     }
 
+    #[inline(always)]
     fn push_byte(&mut self, v: u8) {
         self.stack.push_byte(v);
     }
 
+    #[inline(always)]
     fn push_short(&mut self, v: u16) {
         self.stack.push_short(v);
     }
@@ -147,21 +155,21 @@ enum Value {
 }
 
 impl Value {
-    #[inline]
+    #[inline(always)]
     fn wrapping_add(&self, i: u8) -> Self {
         match self {
             Value::Short(v) => Value::Short(v.wrapping_add(u16::from(i))),
             Value::Byte(v) => Value::Byte(v.wrapping_add(i)),
         }
     }
-    #[inline]
+    #[inline(always)]
     fn shr(&self, i: u32) -> Self {
         match self {
             Value::Short(v) => Value::Short(v.checked_shr(i).unwrap_or(0)),
             Value::Byte(v) => Value::Byte(v.checked_shr(i).unwrap_or(0)),
         }
     }
-    #[inline]
+    #[inline(always)]
     fn shl(&self, i: u32) -> Self {
         match self {
             Value::Short(v) => Value::Short(v.checked_shl(i).unwrap_or(0)),
@@ -180,51 +188,51 @@ impl From<Value> for u16 {
 }
 
 impl Stack<'_> {
-    #[inline]
+    #[inline(always)]
     fn pop_byte(&mut self) -> u8 {
         let out = self.data[usize::from(self.index)];
         self.index = self.index.wrapping_sub(1);
         out
     }
 
-    #[inline]
+    #[inline(always)]
     fn pop_short(&mut self) -> u16 {
         let lo = self.pop_byte();
         let hi = self.pop_byte();
         u16::from_le_bytes([lo, hi])
     }
 
-    #[inline]
+    #[inline(always)]
     fn push_byte(&mut self, v: u8) {
         self.index = self.index.wrapping_add(1);
         self.data[usize::from(self.index)] = v;
     }
 
-    #[inline]
+    #[inline(always)]
     fn emplace_byte(&mut self, v: u8) {
         self.data[usize::from(self.index)] = v;
     }
 
-    #[inline]
+    #[inline(always)]
     fn emplace_short(&mut self, v: u16) {
         let [lo, hi] = v.to_le_bytes();
         self.data[usize::from(self.index.wrapping_sub(1))] = hi;
         self.data[usize::from(self.index)] = lo;
     }
 
-    #[inline]
+    #[inline(always)]
     fn reserve(&mut self, n: u8) {
         self.index = self.index.wrapping_add(n);
     }
 
-    #[inline]
+    #[inline(always)]
     fn push_short(&mut self, v: u16) {
         let [lo, hi] = v.to_le_bytes();
         self.push_byte(hi);
         self.push_byte(lo);
     }
 
-    #[inline]
+    #[inline(always)]
     fn push(&mut self, v: Value) {
         match v {
             Value::Short(v) => self.push_short(v),
@@ -233,12 +241,12 @@ impl Stack<'_> {
     }
 
     /// Peeks at a byte from the data stack
-    #[inline]
+    #[inline(always)]
     pub fn peek_byte_at(&self, offset: u8) -> u8 {
         self.data[usize::from(self.index.wrapping_sub(offset))]
     }
 
-    #[inline]
+    #[inline(always)]
     fn peek_short_at(&self, offset: u8) -> u16 {
         let lo = self.peek_byte_at(offset);
         let hi = self.peek_byte_at(offset.wrapping_add(1));
@@ -246,19 +254,19 @@ impl Stack<'_> {
     }
 
     /// Returns the number of items in the stack
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> u8 {
         self.index.wrapping_add(1)
     }
 
     /// Checks whether the stack is empty
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Sets the number of items in the stack
-    #[inline]
+    #[inline(always)]
     pub fn set_len(&mut self, n: u8) {
         self.index = n.wrapping_sub(1);
     }
@@ -394,7 +402,7 @@ impl<'a> Uxn<'a> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn ram_read<const FLAGS: u8>(&self, addr: u16) -> Value {
         if short(FLAGS) {
             let hi = self.ram[usize::from(addr)];
@@ -406,7 +414,7 @@ impl<'a> Uxn<'a> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, 'a, FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.ret
@@ -416,7 +424,7 @@ impl<'a> Uxn<'a> {
         StackView::new(stack)
     }
 
-    #[inline]
+    #[inline(always)]
     fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, 'a, FLAGS> {
         let stack = if ret(FLAGS) {
             &mut self.stack
@@ -429,7 +437,7 @@ impl<'a> Uxn<'a> {
     /// Reads a word from RAM
     ///
     /// If the address is at the top of RAM, the second byte will wrap to 0
-    #[inline]
+    #[inline(always)]
     pub fn ram_read_word(&self, addr: u16) -> u16 {
         let hi = self.ram[usize::from(addr)];
         let lo = self.ram[usize::from(addr.wrapping_add(1))];
@@ -437,7 +445,7 @@ impl<'a> Uxn<'a> {
     }
 
     /// Writes to the given address in device memory
-    #[inline]
+    #[inline(always)]
     pub fn write_dev_mem(&mut self, addr: u8, value: u8) {
         self.dev[usize::from(addr)] = value;
     }
@@ -486,20 +494,20 @@ impl<'a> Uxn<'a> {
     }
 
     /// Converts raw ports memory into a [`Ports`] object
-    #[inline]
+    #[inline(always)]
     pub fn dev<D: Ports>(&self) -> &D {
         self.dev_at(D::BASE)
     }
 
-    /// Returns a reference to a device located at `pos`
-    #[inline]
+    /// Returns a shared reference to a device located at `pos`
+    #[inline(always)]
     pub fn dev_at<D: Ports>(&self, pos: u8) -> &D {
         Self::check_dev_size::<D>();
         D::ref_from_bytes(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
     }
 
-    /// Returns a reference to a device located at `pos`
-    #[inline]
+    /// Returns an exclusive reference to a device located at `pos`
+    #[inline(always)]
     pub fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
         Self::check_dev_size::<D>();
         D::mut_from_bytes(&mut self.dev[usize::from(pos)..][..DEV_SIZE])
@@ -507,43 +515,43 @@ impl<'a> Uxn<'a> {
     }
 
     /// Returns a mutable reference to the given [`Ports`] object
-    #[inline]
+    #[inline(always)]
     pub fn dev_mut<D: Ports>(&mut self) -> &mut D {
         self.dev_mut_at(D::BASE)
     }
 
     /// Reads a byte from RAM
-    #[inline]
+    #[inline(always)]
     pub fn ram_read_byte(&self, addr: u16) -> u8 {
         self.ram[usize::from(addr)]
     }
 
     /// Writes a byte to RAM
-    #[inline]
+    #[inline(always)]
     pub fn ram_write_byte(&mut self, addr: u16, v: u8) {
         self.ram[usize::from(addr)] = v;
     }
 
     /// Shared borrow of the working stack
-    #[inline]
+    #[inline(always)]
     pub fn stack(&self) -> &Stack<'a> {
         &self.stack
     }
 
     /// Mutable borrow of the working stack
-    #[inline]
+    #[inline(always)]
     pub fn stack_mut(&mut self) -> &mut Stack<'a> {
         &mut self.stack
     }
 
     /// Shared borrow of the return stack
-    #[inline]
+    #[inline(always)]
     pub fn ret(&self) -> &Stack<'_> {
         &self.ret
     }
 
     /// Mutable borrow of the return stack
-    #[inline]
+    #[inline(always)]
     pub fn ret_mut(&mut self) -> &mut Stack<'a> {
         &mut self.ret
     }
@@ -564,8 +572,7 @@ impl<'a> Uxn<'a> {
     }
 
     /// Asserts that the given [`Ports`] object is of size [`DEV_SIZE`]
-    #[inline]
-    fn check_dev_size<D: Ports>() {
+    const fn check_dev_size<D: Ports>() {
         struct AssertDevSize<D>(D);
         impl<D> AssertDevSize<D> {
             const ASSERT: () = if core::mem::size_of::<D>() != DEV_SIZE {
@@ -839,7 +846,7 @@ impl<'a> Uxn<'a> {
     }
 
     /// Computes a jump, either relative (signed) or absolute
-    #[inline]
+    #[inline(always)]
     fn jump_offset(pc: u16, v: Value) -> u16 {
         match v {
             Value::Short(dst) => dst,
