@@ -2,12 +2,17 @@
 #![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
 #![cfg_attr(not(any(test, feature = "native")), forbid(unsafe_code))]
+#![cfg_attr(feature = "tailcall", feature(explicit_tail_calls))]
+#![cfg_attr(feature = "tailcall", expect(incomplete_features))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
 #[cfg(feature = "native")]
 mod native;
+
+#[cfg(feature = "tailcall")]
+mod tailcall;
 
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
@@ -56,6 +61,10 @@ pub enum Backend {
     #[cfg(feature = "native")]
     /// Use hand-written threaded assembly
     Native,
+
+    #[cfg(feature = "tailcall")]
+    /// Use a tail-call interpreter
+    Tailcall,
 }
 
 /// Virtual stack, which is aware of `keep` and `short` modes
