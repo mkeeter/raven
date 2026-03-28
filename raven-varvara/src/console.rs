@@ -1,6 +1,6 @@
 use crate::{Event, EventData};
 use std::mem::offset_of;
-use uxn::{Ports, Uxn};
+use uxn::{Ports, UxnCore};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
 pub struct Console {
@@ -74,7 +74,7 @@ impl Console {
         }
     }
 
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo(&mut self, vm: &mut UxnCore, target: u8) {
         let v = vm.dev::<ConsolePorts>();
         match target {
             ConsolePorts::WRITE => {
@@ -86,14 +86,14 @@ impl Console {
             _ => (),
         }
     }
-    pub fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
+    pub fn dei(&mut self, _vm: &mut UxnCore, _target: u8) {
         // Nothing to do here; data is pre-populated in `vm.dev` memory
     }
 
     /// Sets the appropriate type value if there are arguments to be parsed
     ///
     /// This should be called before running the reset vector
-    pub fn set_has_args(&mut self, vm: &mut Uxn, has_args: bool) {
+    pub fn set_has_args(&mut self, vm: &mut UxnCore, has_args: bool) {
         if has_args {
             let p = vm.dev_mut::<ConsolePorts>();
             p.type_ = 1;
@@ -103,7 +103,7 @@ impl Console {
     /// Sets the current character type
     ///
     /// This should be called before sending a console event
-    pub fn set_type(&mut self, vm: &mut Uxn, ty: Type) {
+    pub fn set_type(&mut self, vm: &mut UxnCore, ty: Type) {
         let p = vm.dev_mut::<ConsolePorts>();
         p.type_ = ty as u8;
     }
@@ -112,7 +112,7 @@ impl Console {
     ///
     /// Note that this function does not set the type, which should be
     /// configured by calling [`Self::set_type`] before firing the vector.
-    pub fn update(&self, vm: &Uxn, c: u8) -> Event {
+    pub fn update(&self, vm: &UxnCore, c: u8) -> Event {
         let p = vm.dev::<ConsolePorts>();
         let vector = p.vector.get();
         Event {

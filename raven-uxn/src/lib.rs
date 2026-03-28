@@ -273,7 +273,30 @@ impl Stack<'_> {
 }
 
 /// The virtual machine itself
-pub struct Uxn<'a> {
+pub struct Uxn<'a>(Option<UxnCore<'a>>);
+
+impl<'a> Uxn<'a> {
+    /// Build a new `Uxn` with zeroed memory
+    pub fn new(mem: &'a mut UxnMem, backend: Backend) -> Self {
+        Self(Some(UxnCore::new(mem, backend)))
+    }
+}
+
+impl<'a> core::ops::Deref for Uxn<'a> {
+    type Target = UxnCore<'a>;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl<'a> core::ops::DerefMut for Uxn<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().unwrap()
+    }
+}
+
+/// The virtual machine itself
+pub struct UxnCore<'a> {
     /// Device memory
     dev: &'a mut [u8; 256],
     /// 64 KiB of VM memory
@@ -354,7 +377,7 @@ impl UxnMem {
     }
 }
 
-impl<'a> Uxn<'a> {
+impl<'a> UxnCore<'a> {
     /// Build a new `Uxn` with zeroed memory
     pub fn new(mem: &'a mut UxnMem, backend: Backend) -> Self {
         let UxnMem {
@@ -363,6 +386,7 @@ impl<'a> Uxn<'a> {
             rstack,
             ram,
         } = mem;
+        ram.fill(0);
         Self {
             dev,
             ram,
@@ -1603,7 +1627,7 @@ pub trait Device {
     ///
     /// This function must write its output byte to `vm.dev[target]`; the CPU
     /// evaluation loop will then copy this value to the stack.
-    fn dei(&mut self, vm: &mut Uxn, target: u8);
+    fn dei(&mut self, vm: &mut UxnCore, target: u8);
 
     /// Performs the `DEO` operation on the given target
     ///
@@ -1613,7 +1637,7 @@ pub trait Device {
     /// Returns `true` if the CPU should keep running, `false` if it should
     /// exit.
     #[must_use]
-    fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool;
+    fn deo(&mut self, vm: &mut UxnCore, target: u8) -> bool;
 }
 
 /// Trait for a type which can be cast to a device ports `struct`
@@ -1631,10 +1655,10 @@ pub trait Ports:
 /// Device which does nothing
 pub struct EmptyDevice;
 impl Device for EmptyDevice {
-    fn dei(&mut self, _vm: &mut Uxn, _target: u8) {
+    fn dei(&mut self, _vm: &mut UxnCore, _target: u8) {
         // nothing to do here
     }
-    fn deo(&mut self, _vm: &mut Uxn, _target: u8) -> bool {
+    fn deo(&mut self, _vm: &mut UxnCore, _target: u8) -> bool {
         // nothing to do here, keep running
         true
     }

@@ -26,7 +26,7 @@ pub use mouse::MouseState;
 
 pub use console::spawn_worker as spawn_console_worker;
 
-use uxn::{Device, Ports, Uxn};
+use uxn::{Device, Ports, Uxn, UxnCore};
 
 /// Write to execute before calling the event vector
 #[derive(Copy, Clone, Debug)]
@@ -124,7 +124,7 @@ impl Default for Varvara {
 }
 
 impl Device for Varvara {
-    fn deo(&mut self, vm: &mut Uxn, target: u8) -> bool {
+    fn deo(&mut self, vm: &mut UxnCore, target: u8) -> bool {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.deo(vm, target),
             console::ConsolePorts::BASE => self.console.deo(vm, target),
@@ -140,7 +140,7 @@ impl Device for Varvara {
         }
         !self.system.should_exit()
     }
-    fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    fn dei(&mut self, vm: &mut UxnCore, target: u8) {
         match target & 0xF0 {
             system::SystemPorts::BASE => self.system.dei(vm, target),
             console::ConsolePorts::BASE => self.console.dei(vm, target),

@@ -1,6 +1,6 @@
 use chrono::{Datelike, Timelike};
 use std::mem::offset_of;
-use uxn::{Ports, Uxn};
+use uxn::{Ports, UxnCore};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
 #[derive(IntoBytes, KnownLayout, Immutable, FromBytes)]
@@ -37,10 +37,10 @@ impl DatetimePorts {
 pub struct Datetime;
 
 impl Datetime {
-    pub fn deo(&mut self, _vm: &mut Uxn, _target: u8) {
+    pub fn deo(&mut self, _vm: &mut UxnCore, _target: u8) {
         // Time in Varvara, just like in real live, cannot be changed
     }
-    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn dei(&mut self, vm: &mut UxnCore, target: u8) {
         let d = vm.dev_mut::<DatetimePorts>();
         let t = chrono::Local::now();
         match target {

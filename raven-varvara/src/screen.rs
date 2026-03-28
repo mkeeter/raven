@@ -1,6 +1,6 @@
 use crate::Event;
 use std::mem::offset_of;
-use uxn::{Ports, Uxn};
+use uxn::{Ports, UxnCore};
 use zerocopy::{BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, U16};
 
 #[derive(IntoBytes, KnownLayout, Immutable, FromBytes)]
@@ -177,7 +177,7 @@ impl Screen {
     }
 
     /// Gets the current frame, returning a `(buffer, width, height)` tuple
-    pub fn frame(&mut self, vm: &Uxn) -> &[u8] {
+    pub fn frame(&mut self, vm: &UxnCore) -> &[u8] {
         let prev_colors = self.colors;
         let sys = vm.dev::<crate::system::SystemPorts>();
         self.colors = [0, 1, 2, 3].map(|i| sys.color(i));
@@ -208,7 +208,7 @@ impl Screen {
     }
 
     /// Executes the `pixel` operation
-    fn pixel(&mut self, vm: &mut Uxn) {
+    fn pixel(&mut self, vm: &mut UxnCore) {
         let v = vm.dev::<ScreenPorts>();
         let p = v.pixel;
         let auto = v.auto;
@@ -236,7 +236,7 @@ impl Screen {
         }
     }
 
-    fn sprite(&mut self, vm: &mut Uxn) {
+    fn sprite(&mut self, vm: &mut UxnCore) {
         let v = vm.dev::<ScreenPorts>();
         let s = v.sprite;
 
@@ -340,7 +340,7 @@ impl Screen {
     }
 
     /// Executes a DEO command against the screen
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo(&mut self, vm: &mut UxnCore, target: u8) {
         let v = vm.dev::<ScreenPorts>();
         self.changed = true;
         match target {
@@ -363,7 +363,7 @@ impl Screen {
     }
 
     /// Executes a DEI command against the screen
-    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn dei(&mut self, vm: &mut UxnCore, target: u8) {
         let v = vm.dev_mut::<ScreenPorts>();
         match target {
             ScreenPorts::WIDTH_R => {
@@ -377,7 +377,7 @@ impl Screen {
     }
 
     /// Called on screen update; returns the screen vector
-    pub fn update(&mut self, vm: &mut Uxn) -> Event {
+    pub fn update(&mut self, vm: &mut UxnCore) -> Event {
         // Nothing to do here, but return the screen vector
         let vector = vm.dev::<ScreenPorts>().vector.get();
         Event { data: None, vector }
