@@ -14,7 +14,8 @@ fuzz:
 
 # Build a web application in `raven-gui/dist`
 dist:
-    cargo build --release -praven-gui --target wasm32-unknown-unknown
+    rustup +nightly target add wasm32-unknown-unknown
+    cargo +nightly build --release -praven-gui --features=tailcall --target wasm32-unknown-unknown
     wasm-bindgen target/wasm32-unknown-unknown/release/raven-gui.wasm --out-dir {{PKG_DIR}} --target web
     wasm-opt -O {{PKG_DIR}}/raven-gui_bg.wasm -o {{PKG_WA}}
     mkdir -p  {{DIST_DIR}}

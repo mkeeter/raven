@@ -12,6 +12,7 @@ type TailFn = for<'a> extern "rust-preserve-none" fn(
     &mut dyn Device,
 ) -> (UxnCore<'a>, u16);
 
+#[cfg_attr(target_arch = "wasm32", target_feature(enable = "tail-call"))]
 pub fn entry<'a>(
     core: UxnCore<'a>,
     dev: &mut dyn Device,

@@ -323,6 +323,9 @@ impl<'a> Uxn<'a> {
     }
 
     /// Runs the VM starting at the given address until it terminates
+    ///
+    /// The chosen backend is persisted and will be used in subsequent calls to
+    /// [`self.run_with_current_backend(..)`](Self::run_with_current_backend).
     pub fn run<D: Device>(
         &mut self,
         dev: &mut D,

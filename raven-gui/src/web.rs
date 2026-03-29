@@ -40,13 +40,17 @@ pub fn run() -> Result<()> {
         .unwrap_or(include_bytes!("../../roms/controller.rom"));
 
     let mem = UxnMem::boxed();
-    let mut vm = Uxn::new(Box::leak(mem), Backend::Interpreter);
+    let mut vm = Uxn::new(Box::leak(mem));
     let mut dev = Varvara::new();
     let extra = vm.reset(rom);
     dev.reset(extra);
 
     // Run the reset vector
-    vm.run(&mut dev, 0x100);
+    #[cfg(feature = "tailcall")]
+    let backend = Backend::Tailcall;
+    #[cfg(not(feature = "tailcall"))]
+    let backend = Backend::Interpreter;
+    vm.run(&mut dev, 0x100, backend);
     dev.output(&vm).check()?;
 
     let size @ (width, height) = dev.output(&vm).size;
@@ -169,7 +173,6 @@ pub fn run() -> Result<()> {
     file_load.set_onchange(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
-    let mut _audio = None;
     let mut audio_data = Some(dev.audio_streams());
     let audio_check = document
         .get_element_by_id("audio-check")
@@ -177,11 +180,11 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::HtmlElement>()
         .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
 
-    #[expect(unused_assignments)] // audio must stay alive in parent context
     let a = Closure::<dyn FnMut()>::new(move || {
         if let Some(d) = audio_data.take() {
             info!("setting up audio");
-            _audio = audio_setup(d);
+            // leak audio player so that it keeps playing
+            std::mem::forget(audio_setup(d));
         }
         let audio_check = document
             .get_element_by_id("audio-check")
