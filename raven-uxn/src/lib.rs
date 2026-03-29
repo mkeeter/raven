@@ -1,5 +1,5 @@
 //! Uxn virtual machine
-#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 #![warn(missing_docs)]
 #![cfg_attr(not(any(test, feature = "native")), forbid(unsafe_code))]
 // Nightly features for tailcall implementation
@@ -71,17 +71,32 @@ impl<'a> Stack<'a> {
 
 /// Uxn evaluation backend
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum Backend {
-    /// Use a bytecode interpreter
+    /// Bytecode interpreter
     Interpreter,
 
     #[cfg(feature = "native")]
-    /// Use hand-written threaded assembly
+    /// Hand-written threaded assembly
     Native,
 
     #[cfg(feature = "tailcall")]
-    /// Use a tail-call interpreter
+    /// Tail-call interpreter
     Tailcall,
+}
+
+#[cfg(feature = "std")]
+impl std::fmt::Display for Backend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Backend::Interpreter => "interpreter",
+            #[cfg(feature = "native")]
+            Backend::Native => "native",
+            #[cfg(feature = "tailcall")]
+            Backend::Tailcall => "tailcall",
+        };
+        write!(f, "{s}")
+    }
 }
 
 /// Virtual stack, which is aware of `keep` and `short` modes

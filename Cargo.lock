@@ -2331,7 +2331,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "raven-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2345,7 +2345,7 @@ dependencies = [
 
 [[package]]
 name = "raven-gui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2364,8 +2364,9 @@ dependencies = [
 
 [[package]]
 name = "raven-uxn"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "clap",
  "criterion",
  "rustversion",
  "workspace-hack",
@@ -2374,7 +2375,7 @@ dependencies = [
 
 [[package]]
 name = "raven-varvara"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "criterion",

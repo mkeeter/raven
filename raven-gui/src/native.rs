@@ -1,7 +1,7 @@
 use anyhow::{Context, anyhow};
 use std::{io::Read, sync::mpsc};
 
-use uxn::{Backend, Uxn, UxnMem};
+use uxn::{Uxn, UxnMem};
 use varvara::Varvara;
 
 use anyhow::Result;
@@ -23,9 +23,9 @@ struct Args {
     #[clap(long)]
     scale: Option<f32>,
 
-    /// Use the native assembly Uxn implementation
-    #[clap(long)]
-    native: bool,
+    /// Interpreter backend
+    #[clap(long, default_value_t = uxn::Backend::Interpreter)]
+    backend: uxn::Backend,
 
     /// Arguments to pass into the VM
     #[arg(trailing_var_arg = true)]
@@ -56,15 +56,7 @@ pub fn run() -> Result<()> {
 
     // Run the reset vector
     let start = std::time::Instant::now();
-    vm.run(
-        &mut dev,
-        0x100,
-        if args.native {
-            Backend::Native
-        } else {
-            Backend::Interpreter
-        },
-    );
+    vm.run(&mut dev, 0x100, args.backend);
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;

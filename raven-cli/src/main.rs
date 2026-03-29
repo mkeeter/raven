@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use uxn::{Backend, Uxn, UxnMem};
+use uxn::{Uxn, UxnMem};
 use varvara::Varvara;
 
 use anyhow::{Context, Result};
@@ -15,9 +15,9 @@ struct Args {
     /// ROM to load and execute
     rom: PathBuf,
 
-    /// Use the native Uxn implementation
-    #[clap(long)]
-    native: bool,
+    /// Interpreter backend
+    #[clap(long, default_value_t = uxn::Backend::Interpreter)]
+    backend: uxn::Backend,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -43,15 +43,10 @@ fn main() -> Result<()> {
     let data = vm.reset(&rom);
     dev.reset(data);
     dev.init_args(&mut vm, &args.args);
-    let backend = if args.native {
-        Backend::Native
-    } else {
-        Backend::Interpreter
-    };
 
     // Run the reset vector
     let start = std::time::Instant::now();
-    vm.run(&mut dev, 0x100, backend);
+    vm.run(&mut dev, 0x100, args.backend);
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;

@@ -1,6 +1,6 @@
 [package]
 name = "raven-varvara"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
@@ -13,7 +13,7 @@ chrono.workspace = true
 log.workspace = true
 static_assertions.workspace = true
 zerocopy.workspace = true
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2", default-features = false, features = ["alloc"] }
+uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.3.0", default-features = false, features = ["alloc"] }
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [features]

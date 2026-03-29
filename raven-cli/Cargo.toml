@@ -1,6 +1,6 @@
 [package]
 name = "raven-cli"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
@@ -15,8 +15,8 @@ env_logger.workspace = true
 locked-tripwire.workspace = true
 log.workspace = true
 
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2.0" }
-varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.2.0" }
+uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.3.0", features = ["clap"] }
+varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.3.0" }
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [features]

@@ -1,3 +1,6 @@
+# 0.3.0
+TODO write stuff here
+
 # 0.2.1
 - Fix bug in initial Varvara screen buffer allocation
 - Bump dependencies to latest releases
