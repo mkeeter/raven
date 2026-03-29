@@ -17,11 +17,11 @@ fn bench_startup(c: &mut Criterion, rom: &[u8], backend: Backend, name: &str) {
     c.bench_function(name, |b| {
         b.iter(|| {
             let mut mem = UxnMem::boxed();
-            let mut vm = Uxn::new(&mut mem, backend);
+            let mut vm = Uxn::new(&mut mem);
             let mut dev = Varvara::new();
             let remaining = vm.reset(rom);
             dev.reset(remaining);
-            std::hint::black_box(vm.run(&mut dev, 0x100));
+            std::hint::black_box(vm.run(&mut dev, 0x100, backend));
         });
     });
 }

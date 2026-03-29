@@ -243,16 +243,16 @@ mod test {
                 mem_interp.ram[i] = i as u8;
             }
         }
-        let mut vm_native = Uxn::new(&mut mem_native, Backend::Native);
+        let mut vm_native = Uxn::new(&mut mem_native);
         let r = vm_native.reset(&cmd);
         assert!(r.is_empty());
 
-        let mut vm_interp = Uxn::new(&mut mem_interp, Backend::Interpreter);
+        let mut vm_interp = Uxn::new(&mut mem_interp);
         let r = vm_interp.reset(&cmd);
         assert!(r.is_empty());
 
-        let pc_native = vm_native.run(&mut dev, 0x100);
-        let pc_interp = vm_interp.run(&mut dev, 0x100);
+        let pc_native = vm_native.run(&mut dev, 0x100, Backend::Native);
+        let pc_interp = vm_interp.run(&mut dev, 0x100, Backend::Interpreter);
         assert_eq!(pc_native, pc_interp, "{op_name}: pc mismatch");
 
         assert_eq!(

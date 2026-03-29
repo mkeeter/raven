@@ -301,7 +301,7 @@ impl Varvara {
             if let Some(d) = e.data {
                 vm.write_dev_mem(d.addr, d.value);
             }
-            vm.run(self, e.vector);
+            vm.run_with_current_backend(self, e.vector);
             if let Some(d) = e.data
                 && d.clear
             {

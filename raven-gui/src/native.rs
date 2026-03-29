@@ -46,14 +46,7 @@ pub fn run() -> Result<()> {
     f.read_to_end(&mut rom).context("failed to read file")?;
 
     let mem = UxnMem::boxed();
-    let mut vm = Uxn::new(
-        Box::leak(mem),
-        if args.native {
-            Backend::Native
-        } else {
-            Backend::Interpreter
-        },
-    );
+    let mut vm = Uxn::new(Box::leak(mem));
     let mut dev = Varvara::new();
     let extra = vm.reset(&rom);
     dev.reset(extra);
@@ -63,7 +56,15 @@ pub fn run() -> Result<()> {
 
     // Run the reset vector
     let start = std::time::Instant::now();
-    vm.run(&mut dev, 0x100);
+    vm.run(
+        &mut dev,
+        0x100,
+        if args.native {
+            Backend::Native
+        } else {
+            Backend::Interpreter
+        },
+    );
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;

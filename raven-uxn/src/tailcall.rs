@@ -1,4 +1,4 @@
-use crate::{Backend, Device, Stack, Uxn, UxnCore};
+use crate::{Backend, Device, Stack, UxnCore};
 
 type TailFn = for<'a> fn(
     &'a mut [u8; 256],
@@ -11,9 +11,12 @@ type TailFn = for<'a> fn(
     &mut dyn Device,
 ) -> (UxnCore<'a>, u16);
 
-pub fn run(uxn: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
-    let core = uxn.0.take().unwrap();
-    let (core, pc) = dispatch(
+pub fn entry<'a>(
+    core: UxnCore<'a>,
+    dev: &mut dyn Device,
+    pc: u16,
+) -> (UxnCore<'a>, u16) {
+    dispatch(
         core.stack.data,
         core.stack.index,
         core.ret.data,
@@ -22,9 +25,7 @@ pub fn run(uxn: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
         core.ram,
         pc,
         dev,
-    );
-    uxn.0 = Some(core);
-    pc
+    )
 }
 
 #[expect(clippy::too_many_arguments)]

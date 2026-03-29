@@ -38,22 +38,20 @@ fn main() -> Result<()> {
     f.read_to_end(&mut rom).context("failed to read file")?;
 
     let mut mem = UxnMem::boxed();
-    let mut vm = Uxn::new(
-        &mut mem,
-        if args.native {
-            Backend::Native
-        } else {
-            Backend::Interpreter
-        },
-    );
+    let mut vm = Uxn::new(&mut mem);
     let mut dev = Varvara::new();
     let data = vm.reset(&rom);
     dev.reset(data);
     dev.init_args(&mut vm, &args.args);
+    let backend = if args.native {
+        Backend::Native
+    } else {
+        Backend::Interpreter
+    };
 
     // Run the reset vector
     let start = std::time::Instant::now();
-    vm.run(&mut dev, 0x100);
+    vm.run(&mut dev, 0x100, backend);
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;

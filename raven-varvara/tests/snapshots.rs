@@ -14,11 +14,11 @@ fn get_snapshot(
     backend: Backend,
 ) -> Result<Snapshot, std::io::Error> {
     let mut mem = UxnMem::boxed();
-    let mut vm = Uxn::new(&mut mem, backend);
+    let mut vm = Uxn::new(&mut mem);
     let mut dev = Varvara::new();
     let data = vm.reset(rom);
     dev.reset(data);
-    vm.run(&mut dev, 0x100); // init vector
+    vm.run(&mut dev, 0x100, backend); // init vector
     let out = dev.output(&vm);
     out.check()?;
     let size = out.size;

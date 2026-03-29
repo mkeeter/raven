@@ -286,8 +286,54 @@ pub struct Uxn<'a>(Option<UxnCore<'a>>);
 
 impl<'a> Uxn<'a> {
     /// Build a new `Uxn` with zeroed memory
-    pub fn new(mem: &'a mut UxnMem, backend: Backend) -> Self {
-        Self(Some(UxnCore::new(mem, backend)))
+    pub fn new(mem: &'a mut UxnMem) -> Self {
+        Self(Some(UxnCore::new(mem)))
+    }
+
+    /// Runs the VM starting at the given address until it terminates
+    pub fn run<D: Device>(
+        &mut self,
+        dev: &mut D,
+        pc: u16,
+        backend: Backend,
+    ) -> u16 {
+        self.backend = backend;
+        self.run_with_current_backend(dev, pc)
+    }
+
+    /// Runs the VM starting at the given address until it terminates
+    ///
+    /// The current backend is used, so this function is appropriate for
+    /// callbacks within a device (e.g. an event handler).
+    #[inline]
+    pub fn run_with_current_backend<D: Device>(
+        &mut self,
+        dev: &mut D,
+        mut pc: u16,
+    ) -> u16 {
+        match self.backend {
+            Backend::Interpreter => {
+                let core: &mut UxnCore = &mut *self;
+                loop {
+                    let op = core.next(&mut pc);
+                    let Some(next) = core.op(op, dev, pc) else {
+                        break pc;
+                    };
+                    pc = next;
+                }
+            }
+
+            #[cfg(feature = "native")]
+            Backend::Native => native::entry(self, dev, pc),
+
+            #[cfg(feature = "tailcall")]
+            Backend::Tailcall => {
+                let core = self.0.take().unwrap();
+                let (core, pc) = tailcall::entry(core, dev, pc);
+                self.0 = Some(core);
+                pc
+            }
+        }
     }
 }
 
@@ -388,7 +434,7 @@ impl UxnMem {
 
 impl<'a> UxnCore<'a> {
     /// Build a new `Uxn` with zeroed memory
-    pub fn new(mem: &'a mut UxnMem, backend: Backend) -> Self {
+    pub fn new(mem: &'a mut UxnMem) -> Self {
         let UxnMem {
             dev,
             stack,
@@ -401,7 +447,7 @@ impl<'a> UxnCore<'a> {
             ram,
             stack: Stack::new(stack),
             ret: Stack::new(rstack),
-            backend,
+            backend: Backend::Interpreter,
         }
     }
 
@@ -481,22 +527,6 @@ impl<'a> UxnCore<'a> {
     #[inline(always)]
     pub fn write_dev_mem(&mut self, addr: u8, value: u8) {
         self.dev[usize::from(addr)] = value;
-    }
-
-    /// Runs the VM starting at the given address until it terminates
-    #[inline]
-    pub fn run<D: Device>(&mut self, dev: &mut D, mut pc: u16) -> u16 {
-        match self.backend {
-            Backend::Interpreter => loop {
-                let op = self.next(&mut pc);
-                let Some(next) = self.op(op, dev, pc) else {
-                    break pc;
-                };
-                pc = next;
-            },
-            #[cfg(feature = "native")]
-            Backend::Native => native::entry(self, dev, pc),
-        }
     }
 
     /// Runs until the program terminates or we hit a stop condition
@@ -2065,7 +2095,7 @@ mod test {
 
     fn parse_and_test(s: &str) {
         let mut mem = UxnMem::new();
-        let mut vm = Uxn::new(&mut mem, Backend::Interpreter);
+        let mut vm = Uxn::new(&mut mem);
         let mut iter = s.split_whitespace();
         let mut op = None;
         let mut dev = EmptyDevice;
@@ -2093,7 +2123,7 @@ mod test {
                     }
                 }
                 vm.ram[0] = op.unwrap();
-                vm.run(&mut dev, 0);
+                vm.run(&mut dev, 0, Backend::Interpreter);
                 let mut actual = vec![];
                 while vm.stack.index != u8::MAX {
                     actual.push(vm.stack.pop_byte());
@@ -2198,13 +2228,13 @@ mod test {
     #[test]
     fn fib() {
         let mut mem = UxnMem::boxed();
-        let mut vm = Uxn::new(&mut mem, Backend::Interpreter);
+        let mut vm = Uxn::new(&mut mem);
 
         let mut uxn_fib = |i| {
             let _ = vm.reset(FIB);
             vm.ram_write_byte(0x101, i);
             let mut dev = EmptyDevice;
-            vm.run(&mut dev, 0x100);
+            vm.run(&mut dev, 0x100, Backend::Interpreter);
             vm.stack_view::<0b001>().pop_short()
         };
 

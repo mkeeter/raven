@@ -90,7 +90,7 @@ impl<'a> Stage<'a> {
         let data = self.vm.reset(data);
         self.dev.reset(data);
         let start = web_time::Instant::now();
-        self.vm.run(&mut self.dev, 0x100);
+        self.vm.run_with_current_backend(&mut self.dev, 0x100);
         info!("completed startup in {:?}", start.elapsed());
         let out = self.dev.output(&self.vm);
         out.check()?;
