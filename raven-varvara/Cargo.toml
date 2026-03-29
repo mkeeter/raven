@@ -19,6 +19,7 @@ workspace-hack = { version = "0.1", path = "../workspace-hack" }
 [features]
 default = ["native"]
 native = ["uxn/native"]
+tailcall = []
 
 [dev-dependencies]
 criterion.workspace = true

@@ -31,6 +31,8 @@ fn mandelbrot_benchmark(c: &mut Criterion) {
     bench_startup(c, &rom, Backend::Interpreter, "mandelbrot/interpreter");
     #[cfg(feature = "native")]
     bench_startup(c, &rom, Backend::Native, "mandelbrot/native");
+    #[cfg(feature = "tailcall")]
+    bench_startup(c, &rom, Backend::Tailcall, "mandelbrot/tailcall");
 }
 
 criterion_group!(benches, mandelbrot_benchmark);

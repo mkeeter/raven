@@ -18,6 +18,8 @@ fn fibonacci_benchmark(c: &mut Criterion) {
     bench_fib(c, Backend::Interpreter, "fibonacci/interpreter");
     #[cfg(feature = "native")]
     bench_fib(c, Backend::Native, "fibonacci/native");
+    #[cfg(feature = "tailcall")]
+    bench_fib(c, Backend::Tailcall, "fibonacci/tailcall");
 }
 
 criterion_group!(benches, fibonacci_benchmark);

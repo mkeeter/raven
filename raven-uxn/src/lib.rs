@@ -2289,7 +2289,7 @@ mod test {
                     }
                 }
                 let mut ram = UxnMem::boxed();
-                let mut $vm = Uxn::new(&mut ram, Backend::Interpreter);
+                let mut $vm = Uxn::new(&mut ram);
                 let _ = $vm.reset($data);
                 for d in $data {
                     $vm.stack.push(Value::Byte(*d));

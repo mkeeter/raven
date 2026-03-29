@@ -7,6 +7,7 @@ type TailFn = for<'a> fn(
     u8,
     &'a mut [u8; 256],
     &'a mut [u8; 65536],
+    Backend,
     u16,
     &mut dyn Device,
 ) -> (UxnCore<'a>, u16);
@@ -23,6 +24,7 @@ pub fn entry<'a>(
         core.ret.index,
         core.dev,
         core.ram,
+        core.backend,
         pc,
         dev,
     )
@@ -36,6 +38,7 @@ fn dispatch<'a>(
     rstack_index: u8,
     dev: &'a mut [u8; 256],
     ram: &'a mut [u8; 65536],
+    backend: Backend,
     mut pc: u16,
     vdev: &mut dyn Device,
 ) -> (UxnCore<'a>, u16) {
@@ -50,7 +53,7 @@ fn dispatch<'a>(
         },
         dev,
         ram,
-        backend: Backend::Tailcall, // unused
+        backend,
     };
     let op = core.next(&mut pc);
     const TABLE: [TailFn; 256] = [
@@ -318,6 +321,7 @@ fn dispatch<'a>(
         core.ret.index,
         core.dev,
         core.ram,
+        core.backend,
         pc,
         vdev,
     )
@@ -333,6 +337,7 @@ macro_rules! tail_fn {
             rstack_index: u8,
             dev: &'a mut [u8; 256],
             ram: &'a mut [u8; 65536],
+            backend: Backend,
             pc: u16,
             vdev: &mut dyn Device,
         ) -> (UxnCore<'a>, u16) {
@@ -347,7 +352,7 @@ macro_rules! tail_fn {
                 },
                 dev,
                 ram,
-                backend: Backend::Tailcall, // unused
+                backend,
             };
             match core.$name::<$($flags)?>(pc) {
                 Some(pc) => {
@@ -358,6 +363,7 @@ macro_rules! tail_fn {
                         core.ret.index,
                         core.dev,
                         core.ram,
+                        core.backend,
                         pc,
                         vdev,
                     )
@@ -411,6 +417,7 @@ fn dei<'a, const FLAGS: u8>(
     rstack_index: u8,
     dev: &'a mut [u8; 256],
     ram: &'a mut [u8; 65536],
+    backend: Backend,
     pc: u16,
     vdev: &mut dyn Device,
 ) -> (UxnCore<'a>, u16) {
@@ -425,7 +432,7 @@ fn dei<'a, const FLAGS: u8>(
         },
         dev,
         ram,
-        backend: Backend::Tailcall, // unused
+        backend,
     };
     match core.dei::<FLAGS>(vdev, pc) {
         Some(pc) => {
@@ -436,6 +443,7 @@ fn dei<'a, const FLAGS: u8>(
                 core.ret.index,
                 core.dev,
                 core.ram,
+                core.backend,
                 pc,
                 vdev,
             )
@@ -452,6 +460,7 @@ fn deo<'a, const FLAGS: u8>(
     rstack_index: u8,
     dev: &'a mut [u8; 256],
     ram: &'a mut [u8; 65536],
+    backend: Backend,
     pc: u16,
     vdev: &mut dyn Device,
 ) -> (UxnCore<'a>, u16) {
@@ -466,7 +475,7 @@ fn deo<'a, const FLAGS: u8>(
         },
         dev,
         ram,
-        backend: Backend::Tailcall, // unused
+        backend,
     };
     match core.deo::<FLAGS>(vdev, pc) {
         Some(pc) => {
@@ -477,6 +486,7 @@ fn deo<'a, const FLAGS: u8>(
                 core.ret.index,
                 core.dev,
                 core.ram,
+                core.backend,
                 pc,
                 vdev,
             )
