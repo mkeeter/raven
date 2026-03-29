@@ -32,35 +32,35 @@ macro_rules! define_extern_fns {
 
 define_extern_fns!(
     fn deo_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b000>(dev.0, 0).is_some()
+        vm.deo::<0b000>(0, dev.0).is_some()
     }
 
     fn deo_2_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b001>(dev.0, 0).is_some()
+        vm.deo::<0b001>(0, dev.0).is_some()
     }
 
     fn deo_r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b010>(dev.0, 0).is_some()
+        vm.deo::<0b010>(0, dev.0).is_some()
     }
 
     fn deo_2r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b011>(dev.0, 0).is_some()
+        vm.deo::<0b011>(0, dev.0).is_some()
     }
 
     fn deo_k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b100>(dev.0, 0).is_some()
+        vm.deo::<0b100>(0, dev.0).is_some()
     }
 
     fn deo_2k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b101>(dev.0, 0).is_some()
+        vm.deo::<0b101>(0, dev.0).is_some()
     }
 
     fn deo_kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b110>(dev.0, 0).is_some()
+        vm.deo::<0b110>(0, dev.0).is_some()
     }
 
     fn deo_2kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b111>(dev.0, 0).is_some()
+        vm.deo::<0b111>(0, dev.0).is_some()
     }
 );
 
@@ -69,34 +69,34 @@ define_extern_fns!(
 
 define_extern_fns!(
     fn dei_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b000>(dev.0, 0).is_some()
+        vm.dei::<0b000>(0, dev.0).is_some()
     }
 
     fn dei_2_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b001>(dev.0, 0).is_some()
+        vm.dei::<0b001>(0, dev.0).is_some()
     }
 
     fn dei_r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b010>(dev.0, 0).is_some()
+        vm.dei::<0b010>(0, dev.0).is_some()
     }
     fn dei_2r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b011>(dev.0, 0).is_some()
+        vm.dei::<0b011>(0, dev.0).is_some()
     }
 
     fn dei_k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b100>(dev.0, 0).is_some()
+        vm.dei::<0b100>(0, dev.0).is_some()
     }
 
     fn dei_2k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b101>(dev.0, 0).is_some()
+        vm.dei::<0b101>(0, dev.0).is_some()
     }
 
     fn dei_kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b110>(dev.0, 0).is_some()
+        vm.dei::<0b110>(0, dev.0).is_some()
     }
 
     fn dei_2kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b111>(dev.0, 0).is_some()
+        vm.dei::<0b111>(0, dev.0).is_some()
     }
 );
 

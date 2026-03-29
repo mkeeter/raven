@@ -329,6 +329,13 @@ fn dispatch<'a>(
 
 macro_rules! tail_fn {
     ($name:ident $(::<$flags:ident>)?) => {
+        tail_fn!($name $(::<$flags>)?[][vdev: &mut dyn Device]);
+    };
+    ($name:ident $(::<$flags:ident>)?($($arg:ident: $ty:ty),*)) => {
+        tail_fn!($name $(::<$flags>)?[$($arg: $ty),*][]);
+    };
+    ($name:ident $(::<$flags:ident>)?[$($arg0:ident: $ty0:ty),*][$($arg1:ident: $ty1:ty),*]) => {
+
         #[expect(clippy::too_many_arguments)]
         fn $name<'a, $(const $flags: u8)?>(
             stack_data: &'a mut [u8; 256],
@@ -339,7 +346,8 @@ macro_rules! tail_fn {
             ram: &'a mut [u8; 65536],
             backend: Backend,
             pc: u16,
-            vdev: &mut dyn Device,
+            $($arg0: $ty0),*
+            $($arg1: $ty1),*
         ) -> (UxnCore<'a>, u16) {
             let mut core = UxnCore {
                 stack: Stack {
@@ -354,7 +362,7 @@ macro_rules! tail_fn {
                 ram,
                 backend,
             };
-            match core.$name::<$($flags)?>(pc) {
+            match core.$name::<$($flags)?>(pc, $($arg0),*) {
                 Some(pc) => {
                     become dispatch(
                         core.stack.data,
@@ -365,7 +373,8 @@ macro_rules! tail_fn {
                         core.ram,
                         core.backend,
                         pc,
-                        vdev,
+                        $($arg0),*
+                        $($arg1),*
                     )
                 }
                 None => (core, pc),
@@ -408,89 +417,5 @@ tail_fn!(ora::<FLAGS>);
 tail_fn!(eor::<FLAGS>);
 tail_fn!(sft::<FLAGS>);
 tail_fn!(lit::<FLAGS>);
-
-#[expect(clippy::too_many_arguments)]
-fn dei<'a, const FLAGS: u8>(
-    stack_data: &'a mut [u8; 256],
-    stack_index: u8,
-    rstack_data: &'a mut [u8; 256],
-    rstack_index: u8,
-    dev: &'a mut [u8; 256],
-    ram: &'a mut [u8; 65536],
-    backend: Backend,
-    pc: u16,
-    vdev: &mut dyn Device,
-) -> (UxnCore<'a>, u16) {
-    let mut core = UxnCore {
-        stack: Stack {
-            data: stack_data,
-            index: stack_index,
-        },
-        ret: Stack {
-            data: rstack_data,
-            index: rstack_index,
-        },
-        dev,
-        ram,
-        backend,
-    };
-    match core.dei::<FLAGS>(vdev, pc) {
-        Some(pc) => {
-            become dispatch(
-                core.stack.data,
-                core.stack.index,
-                core.ret.data,
-                core.ret.index,
-                core.dev,
-                core.ram,
-                core.backend,
-                pc,
-                vdev,
-            )
-        }
-        None => (core, pc),
-    }
-}
-
-#[expect(clippy::too_many_arguments)]
-fn deo<'a, const FLAGS: u8>(
-    stack_data: &'a mut [u8; 256],
-    stack_index: u8,
-    rstack_data: &'a mut [u8; 256],
-    rstack_index: u8,
-    dev: &'a mut [u8; 256],
-    ram: &'a mut [u8; 65536],
-    backend: Backend,
-    pc: u16,
-    vdev: &mut dyn Device,
-) -> (UxnCore<'a>, u16) {
-    let mut core = UxnCore {
-        stack: Stack {
-            data: stack_data,
-            index: stack_index,
-        },
-        ret: Stack {
-            data: rstack_data,
-            index: rstack_index,
-        },
-        dev,
-        ram,
-        backend,
-    };
-    match core.deo::<FLAGS>(vdev, pc) {
-        Some(pc) => {
-            become dispatch(
-                core.stack.data,
-                core.stack.index,
-                core.ret.data,
-                core.ret.index,
-                core.dev,
-                core.ram,
-                core.backend,
-                pc,
-                vdev,
-            )
-        }
-        None => (core, pc),
-    }
-}
+tail_fn!(dei::<FLAGS>(dev: &mut dyn Device));
+tail_fn!(deo::<FLAGS>(dev: &mut dyn Device));
