@@ -2,8 +2,12 @@
 #![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
 #![cfg_attr(not(any(test, feature = "native")), forbid(unsafe_code))]
-#![cfg_attr(feature = "tailcall", feature(explicit_tail_calls))]
-#![cfg_attr(feature = "tailcall", expect(incomplete_features))]
+// Nightly features for tailcall implementation
+#![cfg_attr(nightly, feature(explicit_tail_calls))]
+#![cfg_attr(nightly, feature(rust_preserve_none_cc))]
+#![cfg_attr(nightly, expect(incomplete_features))]
+#[cfg(all(not(nightly), feature = "tailcall"))]
+compile_error!("the `tailcall` feature requires a nightly compiler");
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -11,8 +15,21 @@ extern crate alloc;
 #[cfg(feature = "native")]
 mod native;
 
-#[cfg(feature = "tailcall")]
+#[cfg(all(nightly, feature = "tailcall"))]
 mod tailcall;
+
+// stub module to improve quality of error messages
+#[cfg(all(not(nightly), feature = "tailcall"))]
+mod tailcall {
+    use super::*;
+    pub fn entry<'a>(
+        _core: UxnCore<'a>,
+        _dev: &mut dyn Device,
+        _pc: u16,
+    ) -> (UxnCore<'a>, u16) {
+        unimplemented!()
+    }
+}
 
 const fn keep(flags: u8) -> bool {
     (flags & (1 << 2)) != 0
@@ -2360,7 +2377,7 @@ mod test {
                         let guard = NoPanic;
                         init!(vm, data, $op);
                         let mut dev = EmptyDevice;
-                        vm.$op::<FLAGS>(&mut dev, 0x100);
+                        vm.$op::<FLAGS>(0x100, &mut dev);
                         core::mem::forget(guard);
                     }
                 }

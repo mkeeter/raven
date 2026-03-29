@@ -1,6 +1,6 @@
 use crate::{Backend, Device, Stack, UxnCore};
 
-type TailFn = for<'a> fn(
+type TailFn = for<'a> extern "rust-preserve-none" fn(
     &'a mut [u8; 256],
     u8,
     &'a mut [u8; 256],
@@ -30,8 +30,7 @@ pub fn entry<'a>(
     )
 }
 
-#[expect(clippy::too_many_arguments)]
-fn dispatch<'a>(
+extern "rust-preserve-none" fn dispatch<'a>(
     stack_data: &'a mut [u8; 256],
     stack_index: u8,
     rstack_data: &'a mut [u8; 256],
@@ -335,9 +334,7 @@ macro_rules! tail_fn {
         tail_fn!($name $(::<$flags>)?[$($arg: $ty),*][]);
     };
     ($name:ident $(::<$flags:ident>)?[$($arg0:ident: $ty0:ty),*][$($arg1:ident: $ty1:ty),*]) => {
-
-        #[expect(clippy::too_many_arguments)]
-        fn $name<'a, $(const $flags: u8)?>(
+        extern "rust-preserve-none" fn $name<'a, $(const $flags: u8)?>(
             stack_data: &'a mut [u8; 256],
             stack_index: u8,
             rstack_data: &'a mut [u8; 256],
