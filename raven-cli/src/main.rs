@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use uxn::{Uxn, UxnMem};
+use uxn::{Uxn, UxnMem, backend};
 use varvara::Varvara;
 
 use anyhow::{Context, Result};
@@ -16,8 +16,8 @@ struct Args {
     rom: PathBuf,
 
     /// Interpreter backend
-    #[clap(long, default_value_t = uxn::Backend::Interpreter)]
-    backend: uxn::Backend,
+    #[clap(long, default_value_t = uxn::backend::Backend::Interpreter)]
+    backend: uxn::backend::Backend,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -37,16 +37,32 @@ fn main() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
+    match args.backend {
+        uxn::backend::Backend::Interpreter => {
+            run_with_backend::<backend::Interpreter>(&rom, &args)
+        }
+        #[cfg(feature = "native")]
+        uxn::backend::Backend::Native => {
+            run_with_backend::<backend::Native>(&rom, &args)
+        }
+        #[cfg(feature = "tailcall")]
+        uxn::backend::Backend::Tailcall => {
+            run_with_backend::<backend::Tailcall>(&rom, &args)
+        }
+    }
+}
+
+fn run_with_backend<B: uxn::Backend>(rom: &[u8], args: &Args) -> Result<()> {
     let mut mem = UxnMem::boxed();
-    let mut vm = Uxn::new(&mut mem);
+    let mut vm = Uxn::<B>::new(&mut mem);
     let mut dev = Varvara::new();
-    let data = vm.reset(&rom);
+    let data = vm.reset(rom);
     dev.reset(data);
     dev.init_args(&mut vm, &args.args);
 
     // Run the reset vector
     let start = std::time::Instant::now();
-    vm.run(&mut dev, 0x100, args.backend);
+    vm.run(&mut dev, 0x100);
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;

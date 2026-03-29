@@ -1,4 +1,4 @@
-use crate::{Backend, Device, Stack, UxnCore};
+use crate::{Device, Stack, UxnCore};
 
 type TailFn = for<'a> extern "rust-preserve-none" fn(
     &'a mut [u8; 256],
@@ -7,7 +7,6 @@ type TailFn = for<'a> extern "rust-preserve-none" fn(
     u8,
     &'a mut [u8; 256],
     &'a mut [u8; 65536],
-    Backend,
     u16,
     &mut dyn Device,
 ) -> (UxnCore<'a>, u16);
@@ -25,7 +24,6 @@ pub fn entry<'a>(
         core.ret.index,
         core.dev,
         core.ram,
-        core.backend,
         pc,
         dev,
     )
@@ -300,7 +298,6 @@ extern "rust-preserve-none" fn dispatch<'a>(
     rstack_index: u8,
     dev: &'a mut [u8; 256],
     ram: &'a mut [u8; 65536],
-    backend: Backend,
     mut pc: u16,
     vdev: &mut dyn Device,
 ) -> (UxnCore<'a>, u16) {
@@ -315,7 +312,6 @@ extern "rust-preserve-none" fn dispatch<'a>(
         },
         dev,
         ram,
-        backend,
     };
     let op = core.next(&mut pc);
     become TABLE.0[op as usize](
@@ -325,7 +321,6 @@ extern "rust-preserve-none" fn dispatch<'a>(
         core.ret.index,
         core.dev,
         core.ram,
-        core.backend,
         pc,
         vdev,
     )
@@ -346,7 +341,6 @@ macro_rules! tail_fn {
             rstack_index: u8,
             dev: &'a mut [u8; 256],
             ram: &'a mut [u8; 65536],
-            backend: Backend,
             pc: u16,
             $($arg0: $ty0),*
             $($arg1: $ty1),*
@@ -362,7 +356,6 @@ macro_rules! tail_fn {
                 },
                 dev,
                 ram,
-                backend,
             };
             match core.$name::<$($flags)?>(pc, $($arg0),*) {
                 Some(pc) => {
@@ -373,7 +366,6 @@ macro_rules! tail_fn {
                         core.ret.index,
                         core.dev,
                         core.ram,
-                        core.backend,
                         pc,
                         $($arg0),*
                         $($arg1),*

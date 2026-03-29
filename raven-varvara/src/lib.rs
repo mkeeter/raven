@@ -200,7 +200,7 @@ impl Varvara {
     /// Calls the screen vector
     ///
     /// This function must be called at 60 Hz
-    pub fn redraw(&mut self, vm: &mut Uxn) {
+    pub fn redraw<B: uxn::Backend>(&mut self, vm: &mut Uxn<B>) {
         let e = self.screen.update(vm);
         self.process_event(vm, e);
     }
@@ -208,7 +208,7 @@ impl Varvara {
     /// Sets initial value for `Console/type` based on the presense of arguments
     ///
     /// This should be called before running the reset vector
-    pub fn init_args(&mut self, vm: &mut Uxn, args: &[String]) {
+    pub fn init_args<B>(&mut self, vm: &mut Uxn<B>, args: &[String]) {
         self.console.set_has_args(vm, !args.is_empty());
     }
 
@@ -217,7 +217,7 @@ impl Varvara {
     /// This is not idempotent; the output is taken from various accumulators
     /// and will be empty if this is called multiple times.
     #[must_use]
-    pub fn output(&mut self, vm: &Uxn) -> Output<'_> {
+    pub fn output<B>(&mut self, vm: &Uxn<B>) -> Output<'_> {
         Output {
             size: self.screen.size(),
             frame: self.screen.frame(vm),
@@ -232,7 +232,11 @@ impl Varvara {
     ///
     /// Leaves the console type set to `stdin`, and returns the current output
     /// state of the system
-    pub fn send_args(&mut self, vm: &mut Uxn, args: &[String]) -> Output<'_> {
+    pub fn send_args<B: uxn::Backend>(
+        &mut self,
+        vm: &mut Uxn<B>,
+        args: &[String],
+    ) -> Output<'_> {
         for (i, a) in args.iter().enumerate() {
             self.console.set_type(vm, console::Type::Argument);
             for c in a.bytes() {
@@ -252,40 +256,45 @@ impl Varvara {
     }
 
     /// Send a character from the keyboard (controller) device
-    pub fn char(&mut self, vm: &mut Uxn, k: u8) {
+    pub fn char<B: uxn::Backend>(&mut self, vm: &mut Uxn<B>, k: u8) {
         let e = self.controller.char(vm, k);
         self.process_event(vm, e);
     }
 
     /// Press a key on the controller device
-    pub fn pressed(&mut self, vm: &mut Uxn, k: Key, repeat: bool) {
+    pub fn pressed<B: uxn::Backend>(
+        &mut self,
+        vm: &mut Uxn<B>,
+        k: Key,
+        repeat: bool,
+    ) {
         if let Some(e) = self.controller.pressed(vm, k, repeat) {
             self.process_event(vm, e);
         }
     }
 
     /// Release a key on the controller device
-    pub fn released(&mut self, vm: &mut Uxn, k: Key) {
+    pub fn released<B: uxn::Backend>(&mut self, vm: &mut Uxn<B>, k: Key) {
         if let Some(e) = self.controller.released(vm, k) {
             self.process_event(vm, e);
         }
     }
 
     /// Send a character from the console device
-    pub fn console(&mut self, vm: &mut Uxn, c: u8) {
+    pub fn console<B: uxn::Backend>(&mut self, vm: &mut Uxn<B>, c: u8) {
         let e = self.console.update(vm, c);
         self.process_event(vm, e);
     }
 
     /// Updates the mouse state
-    pub fn mouse(&mut self, vm: &mut Uxn, m: MouseState) {
+    pub fn mouse<B: uxn::Backend>(&mut self, vm: &mut Uxn<B>, m: MouseState) {
         if let Some(e) = self.mouse.update(vm, m) {
             self.process_event(vm, e);
         }
     }
 
     /// Processes pending audio events
-    pub fn audio(&mut self, vm: &mut Uxn) {
+    pub fn audio<B: uxn::Backend>(&mut self, vm: &mut Uxn<B>) {
         for i in 0..audio::DEV_COUNT {
             if let Some(e) = self.audio.update(vm, usize::from(i)) {
                 self.process_event(vm, e);
@@ -296,12 +305,12 @@ impl Varvara {
     /// Processes a single vector event
     ///
     /// Events with an unassigned vector (i.e. 0) are ignored
-    fn process_event(&mut self, vm: &mut Uxn, e: Event) {
+    fn process_event<B: uxn::Backend>(&mut self, vm: &mut Uxn<B>, e: Event) {
         if e.vector != 0 {
             if let Some(d) = e.data {
                 vm.write_dev_mem(d.addr, d.value);
             }
-            vm.run_with_current_backend(self, e.vector);
+            vm.run(self, e.vector);
             if let Some(d) = e.data
                 && d.clear
             {

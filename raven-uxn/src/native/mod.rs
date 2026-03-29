@@ -164,7 +164,7 @@ declare_extern_fns!(
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
-    use crate::{Backend, EmptyDevice, Uxn, UxnMem, op::*};
+    use crate::{EmptyDevice, Uxn, UxnMem, backend, op::*};
 
     fn run_and_compare(cmd: &[u8]) {
         run_and_compare_all(cmd, false, false);
@@ -243,16 +243,16 @@ mod test {
                 mem_interp.ram[i] = i as u8;
             }
         }
-        let mut vm_native = Uxn::new(&mut mem_native);
+        let mut vm_native = Uxn::<backend::Native>::new(&mut mem_native);
         let r = vm_native.reset(&cmd);
         assert!(r.is_empty());
 
-        let mut vm_interp = Uxn::new(&mut mem_interp);
+        let mut vm_interp = Uxn::<backend::Interpreter>::new(&mut mem_interp);
         let r = vm_interp.reset(&cmd);
         assert!(r.is_empty());
 
-        let pc_native = vm_native.run(&mut dev, 0x100, Backend::Native);
-        let pc_interp = vm_interp.run(&mut dev, 0x100, Backend::Interpreter);
+        let pc_native = vm_native.run(&mut dev, 0x100);
+        let pc_interp = vm_interp.run(&mut dev, 0x100);
         assert_eq!(pc_native, pc_interp, "{op_name}: pc mismatch");
 
         assert_eq!(

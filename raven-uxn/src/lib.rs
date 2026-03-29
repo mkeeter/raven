@@ -69,33 +69,84 @@ impl<'a> Stack<'a> {
     }
 }
 
-/// Uxn evaluation backend
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-pub enum Backend {
+/// Trait for a Uxn evaluator
+pub trait Backend: Sized {
+    /// Run the VM with the selected backend
+    fn run<D: Device>(vm: &mut Uxn<Self>, dev: &mut D, pc: u16) -> u16;
+}
+
+/// Available backends
+pub mod backend {
+    use super::*;
+
     /// Bytecode interpreter
-    Interpreter,
+    pub struct Interpreter;
+    impl crate::Backend for Interpreter {
+        fn run<D: Device>(vm: &mut Uxn<Self>, dev: &mut D, mut pc: u16) -> u16 {
+            let core: &mut UxnCore = &mut *vm;
+            loop {
+                let op = core.next(&mut pc);
+                let Some(next) = core.op(op, dev, pc) else {
+                    break pc;
+                };
+                pc = next;
+            }
+        }
+    }
 
     #[cfg(feature = "native")]
     /// Hand-written threaded assembly
-    Native,
+    pub struct Native;
+
+    #[cfg(feature = "native")]
+    impl crate::Backend for Native {
+        fn run<D: Device>(vm: &mut Uxn<Self>, dev: &mut D, pc: u16) -> u16 {
+            native::entry(vm, dev, pc)
+        }
+    }
 
     #[cfg(feature = "tailcall")]
     /// Tail-call interpreter
-    Tailcall,
-}
+    pub struct Tailcall;
 
-#[cfg(feature = "std")]
-impl std::fmt::Display for Backend {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Backend::Interpreter => "interpreter",
-            #[cfg(feature = "native")]
-            Backend::Native => "native",
-            #[cfg(feature = "tailcall")]
-            Backend::Tailcall => "tailcall",
-        };
-        write!(f, "{s}")
+    #[cfg(feature = "tailcall")]
+    impl crate::Backend for Tailcall {
+        fn run<D: Device>(vm: &mut Uxn<Self>, dev: &mut D, pc: u16) -> u16 {
+            let core = vm.core.take().unwrap();
+            let (core, pc) = tailcall::entry(core, dev, pc);
+            vm.core = Some(core);
+            pc
+        }
+    }
+
+    /// Uxn evaluation backend
+    #[cfg(feature = "clap")]
+    #[derive(clap::ValueEnum, Copy, Clone, Debug)]
+    pub enum Backend {
+        /// Bytecode interpreter
+        Interpreter,
+
+        #[cfg(feature = "native")]
+        /// Hand-written threaded assembly
+        Native,
+
+        #[cfg(feature = "tailcall")]
+        /// Tail-call interpreter
+        Tailcall,
+    }
+
+    #[cfg(feature = "clap")]
+    impl std::fmt::Display for Backend {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let s = match self {
+                Backend::Interpreter => "interpreter",
+                #[cfg(feature = "native")]
+                Backend::Native => "native",
+                #[cfg(feature = "tailcall")]
+                Backend::Tailcall => "tailcall",
+            };
+            write!(f, "{s}")
+        }
     }
 }
 
@@ -314,74 +365,37 @@ impl Stack<'_> {
 }
 
 /// The virtual machine itself
-pub struct Uxn<'a>(Option<UxnCore<'a>>);
+pub struct Uxn<'a, B> {
+    core: Option<UxnCore<'a>>,
+    _backend: core::marker::PhantomData<B>,
+}
 
-impl<'a> Uxn<'a> {
+impl<'a, B: Backend> Uxn<'a, B> {
     /// Build a new `Uxn` with zeroed memory
     pub fn new(mem: &'a mut UxnMem) -> Self {
-        Self(Some(UxnCore::new(mem)))
-    }
-
-    /// Runs the VM starting at the given address until it terminates
-    ///
-    /// The chosen backend is persisted and will be used in subsequent calls to
-    /// [`self.run_with_current_backend(..)`](Self::run_with_current_backend).
-    pub fn run<D: Device>(
-        &mut self,
-        dev: &mut D,
-        pc: u16,
-        backend: Backend,
-    ) -> u16 {
-        self.backend = backend;
-        self.run_with_current_backend(dev, pc)
-    }
-
-    /// Runs the VM starting at the given address until it terminates
-    ///
-    /// The current backend is used, so this function is appropriate for
-    /// callbacks within a device (e.g. an event handler).
-    #[inline]
-    pub fn run_with_current_backend<D: Device>(
-        &mut self,
-        dev: &mut D,
-        mut pc: u16,
-    ) -> u16 {
-        match self.backend {
-            Backend::Interpreter => {
-                let core: &mut UxnCore = &mut *self;
-                loop {
-                    let op = core.next(&mut pc);
-                    let Some(next) = core.op(op, dev, pc) else {
-                        break pc;
-                    };
-                    pc = next;
-                }
-            }
-
-            #[cfg(feature = "native")]
-            Backend::Native => native::entry(self, dev, pc),
-
-            #[cfg(feature = "tailcall")]
-            Backend::Tailcall => {
-                let core = self.0.take().unwrap();
-                let (core, pc) = tailcall::entry(core, dev, pc);
-                self.0 = Some(core);
-                pc
-            }
+        Self {
+            core: Some(UxnCore::new(mem)),
+            _backend: core::marker::PhantomData,
         }
     }
-}
 
-impl<'a> core::ops::Deref for Uxn<'a> {
-    type Target = UxnCore<'a>;
-    fn deref(&self) -> &Self::Target {
-        self.0.as_ref().unwrap()
+    /// Runs the VM starting at the given address until it terminates
+    #[inline]
+    pub fn run<D: Device>(&mut self, dev: &mut D, pc: u16) -> u16 {
+        B::run(self, dev, pc)
     }
 }
 
-impl<'a> core::ops::DerefMut for Uxn<'a> {
+impl<'a, B> core::ops::Deref for Uxn<'a, B> {
+    type Target = UxnCore<'a>;
+    fn deref(&self) -> &Self::Target {
+        self.core.as_ref().unwrap()
+    }
+}
+
+impl<'a, B> core::ops::DerefMut for Uxn<'a, B> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.as_mut().unwrap()
+        self.core.as_mut().unwrap()
     }
 }
 
@@ -395,9 +409,6 @@ pub struct UxnCore<'a> {
     stack: Stack<'a>,
     /// 256-byte return stack
     ret: Stack<'a>,
-
-    /// Preferred evaluation backend
-    backend: Backend,
 }
 
 macro_rules! op_cmp {
@@ -482,7 +493,6 @@ impl<'a> UxnCore<'a> {
             ram,
             stack: Stack::new(stack),
             ret: Stack::new(rstack),
-            backend: Backend::Interpreter,
         }
     }
 
@@ -562,35 +572,6 @@ impl<'a> UxnCore<'a> {
     #[inline(always)]
     pub fn write_dev_mem(&mut self, addr: u8, value: u8) {
         self.dev[usize::from(addr)] = value;
-    }
-
-    /// Runs until the program terminates or we hit a stop condition
-    ///
-    /// Returns the new program counter if the program terminated, or `None` if
-    /// the stop condition was reached.
-    ///
-    /// This function always uses the interpreter backend.
-    #[inline]
-    pub fn run_until<D: Device, F: Fn(&Self, &D, usize) -> bool>(
-        &mut self,
-        dev: &mut D,
-        mut pc: u16,
-        stop: F,
-    ) -> Option<u16> {
-        let prev = core::mem::replace(&mut self.backend, Backend::Interpreter);
-        for i in 0.. {
-            let op = self.next(&mut pc);
-            let Some(next) = self.op(op, dev, pc) else {
-                self.backend = prev;
-                return Some(pc);
-            };
-            pc = next;
-            if stop(self, dev, i) {
-                self.backend = prev;
-                return None;
-            }
-        }
-        unreachable!()
     }
 
     /// Converts raw ports memory into a [`Ports`] object
@@ -1716,6 +1697,34 @@ pub trait Device {
     fn deo(&mut self, vm: &mut UxnCore, target: u8) -> bool;
 }
 
+impl<'a> Uxn<'a, backend::Interpreter> {
+    /// Runs until the program terminates or we hit a stop condition
+    ///
+    /// Returns the new program counter if the program terminated, or `None` if
+    /// the stop condition was reached.
+    ///
+    /// This function always uses the interpreter backend.
+    #[inline]
+    pub fn run_until<D: Device, F: Fn(&Self, &D, usize) -> bool>(
+        &mut self,
+        dev: &mut D,
+        mut pc: u16,
+        stop: F,
+    ) -> Option<u16> {
+        for i in 0.. {
+            let op = self.next(&mut pc);
+            let Some(next) = self.op(op, dev, pc) else {
+                return Some(pc);
+            };
+            pc = next;
+            if stop(self, dev, i) {
+                return None;
+            }
+        }
+        unreachable!()
+    }
+}
+
 /// Trait for a type which can be cast to a device ports `struct`
 pub trait Ports:
     zerocopy::IntoBytes
@@ -2132,7 +2141,7 @@ mod test {
 
     fn parse_and_test(s: &str) {
         let mut mem = UxnMem::new();
-        let mut vm = Uxn::new(&mut mem);
+        let mut vm = Uxn::<backend::Interpreter>::new(&mut mem);
         let mut iter = s.split_whitespace();
         let mut op = None;
         let mut dev = EmptyDevice;
@@ -2160,7 +2169,7 @@ mod test {
                     }
                 }
                 vm.ram[0] = op.unwrap();
-                vm.run(&mut dev, 0, Backend::Interpreter);
+                vm.run(&mut dev, 0);
                 let mut actual = vec![];
                 while vm.stack.index != u8::MAX {
                     actual.push(vm.stack.pop_byte());
@@ -2265,13 +2274,13 @@ mod test {
     #[test]
     fn fib() {
         let mut mem = UxnMem::boxed();
-        let mut vm = Uxn::new(&mut mem);
+        let mut vm = Uxn::<backend::Interpreter>::new(&mut mem);
 
         let mut uxn_fib = |i| {
             let _ = vm.reset(FIB);
             vm.ram_write_byte(0x101, i);
             let mut dev = EmptyDevice;
-            vm.run(&mut dev, 0x100, Backend::Interpreter);
+            vm.run(&mut dev, 0x100);
             vm.stack_view::<0b001>().pop_short()
         };
 
@@ -2326,7 +2335,7 @@ mod test {
                     }
                 }
                 let mut ram = UxnMem::boxed();
-                let mut $vm = Uxn::new(&mut ram);
+                let mut $vm = Uxn::<backend::Interpreter>::new(&mut ram);
                 let _ = $vm.reset($data);
                 for d in $data {
                     $vm.stack.push(Value::Byte(*d));

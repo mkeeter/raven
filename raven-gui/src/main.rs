@@ -16,8 +16,8 @@ pub enum Event {
     Console(u8),
 }
 
-pub struct Stage<'a> {
-    vm: Uxn<'a>,
+pub struct Stage<'a, B> {
+    vm: Uxn<'a, B>,
     dev: Varvara,
 
     /// Scale factor to adjust window size
@@ -44,9 +44,9 @@ pub struct Stage<'a> {
     resized: Option<Box<dyn FnMut(u16, u16)>>,
 }
 
-impl<'a> Stage<'a> {
+impl<'a, B: uxn::Backend> Stage<'a, B> {
     pub fn new(
-        vm: Uxn<'a>,
+        vm: Uxn<'a, B>,
         dev: Varvara,
         size: (u16, u16),
         scale: f32,
@@ -90,7 +90,7 @@ impl<'a> Stage<'a> {
         let data = self.vm.reset(data);
         self.dev.reset(data);
         let start = web_time::Instant::now();
-        self.vm.run_with_current_backend(&mut self.dev, 0x100);
+        self.vm.run(&mut self.dev, 0x100);
         info!("completed startup in {:?}", start.elapsed());
         let out = self.dev.output(&self.vm);
         out.check()?;
@@ -98,7 +98,7 @@ impl<'a> Stage<'a> {
     }
 }
 
-impl eframe::App for Stage<'_> {
+impl<B: uxn::Backend> eframe::App for Stage<'_, B> {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         while let Ok(e) = self.event_rx.try_recv() {
             match e {

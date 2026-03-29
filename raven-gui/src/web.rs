@@ -9,8 +9,14 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys::Uint8Array;
 
 use crate::{Event, Stage, audio_setup};
-use uxn::{Backend, Uxn, UxnMem};
+use uxn::{Uxn, UxnMem};
 use varvara::Varvara;
+
+#[cfg(feature = "tailcall")]
+type Backend = uxn::backend::Tailcall;
+
+#[cfg(not(feature = "tailcall"))]
+type Backend = uxn::backend::Interpreter;
 
 pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
@@ -40,17 +46,13 @@ pub fn run() -> Result<()> {
         .unwrap_or(include_bytes!("../../roms/controller.rom"));
 
     let mem = UxnMem::boxed();
-    let mut vm = Uxn::new(Box::leak(mem));
+    let mut vm = Uxn::<Backend>::new(Box::leak(mem));
     let mut dev = Varvara::new();
     let extra = vm.reset(rom);
     dev.reset(extra);
 
     // Run the reset vector
-    #[cfg(feature = "tailcall")]
-    let backend = Backend::Tailcall;
-    #[cfg(not(feature = "tailcall"))]
-    let backend = Backend::Interpreter;
-    vm.run(&mut dev, 0x100, backend);
+    vm.run(&mut dev, 0x100);
     dev.output(&vm).check()?;
 
     let size @ (width, height) = dev.output(&vm).size;

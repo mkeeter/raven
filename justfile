@@ -12,6 +12,10 @@ CUT8 := ".{56}$" # regex to strip the trailing 56 characters
 fuzz:
     cargo +nightly fuzz run -O fuzz-native --
 
+# Run benchmarks
+bench:
+    cargo +nightly bench --all-features
+
 # Build a web application in `raven-gui/dist`
 dist:
     rustup +nightly target add wasm32-unknown-unknown
