@@ -17,9 +17,9 @@ uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2", default-f
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [features]
-default = ["native"]
+default = []
 native = ["uxn/native"]
-tailcall = []
+tailcall = ["uxn/tailcall"]
 
 [dev-dependencies]
 criterion.workspace = true
