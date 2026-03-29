@@ -551,8 +551,7 @@ impl<'a> UxnCore<'a> {
     /// Returns the new program counter if the program terminated, or `None` if
     /// the stop condition was reached.
     ///
-    /// This function always uses the interpreter, ignoring the selected
-    /// backend.
+    /// This function always uses the interpreter backend.
     #[inline]
     pub fn run_until<D: Device, F: Fn(&Self, &D, usize) -> bool>(
         &mut self,
@@ -560,13 +559,16 @@ impl<'a> UxnCore<'a> {
         mut pc: u16,
         stop: F,
     ) -> Option<u16> {
+        let prev = core::mem::replace(&mut self.backend, Backend::Interpreter);
         for i in 0.. {
             let op = self.next(&mut pc);
             let Some(next) = self.op(op, dev, pc) else {
+                self.backend = prev;
                 return Some(pc);
             };
             pc = next;
             if stop(self, dev, i) {
+                self.backend = prev;
                 return None;
             }
         }

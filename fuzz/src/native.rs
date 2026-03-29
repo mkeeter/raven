@@ -37,10 +37,10 @@ impl std::fmt::Debug for UxnProgram<'_> {
 
 fuzz_target!(|data: UxnProgram| {
     let mut mem_v = UxnMem::boxed();
-    let mut vm_v = Uxn::new(&mut mem_v, Backend::Interpreter);
+    let mut vm_v = Uxn::new(&mut mem_v);
 
     let mut mem_n = UxnMem::boxed();
-    let mut vm_n = Uxn::new(&mut mem_n, Backend::Native);
+    let mut vm_n = Uxn::new(&mut mem_n);
 
     // Don't load any programs that require auxiliary memory
     if !vm_v.reset(data.0).is_empty() {
@@ -54,7 +54,7 @@ fuzz_target!(|data: UxnProgram| {
     else {
         return;
     };
-    let pc_n = vm_n.run(&mut EmptyDevice, 0x100);
+    let pc_n = vm_n.run(&mut EmptyDevice, 0x100, Backend::Native);
 
     let mut failed = false;
 
