@@ -2354,6 +2354,7 @@ dependencies = [
  "env_logger",
  "locked-tripwire",
  "log",
+ "raven-cli",
  "raven-uxn",
  "raven-varvara",
  "wasm-bindgen-futures",

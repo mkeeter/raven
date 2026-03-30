@@ -150,4 +150,10 @@ mod snapshots {
         use super::*;
         snapshot_tests!(backend::Native);
     }
+
+    #[cfg(feature = "tailcall")]
+    mod tailcall {
+        use super::*;
+        snapshot_tests!(backend::Tailcall);
+    }
 }

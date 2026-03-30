@@ -1,6 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
+use raven_cli as cli;
 use uxn::{Uxn, UxnMem, backend};
 use varvara::Varvara;
 
@@ -16,8 +17,8 @@ struct Args {
     rom: PathBuf,
 
     /// Interpreter backend
-    #[clap(long, default_value_t = uxn::backend::Backend::Interpreter)]
-    backend: uxn::backend::Backend,
+    #[clap(long, default_value_t = cli::Backend::Interpreter)]
+    backend: cli::Backend,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -38,15 +39,15 @@ fn main() -> Result<()> {
     f.read_to_end(&mut rom).context("failed to read file")?;
 
     match args.backend {
-        uxn::backend::Backend::Interpreter => {
+        cli::Backend::Interpreter => {
             run_with_backend::<backend::Interpreter>(&rom, &args)
         }
         #[cfg(feature = "native")]
-        uxn::backend::Backend::Native => {
+        cli::Backend::Native => {
             run_with_backend::<backend::Native>(&rom, &args)
         }
         #[cfg(feature = "tailcall")]
-        uxn::backend::Backend::Tailcall => {
+        cli::Backend::Tailcall => {
             run_with_backend::<backend::Tailcall>(&rom, &args)
         }
     }

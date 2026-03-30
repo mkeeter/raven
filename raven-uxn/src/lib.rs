@@ -1,5 +1,5 @@
 //! Uxn virtual machine
-#![cfg_attr(not(any(test, feature = "std")), no_std)]
+#![cfg_attr(not(test), no_std)]
 #![warn(missing_docs)]
 #![cfg_attr(not(any(test, feature = "native")), forbid(unsafe_code))]
 // Nightly features for tailcall implementation
@@ -116,36 +116,6 @@ pub mod backend {
             let (core, pc) = tailcall::entry(core, dev, pc);
             vm.core = Some(core);
             pc
-        }
-    }
-
-    /// Uxn evaluation backend
-    #[cfg(feature = "clap")]
-    #[derive(clap::ValueEnum, Copy, Clone, Debug)]
-    pub enum Backend {
-        /// Bytecode interpreter
-        Interpreter,
-
-        #[cfg(feature = "native")]
-        /// Hand-written threaded assembly
-        Native,
-
-        #[cfg(feature = "tailcall")]
-        /// Tail-call interpreter
-        Tailcall,
-    }
-
-    #[cfg(feature = "clap")]
-    impl std::fmt::Display for Backend {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let s = match self {
-                Backend::Interpreter => "interpreter",
-                #[cfg(feature = "native")]
-                Backend::Native => "native",
-                #[cfg(feature = "tailcall")]
-                Backend::Tailcall => "tailcall",
-            };
-            write!(f, "{s}")
         }
     }
 }

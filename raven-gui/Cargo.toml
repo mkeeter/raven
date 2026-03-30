@@ -27,10 +27,9 @@ tailcall = ["varvara/tailcall"]
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clap.workspace = true
 cpal.workspace = true
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.3.0", features = ["clap"] }
+cli = { path = "../raven-cli", package = "raven-cli", version = "0.3.0" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures.workspace = true
 web-sys.workspace = true
 cpal = { workspace = true, features = ["wasm-bindgen"] }
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.3.0" }
