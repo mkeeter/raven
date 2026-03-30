@@ -61,8 +61,8 @@ pub fn run() -> Result<()> {
 }
 
 fn run_with_backend<B: uxn::Backend>(rom: &[u8], args: &Args) -> Result<()> {
-    let mem = UxnMem::boxed();
-    let mut vm = Uxn::<B>::new(Box::leak(mem));
+    let mut mem = UxnMem::boxed();
+    let mut vm = Uxn::<B>::new(&mut mem);
     let mut dev = Varvara::new();
     let extra = vm.reset(rom);
     dev.reset(extra);
