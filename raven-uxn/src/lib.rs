@@ -468,7 +468,7 @@ impl<'a> UxnCore<'a> {
 
     /// Reads a byte from RAM at the program counter
     #[inline]
-    fn next(&mut self, pc: &mut u16) -> u8 {
+    fn next(&self, pc: &mut u16) -> u8 {
         let out = self.ram[usize::from(*pc)];
         *pc = pc.wrapping_add(1);
         out
@@ -476,7 +476,7 @@ impl<'a> UxnCore<'a> {
 
     /// Reads a word from RAM at the program counter
     #[inline]
-    fn next2(&mut self, pc: &mut u16) -> u16 {
+    fn next2(&self, pc: &mut u16) -> u16 {
         let hi = self.next(pc);
         let lo = self.next(pc);
         u16::from_le_bytes([lo, hi])

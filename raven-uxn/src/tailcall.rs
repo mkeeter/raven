@@ -15,9 +15,10 @@ type TailFn = for<'a> extern "rust-preserve-none" fn(
 pub fn entry<'a>(
     core: UxnCore<'a>,
     dev: &mut dyn Device,
-    pc: u16,
+    mut pc: u16,
 ) -> (UxnCore<'a>, u16) {
-    dispatch(
+    let op = core.next(&mut pc);
+    TABLE.0[op as usize](
         core.stack.data,
         core.stack.index,
         core.ret.data,
@@ -291,41 +292,6 @@ const TABLE: FunctionTable = FunctionTable([
     sft::<0b111>,
 ]);
 
-extern "rust-preserve-none" fn dispatch<'a>(
-    stack_data: &'a mut [u8; 256],
-    stack_index: u8,
-    rstack_data: &'a mut [u8; 256],
-    rstack_index: u8,
-    dev: &'a mut [u8; 256],
-    ram: &'a mut [u8; 65536],
-    mut pc: u16,
-    vdev: &mut dyn Device,
-) -> (UxnCore<'a>, u16) {
-    let mut core = UxnCore {
-        stack: Stack {
-            data: stack_data,
-            index: stack_index,
-        },
-        ret: Stack {
-            data: rstack_data,
-            index: rstack_index,
-        },
-        dev,
-        ram,
-    };
-    let op = core.next(&mut pc);
-    become TABLE.0[op as usize](
-        core.stack.data,
-        core.stack.index,
-        core.ret.data,
-        core.ret.index,
-        core.dev,
-        core.ram,
-        pc,
-        vdev,
-    )
-}
-
 macro_rules! tail_fn {
     ($name:ident $(::<$flags:ident>)?) => {
         tail_fn!($name $(::<$flags>)?[][vdev: &mut dyn Device]);
@@ -358,8 +324,9 @@ macro_rules! tail_fn {
                 ram,
             };
             match core.$name::<$($flags)?>(pc, $($arg0),*) {
-                Some(pc) => {
-                    become dispatch(
+                Some(mut pc) => {
+                    let op = core.next(&mut pc);
+                    become TABLE.0[op as usize](
                         core.stack.data,
                         core.stack.index,
                         core.ret.data,
