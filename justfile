@@ -30,8 +30,8 @@ fuzz:
     cargo +nightly fuzz run -O fuzz-native --
 
 # Run benchmarks
-bench:
-    cargo +nightly bench --all-features
+bench +ARGS:
+    cargo +nightly bench --all-features -- {{ARGS}}
 
 # Build a web application in `raven-gui/dist`
 dist:
