@@ -2367,7 +2367,6 @@ dependencies = [
 name = "raven-uxn"
 version = "0.3.0"
 dependencies = [
- "clap",
  "criterion",
  "rustversion",
  "workspace-hack",
