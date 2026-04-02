@@ -2358,6 +2358,7 @@ dependencies = [
  "raven-varvara",
  "wasm-bindgen-futures",
  "web-sys",
+ "web-time",
  "workspace-hack",
 ]
 
