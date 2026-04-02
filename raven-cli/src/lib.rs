@@ -25,3 +25,41 @@ impl std::fmt::Display for Backend {
         write!(f, "{s}")
     }
 }
+
+// Shenanigans to pick the fastest backend on a per-architecture basis
+#[cfg(target_arch = "x86_64")]
+mod default {
+    // Prefer native, then tailcall, then interpreter
+    use super::Backend;
+    #[cfg(feature = "native")]
+    pub const BACKEND_DEFAULT: Backend = Backend::Native;
+    #[cfg(all(not(feature = "native"), feature = "tailcall"))]
+    pub const BACKEND_DEFAULT: Backend = Backend::Tailcall;
+    #[cfg(all(not(feature = "native"), not(feature = "tailcall")))]
+    pub const BACKEND_DEFAULT: Backend = Backend::Interpreter;
+}
+
+#[cfg(target_arch = "aarch64")]
+mod default {
+    // Prefer tailcall, then native, then interpreter
+    use super::Backend;
+    #[cfg(feature = "tailcall")]
+    pub const BACKEND_DEFAULT: Backend = Backend::Tailcall;
+    #[cfg(all(not(feature = "tailcall"), feature = "native"))]
+    pub const BACKEND_DEFAULT: Backend = Backend::Native;
+    #[cfg(all(not(feature = "tailcall"), not(feature = "native")))]
+    pub const BACKEND_DEFAULT: Backend = Backend::Interpreter;
+}
+
+#[cfg(all(not(target_arch = "aarch64"), not(target_arch = "x86_64")))]
+mod default {
+    // Prefer interpreter
+    use super::Backend;
+    pub const BACKEND_DEFAULT: Backend = Backend::Interpreter;
+}
+
+impl Default for Backend {
+    fn default() -> Self {
+        default::BACKEND_DEFAULT
+    }
+}

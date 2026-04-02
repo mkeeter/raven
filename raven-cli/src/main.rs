@@ -17,7 +17,7 @@ struct Args {
     rom: PathBuf,
 
     /// Interpreter backend
-    #[clap(long, default_value_t = cli::Backend::Interpreter)]
+    #[clap(long, default_value_t = Default::default())]
     backend: cli::Backend,
 
     /// Arguments to pass into the VM
