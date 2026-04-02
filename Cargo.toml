@@ -27,4 +27,5 @@ log = "0.4.21"
 static_assertions = "1.1.0"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "*", features = ["HtmlSelectElement", "HtmlOptionElement"] }
+web-time = "1.1.0"
 zerocopy = { version = "0.8.42", features = ["derive"] }
