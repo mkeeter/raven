@@ -13,12 +13,16 @@ use log::info;
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// ROM to load and execute
-    rom: PathBuf,
+    /// Quit after initialization (for startup timing)
+    #[clap(short, long)]
+    quit: bool,
 
     /// Interpreter backend
     #[clap(long, default_value_t = Default::default())]
     backend: cli::Backend,
+
+    /// ROM to load and execute
+    rom: PathBuf,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -67,6 +71,13 @@ fn run_with_backend<B: uxn::Backend>(rom: &[u8], args: &Args) -> Result<()> {
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;
+
+    // Quit if we only care about startup
+    if args.quit {
+        return Ok(());
+    }
+
+    // Otherwise, pass CLI arguments to the device and keep going
     dev.send_args(&mut vm, &args.args).check()?;
 
     // Blocking loop, listening to the stdin reader thread
