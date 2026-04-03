@@ -7,9 +7,9 @@ For details, see [the project writeup](https://mattkeeter.com/projects/raven).
 
 --------------------------------------------------------------------------------
 
-The `raven-uxn` crate includes three implementations of the Uxn CPU:
+The `raven-uxn` crate includes three backends for Uxn CPU emulation:
 
-- The safe interpreter is a `#[no_std]` crate written in 100% safe Rust, with a
+- The baseline interpreter is a `#[no_std]` crate written in 100% safe Rust, with a
   single dependency (`zerocopy`).  It is 10-20% faster than
   the [reference implementation](https://git.sr.ht/~rabbits/uxn/tree/main/item/src)
   for CPU-heavy workloads (e.g.
@@ -20,8 +20,16 @@ The `raven-uxn` crate includes three implementations of the Uxn CPU:
   assembly (with Rust shims on either side), and run *significantly* faster
   than the reference implementation (40-50% faster for AArch64, 2× faster for
   x86)
+- The tailcall interpreter is also written in 100% safe Rust, but requires
+  running a nightly toolchain.  It is the fastest backend on AArch64, and faster
+  than the baseline interpreter on `x86-64` (but slower than the native assembly
+  implementation)
 
-The native interpreter can be checked against the safe interpreter with fuzz
+Backends are feature-gated because they have platform and toolchain
+requirements; when making a desktop build, use `--all-features` to select all
+backends.
+
+The native interpreter can be checked against the baseline interpreter with fuzz
 testing:
 
 ```console
@@ -55,6 +63,15 @@ and [`wasm-opt`](https://github.com/WebAssembly/binaryen) to be installed.
 Using the [Just](https://just.systems/) command runner, the web application can
 be built with `just dist` (deploying files to `raven-gui/dist`) and served
 locally with `just serve`.
+
+It's also possible to compile `raven-cli` as a WASM application (for use with
+[`wasmtime`](https://github.com/bytecodealliance/wasmtime) or similar):
+
+```console
+rustup +nightly target add wasm32-wasip1
+cargo +nightly build --release -praven-cli --target=wasm32-wasip1
+# add `--features=tailcall` to test tailcall performance in WASM
+```
 
 --------------------------------------------------------------------------------
 

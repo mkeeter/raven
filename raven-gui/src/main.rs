@@ -8,7 +8,7 @@ use cpal::traits::StreamTrait;
 use eframe::egui;
 use log::{error, info};
 
-/// Injected events from the [`Stage::rx`] queue
+/// Injected events from the [`Stage::event_rx`] queue
 #[derive(Debug)]
 pub enum Event {
     LoadRom(Vec<u8>),

@@ -46,7 +46,7 @@ struct Event {
     pub vector: u16,
 }
 
-/// Output from [`Varvara::update`], which may modify the GUI
+/// Output from [`Varvara::output`], reflecting the system's output state
 pub struct Output<'a> {
     /// Current window size
     pub size: (u16, u16),

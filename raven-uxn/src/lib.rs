@@ -76,6 +76,9 @@ pub trait Backend: Sized {
 }
 
 /// Available backends
+///
+/// Types in this module should be used as template parameters to the [`Uxn`]
+/// object.
 pub mod backend {
     use super::*;
 
@@ -369,7 +372,11 @@ impl<'a, B> core::ops::DerefMut for Uxn<'a, B> {
     }
 }
 
-/// The virtual machine itself
+/// Core implementation of the virtual machine
+///
+/// This is necessary because the tail-call interpreter must deconstruct the
+/// `UxnCore` into its component pieces, which requires ownership; the [`Uxn`]
+/// contains an `Option<UxnCore>` which we can steal then replace.
 pub struct UxnCore<'a> {
     /// Device memory
     dev: &'a mut [u8; 256],

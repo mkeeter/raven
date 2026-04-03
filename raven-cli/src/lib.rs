@@ -1,4 +1,12 @@
+//! Infrastructure for CLI tools
+//!
+//! This crate is primarily a binary crate for the `raven-cli` executable, but
+//! defines a `clap`-compatible [`Backend`] object for use in other CLIs.
+
 /// Uxn evaluation backend
+///
+/// Enable features on this crate to show values other than
+/// [`Interpreter`](Backend::Interpreter)
 #[derive(clap::ValueEnum, Copy, Clone, Debug)]
 pub enum Backend {
     /// Bytecode interpreter
