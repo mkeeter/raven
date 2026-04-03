@@ -3,9 +3,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(not(any(test, feature = "native")), forbid(unsafe_code))]
 // Nightly features for tailcall implementation
-#![cfg_attr(nightly, feature(explicit_tail_calls))]
-#![cfg_attr(nightly, feature(rust_preserve_none_cc))]
-#![cfg_attr(nightly, expect(incomplete_features))]
+#![cfg_attr(all(nightly, feature = "tailcall"), feature(explicit_tail_calls))]
+#![cfg_attr(all(nightly, feature = "tailcall"), feature(rust_preserve_none_cc))]
+#![cfg_attr(all(nightly, feature = "tailcall"), expect(incomplete_features))]
 #[cfg(all(not(nightly), feature = "tailcall"))]
 compile_error!("the `tailcall` feature requires a nightly compiler");
 
