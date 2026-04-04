@@ -39,6 +39,14 @@ jobs:
       shell: bash
     - name: Test
       run: cargo test --release --verbose
+    - if: runner.os == 'Linux'
+      name: Check `git` cleanliness
+      run: |
+        if [[ -n $(git status --porcelain Cargo.lock) ]]; then
+          echo "Error: Cargo.lock needs to be updated"
+          git diff Cargo.lock
+          exit 1
+        fi
   fuzz:
     strategy:
       matrix:
@@ -69,6 +77,14 @@ jobs:
       shell: bash
     - name: Test
       run: cargo +nightly fuzz run -O fuzz-native -- -max_total_time=60
+    - if: runner.os == 'Linux'
+      name: Check `git` cleanliness
+      run: |
+        if [[ -n $(git status --porcelain fuzz/Cargo.lock) ]]; then
+          echo "Error: fuzz/Cargo.lock needs to be updated"
+          git diff fuzz/Cargo.lock
+          exit 1
+        fi
   clippy:
     strategy:
       matrix:
