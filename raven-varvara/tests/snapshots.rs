@@ -2,19 +2,18 @@ use image::{DynamicImage, ImageBuffer, ImageReader, Rgba};
 use raven_varvara::Varvara;
 use std::io::Read;
 use std::path::Path;
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Backend, Uxn, UxnMem, backend};
 
 struct Snapshot {
     pixels: Vec<u8>,
     size: (u16, u16),
 }
 
-fn get_snapshot(
+fn get_snapshot<B: uxn::Backend>(
     rom: &[u8],
-    backend: Backend,
 ) -> Result<Snapshot, std::io::Error> {
-    let mut ram = UxnRam::new();
-    let mut vm = Uxn::new(&mut ram, backend);
+    let mut mem = UxnMem::boxed();
+    let mut vm = Uxn::<B>::new(&mut mem);
     let mut dev = Varvara::new();
     let data = vm.reset(rom);
     dev.reset(data);
@@ -51,7 +50,7 @@ fn get_snapshot(
     })
 }
 
-fn run_and_check(name: &str, backend: Backend) {
+fn run_and_check<B: Backend>(name: &str) {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
         .expect("CARGO_MANIFEST_DIR not set");
     let rom_path = Path::new(&manifest_dir)
@@ -63,7 +62,7 @@ fn run_and_check(name: &str, backend: Backend) {
         .expect("could not open ROM file")
         .read_to_end(&mut rom)
         .expect("failed to read ROM");
-    let snapshot = get_snapshot(&rom, backend).expect("ROM execution failed");
+    let snapshot = get_snapshot::<B>(&rom).expect("ROM execution failed");
 
     let our_image = ImageBuffer::<Rgba<u8>, _>::from_raw(
         snapshot.size.0 as u32,
@@ -127,7 +126,7 @@ mod snapshots {
         ($name:ident, $backend:path) => {
             #[test]
             fn $name() {
-                run_and_check(stringify!($name), $backend);
+                run_and_check::<$backend>(stringify!($name));
             }
         };
     }
@@ -144,11 +143,17 @@ mod snapshots {
             snapshot_test!(screen, $backend);
         };
     }
-    snapshot_tests!(Backend::Interpreter);
+    snapshot_tests!(backend::Interpreter);
 
     #[cfg(feature = "native")]
     mod native {
         use super::*;
-        snapshot_tests!(Backend::Native);
+        snapshot_tests!(backend::Native);
+    }
+
+    #[cfg(feature = "tailcall")]
+    mod tailcall {
+        use super::*;
+        snapshot_tests!(backend::Tailcall);
     }
 }

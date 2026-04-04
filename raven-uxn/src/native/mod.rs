@@ -1,4 +1,4 @@
-use crate::{Device, Uxn};
+use crate::{Device, UxnCore};
 
 #[cfg(target_arch = "aarch64")]
 mod aarch64;
@@ -31,36 +31,36 @@ macro_rules! define_extern_fns {
 // Stubs for DEO calls
 
 define_extern_fns!(
-    fn deo_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b000>(dev.0, 0).is_some()
+    fn deo_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b000>(0, dev.0).is_some()
     }
 
-    fn deo_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b001>(dev.0, 0).is_some()
+    fn deo_2_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b001>(0, dev.0).is_some()
     }
 
-    fn deo_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b010>(dev.0, 0).is_some()
+    fn deo_r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b010>(0, dev.0).is_some()
     }
 
-    fn deo_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b011>(dev.0, 0).is_some()
+    fn deo_2r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b011>(0, dev.0).is_some()
     }
 
-    fn deo_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b100>(dev.0, 0).is_some()
+    fn deo_k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b100>(0, dev.0).is_some()
     }
 
-    fn deo_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b101>(dev.0, 0).is_some()
+    fn deo_2k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b101>(0, dev.0).is_some()
     }
 
-    fn deo_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b110>(dev.0, 0).is_some()
+    fn deo_kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b110>(0, dev.0).is_some()
     }
 
-    fn deo_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.deo::<0b111>(dev.0, 0).is_some()
+    fn deo_2kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.deo::<0b111>(0, dev.0).is_some()
     }
 );
 
@@ -68,35 +68,35 @@ define_extern_fns!(
 // Stubs for DEI calls
 
 define_extern_fns!(
-    fn dei_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b000>(dev.0, 0).is_some()
+    fn dei_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b000>(0, dev.0).is_some()
     }
 
-    fn dei_2_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b001>(dev.0, 0).is_some()
+    fn dei_2_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b001>(0, dev.0).is_some()
     }
 
-    fn dei_r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b010>(dev.0, 0).is_some()
+    fn dei_r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b010>(0, dev.0).is_some()
     }
-    fn dei_2r_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b011>(dev.0, 0).is_some()
-    }
-
-    fn dei_k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b100>(dev.0, 0).is_some()
+    fn dei_2r_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b011>(0, dev.0).is_some()
     }
 
-    fn dei_2k_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b101>(dev.0, 0).is_some()
+    fn dei_k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b100>(0, dev.0).is_some()
     }
 
-    fn dei_kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b110>(dev.0, 0).is_some()
+    fn dei_2k_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b101>(0, dev.0).is_some()
     }
 
-    fn dei_2kr_entry(vm: &mut Uxn, dev: &mut DeviceHandle) -> bool {
-        vm.dei::<0b111>(dev.0, 0).is_some()
+    fn dei_kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b110>(0, dev.0).is_some()
+    }
+
+    fn dei_2kr_entry(vm: &mut UxnCore, dev: &mut DeviceHandle) -> bool {
+        vm.dei::<0b111>(0, dev.0).is_some()
     }
 );
 
@@ -104,7 +104,7 @@ define_extern_fns!(
 
 pub(crate) struct DeviceHandle<'a>(pub &'a mut dyn Device);
 
-pub fn entry(vm: &mut Uxn, dev: &mut dyn Device, pc: u16) -> u16 {
+pub fn entry(vm: &mut UxnCore, dev: &mut dyn Device, pc: u16) -> u16 {
     let mut h = DeviceHandle(dev);
 
     // SAFETY: do you trust me?
@@ -157,14 +157,14 @@ declare_extern_fns!(
         ret_index: *mut u8,
         ram: *mut u8,
         pc: u16,
-        vm: *mut Uxn,
+        vm: *mut UxnCore,
         dev: *mut DeviceHandle,
     ) -> u16;
 );
 
 #[cfg(all(feature = "alloc", test))]
 mod test {
-    use crate::{Backend, EmptyDevice, Uxn, UxnRam, op::*};
+    use crate::{EmptyDevice, Uxn, UxnMem, backend, op::*};
 
     fn run_and_compare(cmd: &[u8]) {
         run_and_compare_all(cmd, false, false);
@@ -235,19 +235,19 @@ mod test {
         }
 
         let mut dev = EmptyDevice;
-        let mut ram_native = UxnRam::new();
-        let mut ram_interp = UxnRam::new();
+        let mut mem_native = UxnMem::boxed();
+        let mut mem_interp = UxnMem::boxed();
         if fill_ram {
-            for i in 0..ram_native.len() {
-                ram_native[i] = i as u8;
-                ram_interp[i] = i as u8;
+            for i in 0..mem_native.ram.len() {
+                mem_native.ram[i] = i as u8;
+                mem_interp.ram[i] = i as u8;
             }
         }
-        let mut vm_native = Uxn::new(&mut ram_native, Backend::Native);
+        let mut vm_native = Uxn::<backend::Native>::new(&mut mem_native);
         let r = vm_native.reset(&cmd);
         assert!(r.is_empty());
 
-        let mut vm_interp = Uxn::new(&mut ram_interp, Backend::Interpreter);
+        let mut vm_interp = Uxn::<backend::Interpreter>::new(&mut mem_interp);
         let r = vm_interp.reset(&cmd);
         assert!(r.is_empty());
 

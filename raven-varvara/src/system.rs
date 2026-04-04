@@ -1,6 +1,6 @@
 use log::warn;
 use std::mem::offset_of;
-use uxn::{Ports, Uxn};
+use uxn::{Ports, UxnCore};
 use zerocopy::{
     BigEndian, FromBytes, FromZeros, Immutable, IntoBytes, KnownLayout, U16,
 };
@@ -96,7 +96,7 @@ impl System {
         self.exit = None;
     }
 
-    pub fn deo(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn deo(&mut self, vm: &mut UxnCore, target: u8) {
         let v = vm.dev::<SystemPorts>();
         match target {
             SystemPorts::EXPANSION => {
@@ -193,7 +193,7 @@ impl System {
         }
     }
 
-    pub fn dei(&mut self, vm: &mut Uxn, target: u8) {
+    pub fn dei(&mut self, vm: &mut UxnCore, target: u8) {
         match target & 0x0F {
             SystemPorts::WST => {
                 let wst = vm.stack().len();

@@ -2331,7 +2331,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "raven-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2345,7 +2345,7 @@ dependencies = [
 
 [[package]]
 name = "raven-gui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2354,6 +2354,7 @@ dependencies = [
  "env_logger",
  "locked-tripwire",
  "log",
+ "raven-cli",
  "raven-uxn",
  "raven-varvara",
  "wasm-bindgen-futures",
@@ -2364,16 +2365,17 @@ dependencies = [
 
 [[package]]
 name = "raven-uxn"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "criterion",
+ "rustversion",
  "workspace-hack",
  "zerocopy",
 ]
 
 [[package]]
 name = "raven-varvara"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "criterion",

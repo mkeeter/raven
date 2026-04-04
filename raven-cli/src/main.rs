@@ -1,7 +1,8 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use uxn::{Backend, Uxn, UxnRam};
+use raven_cli as cli;
+use uxn::{Uxn, UxnMem, backend};
 use varvara::Varvara;
 
 use anyhow::{Context, Result};
@@ -12,12 +13,16 @@ use log::info;
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    /// Quit after initialization (for startup timing)
+    #[clap(short, long)]
+    quit: bool,
+
+    /// Interpreter backend
+    #[clap(long, default_value_t = Default::default())]
+    backend: cli::Backend,
+
     /// ROM to load and execute
     rom: PathBuf,
-
-    /// Use the native Uxn implementation
-    #[clap(long)]
-    native: bool,
 
     /// Arguments to pass into the VM
     #[arg(last = true)]
@@ -37,17 +42,26 @@ fn main() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
-    let mut ram = UxnRam::new();
-    let mut vm = Uxn::new(
-        &mut ram,
-        if args.native {
-            Backend::Native
-        } else {
-            Backend::Interpreter
-        },
-    );
+    match args.backend {
+        cli::Backend::Interpreter => {
+            run_with_backend::<backend::Interpreter>(&rom, &args)
+        }
+        #[cfg(feature = "native")]
+        cli::Backend::Native => {
+            run_with_backend::<backend::Native>(&rom, &args)
+        }
+        #[cfg(feature = "tailcall")]
+        cli::Backend::Tailcall => {
+            run_with_backend::<backend::Tailcall>(&rom, &args)
+        }
+    }
+}
+
+fn run_with_backend<B: uxn::Backend>(rom: &[u8], args: &Args) -> Result<()> {
+    let mut mem = UxnMem::boxed();
+    let mut vm = Uxn::<B>::new(&mut mem);
     let mut dev = Varvara::new();
-    let data = vm.reset(&rom);
+    let data = vm.reset(rom);
     dev.reset(data);
     dev.init_args(&mut vm, &args.args);
 
@@ -57,6 +71,13 @@ fn main() -> Result<()> {
     info!("startup complete in {:?}", start.elapsed());
 
     dev.output(&vm).check()?;
+
+    // Quit if we only care about startup
+    if args.quit {
+        return Ok(());
+    }
+
+    // Otherwise, pass CLI arguments to the device and keep going
     dev.send_args(&mut vm, &args.args).check()?;
 
     // Blocking loop, listening to the stdin reader thread

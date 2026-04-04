@@ -1,6 +1,6 @@
 [package]
 name = "raven-gui"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
@@ -17,19 +17,19 @@ log.workspace = true
 web-time.workspace = true
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
+uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.3.0" }
+varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.3.0" }
+
+[features]
+native = ["varvara/native"]
+tailcall = ["varvara/tailcall"]
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clap.workspace = true
 cpal.workspace = true
+cli = { path = "../raven-cli", package = "raven-cli", version = "0.3.0" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures.workspace = true
 web-sys.workspace = true
 cpal = { workspace = true, features = ["wasm-bindgen"] }
-
-[target.'cfg(any(target_arch = "aarch64", target_arch = "x86_64"))'.dependencies]
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2" }
-varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.2" }
-
-[target.'cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))'.dependencies]
-uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.2", default-features = false }
-varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.2", default-features = false }

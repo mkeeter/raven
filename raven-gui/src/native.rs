@@ -1,7 +1,7 @@
 use anyhow::{Context, anyhow};
 use std::{io::Read, sync::mpsc};
 
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Uxn, UxnMem, backend};
 use varvara::Varvara;
 
 use anyhow::Result;
@@ -23,9 +23,9 @@ struct Args {
     #[clap(long)]
     scale: Option<f32>,
 
-    /// Use the native assembly Uxn implementation
-    #[clap(long)]
-    native: bool,
+    /// Interpreter backend
+    #[clap(long, default_value_t = cli::Backend::Interpreter)]
+    backend: cli::Backend,
 
     /// Arguments to pass into the VM
     #[arg(trailing_var_arg = true)]
@@ -45,17 +45,26 @@ pub fn run() -> Result<()> {
     let mut rom = vec![];
     f.read_to_end(&mut rom).context("failed to read file")?;
 
-    let ram = UxnRam::new();
-    let mut vm = Uxn::new(
-        ram.leak(),
-        if args.native {
-            Backend::Native
-        } else {
-            Backend::Interpreter
-        },
-    );
+    match args.backend {
+        cli::Backend::Interpreter => {
+            run_with_backend::<backend::Interpreter>(&rom, &args)
+        }
+        #[cfg(feature = "native")]
+        cli::Backend::Native => {
+            run_with_backend::<backend::Native>(&rom, &args)
+        }
+        #[cfg(feature = "tailcall")]
+        cli::Backend::Tailcall => {
+            run_with_backend::<backend::Tailcall>(&rom, &args)
+        }
+    }
+}
+
+fn run_with_backend<B: uxn::Backend>(rom: &[u8], args: &Args) -> Result<()> {
+    let mut mem = UxnMem::boxed();
+    let mut vm = Uxn::<B>::new(&mut mem);
     let mut dev = Varvara::new();
-    let extra = vm.reset(&rom);
+    let extra = vm.reset(rom);
     dev.reset(extra);
     dev.init_args(&mut vm, &args.args);
 

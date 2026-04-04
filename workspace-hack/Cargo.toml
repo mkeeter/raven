@@ -23,12 +23,7 @@ log = { version = "0.4", default-features = false, features = ["std"] }
 num-traits = { version = "0.2" }
 regex = { version = "1", default-features = false, features = ["perf", "std"] }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "std"] }
-zerocopy = { version = "0.8", default-features = false, features = ["derive", "simd"] }
-
-[build-dependencies]
-proc-macro2 = { version = "1" }
-quote = { version = "1" }
-syn = { version = "2", features = ["full"] }
+zerocopy = { version = "0.8", default-features = false, features = ["alloc", "derive", "simd"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
@@ -36,8 +31,10 @@ memchr = { version = "2" }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 log = { version = "0.4", default-features = false, features = ["std"] }
-memchr = { version = "2" }
-syn = { version = "2", default-features = false, features = ["extra-traits", "fold", "visit"] }
+memchr = { version = "2", features = ["alloc", "std"] }
+proc-macro2 = { version = "1", features = ["proc-macro"] }
+quote = { version = "1", features = ["proc-macro"] }
+syn = { version = "2", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "visit"] }
 
 [target.aarch64-apple-darwin.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
@@ -45,13 +42,17 @@ half = { version = "2" }
 image = { version = "0.25", default-features = false, features = ["png", "tiff"] }
 
 [target.aarch64-apple-darwin.build-dependencies]
-syn = { version = "2", default-features = false, features = ["extra-traits", "fold", "visit"] }
+proc-macro2 = { version = "1", features = ["proc-macro"] }
+quote = { version = "1", features = ["proc-macro"] }
+syn = { version = "2", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "visit"] }
 
 [target.wasm32-unknown-unknown.dependencies]
 once_cell = { version = "1", default-features = false, features = ["alloc"] }
 
 [target.wasm32-unknown-unknown.build-dependencies]
-syn = { version = "2", default-features = false, features = ["extra-traits", "visit", "visit-mut"] }
+proc-macro2 = { version = "1", features = ["proc-macro"] }
+quote = { version = "1", features = ["proc-macro"] }
+syn = { version = "2", features = ["clone-impls", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "visit", "visit-mut"] }
 
 [target.x86_64-pc-windows-msvc.dependencies]
 image = { version = "0.25", default-features = false, features = ["bmp", "png"] }
@@ -59,6 +60,8 @@ windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32
 
 [target.x86_64-pc-windows-msvc.build-dependencies]
 log = { version = "0.4", default-features = false, features = ["std"] }
-syn = { version = "2", default-features = false, features = ["extra-traits", "fold", "visit"] }
+proc-macro2 = { version = "1", features = ["proc-macro"] }
+quote = { version = "1", features = ["proc-macro"] }
+syn = { version = "2", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "visit"] }
 
 ### END HAKARI SECTION

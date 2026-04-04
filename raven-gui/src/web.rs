@@ -9,8 +9,14 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys::Uint8Array;
 
 use crate::{Event, Stage, audio_setup};
-use uxn::{Backend, Uxn, UxnRam};
+use uxn::{Uxn, UxnMem};
 use varvara::Varvara;
+
+#[cfg(feature = "tailcall")]
+type Backend = uxn::backend::Tailcall;
+
+#[cfg(not(feature = "tailcall"))]
+type Backend = uxn::backend::Interpreter;
 
 pub fn run() -> Result<()> {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
@@ -39,8 +45,8 @@ pub fn run() -> Result<()> {
         .map(|(_name, data)| *data)
         .unwrap_or(include_bytes!("../../roms/controller.rom"));
 
-    let ram = UxnRam::new();
-    let mut vm = Uxn::new(ram.leak(), Backend::Interpreter);
+    let mem = UxnMem::boxed();
+    let mut vm = Uxn::<Backend>::new(Box::leak(mem));
     let mut dev = Varvara::new();
     let extra = vm.reset(rom);
     dev.reset(extra);
@@ -169,7 +175,6 @@ pub fn run() -> Result<()> {
     file_load.set_onchange(Some(a.as_ref().unchecked_ref()));
     std::mem::forget(a);
 
-    let mut _audio = None;
     let mut audio_data = Some(dev.audio_streams());
     let audio_check = document
         .get_element_by_id("audio-check")
@@ -177,11 +182,11 @@ pub fn run() -> Result<()> {
         .dyn_into::<web_sys::HtmlElement>()
         .map_err(|e| anyhow!("could not cast to HtmlElement: {e:?}"))?;
 
-    #[expect(unused_assignments)] // audio must stay alive in parent context
     let a = Closure::<dyn FnMut()>::new(move || {
         if let Some(d) = audio_data.take() {
             info!("setting up audio");
-            _audio = audio_setup(d);
+            // leak audio player so that it keeps playing
+            std::mem::forget(audio_setup(d));
         }
         let audio_check = document
             .get_element_by_id("audio-check")

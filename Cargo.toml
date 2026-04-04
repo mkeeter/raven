@@ -24,6 +24,7 @@ env_logger = "0.11.3"
 image = { version = "0.25.5", default-features = false, features = [ "png" ] }
 locked-tripwire = "0.1.1"
 log = "0.4.21"
+rustversion = "1"
 static_assertions = "1.1.0"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "*", features = ["HtmlSelectElement", "HtmlOptionElement"] }

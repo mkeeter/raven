@@ -1,11 +1,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use raven_uxn::{Backend, FIB, Uxn, UxnRam};
+use raven_uxn::{Backend, FIB, Uxn, UxnMem, backend};
 
-fn bench_fib(c: &mut Criterion, backend: Backend, name: &str) {
+fn bench_fib<B: Backend>(c: &mut Criterion, name: &str) {
     c.bench_function(name, |b| {
         b.iter(|| {
-            let mut ram = UxnRam::new();
-            let mut vm = Uxn::new(&mut ram, backend);
+            let mut ram = UxnMem::boxed();
+            let mut vm = Uxn::<B>::new(&mut ram);
             let mut dev = raven_uxn::EmptyDevice;
             let _ = vm.reset(FIB);
             vm.ram_write_byte(0x101, 23);
@@ -15,9 +15,11 @@ fn bench_fib(c: &mut Criterion, backend: Backend, name: &str) {
 }
 
 fn fibonacci_benchmark(c: &mut Criterion) {
-    bench_fib(c, Backend::Interpreter, "fibonacci/interpreter");
+    bench_fib::<backend::Interpreter>(c, "fibonacci/interpreter");
     #[cfg(feature = "native")]
-    bench_fib(c, Backend::Native, "fibonacci/native");
+    bench_fib::<backend::Native>(c, "fibonacci/native");
+    #[cfg(feature = "tailcall")]
+    bench_fib::<backend::Tailcall>(c, "fibonacci/tailcall");
 }
 
 criterion_group!(benches, fibonacci_benchmark);

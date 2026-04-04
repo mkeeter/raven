@@ -8,7 +8,7 @@ use cpal::traits::StreamTrait;
 use eframe::egui;
 use log::{error, info};
 
-/// Injected events from the [`Stage::rx`] queue
+/// Injected events from the [`Stage::event_rx`] queue
 #[derive(Debug)]
 pub enum Event {
     LoadRom(Vec<u8>),
@@ -16,8 +16,8 @@ pub enum Event {
     Console(u8),
 }
 
-pub struct Stage<'a> {
-    vm: Uxn<'a>,
+pub struct Stage<'a, B> {
+    vm: Uxn<'a, B>,
     dev: Varvara,
 
     /// Scale factor to adjust window size
@@ -44,9 +44,9 @@ pub struct Stage<'a> {
     resized: Option<Box<dyn FnMut(u16, u16)>>,
 }
 
-impl<'a> Stage<'a> {
+impl<'a, B: uxn::Backend> Stage<'a, B> {
     pub fn new(
-        vm: Uxn<'a>,
+        vm: Uxn<'a, B>,
         dev: Varvara,
         size: (u16, u16),
         scale: f32,
@@ -98,7 +98,7 @@ impl<'a> Stage<'a> {
     }
 }
 
-impl eframe::App for Stage<'_> {
+impl<B: uxn::Backend> eframe::App for Stage<'_, B> {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         while let Ok(e) = self.event_rx.try_recv() {
             match e {

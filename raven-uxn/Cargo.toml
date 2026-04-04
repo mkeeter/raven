@@ -1,6 +1,6 @@
 [package]
 name = "raven-uxn"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
@@ -13,12 +13,16 @@ zerocopy.workspace = true
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 [features]
-default = ["alloc", "native"]
-alloc = []
+default = ["alloc"]
+alloc = ["zerocopy/alloc"]
 native = []
+tailcall = []
 
 [dev-dependencies]
 criterion.workspace = true
+
+[build-dependencies]
+rustversion.workspace = true
 
 [[bench]]
 name = "fibonacci"
