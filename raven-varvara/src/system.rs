@@ -163,14 +163,14 @@ impl System {
             }
             SystemPorts::WST => {
                 let wst = v.wst;
-                vm.stack_mut().set_len(wst)
+                vm.stack_mut::<0>().set_len(wst)
             }
             SystemPorts::RST => {
                 let rst = v.rst;
-                vm.ret_mut().set_len(rst)
+                vm.rstack_mut::<0>().set_len(rst)
             }
             SystemPorts::DEBUG => {
-                for (name, st) in [("WST", vm.stack()), ("RST", vm.ret())] {
+                let run = |name, st: uxn::Stack<'_, 0u8>| {
                     print!("{name} ");
                     let n = st.len();
                     for i in (0..8).rev() {
@@ -182,7 +182,9 @@ impl System {
                         }
                     }
                     println!("<");
-                }
+                };
+                run("WST", vm.stack_mut());
+                run("WST", vm.rstack_mut());
             }
             SystemPorts::STATE => {
                 if v.state != 0 {
@@ -196,11 +198,11 @@ impl System {
     pub fn dei(&mut self, vm: &mut UxnCore, target: u8) {
         match target & 0x0F {
             SystemPorts::WST => {
-                let wst = vm.stack().len();
+                let wst = vm.stack_mut::<0>().len();
                 vm.dev_mut::<SystemPorts>().wst = wst;
             }
             SystemPorts::RST => {
-                let rst = vm.stack().len();
+                let rst = vm.stack_mut::<0>().len();
                 vm.dev_mut::<SystemPorts>().rst = rst;
             }
             _ => (),

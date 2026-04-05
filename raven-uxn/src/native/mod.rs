@@ -110,11 +110,11 @@ pub fn entry(vm: &mut UxnCore, dev: &mut dyn Device, pc: u16) -> u16 {
     // SAFETY: do you trust me?
     unsafe {
         interpreter_entry(
-            vm.stack.data.as_mut_ptr(),
-            &mut vm.stack.index as *mut _,
-            vm.ret.data.as_mut_ptr(),
-            &mut vm.ret.index as *mut _,
-            (*vm.ram).as_mut_ptr(),
+            vm.mem.stack.as_mut_ptr(),
+            &mut vm.stack_index as *mut _,
+            vm.mem.rstack.as_mut_ptr(),
+            &mut vm.rstack_index as *mut _,
+            (vm.mem.ram).as_mut_ptr(),
             pc,
             vm as *mut _,
             &mut h as *mut _,
@@ -256,24 +256,27 @@ mod test {
         assert_eq!(pc_native, pc_interp, "{op_name}: pc mismatch");
 
         assert_eq!(
-            vm_native.dev, vm_interp.dev,
+            vm_native.mem.dev, vm_interp.mem.dev,
             "{op_name}: dev memory mismatch"
         );
-        assert_eq!(vm_native.ram, vm_interp.ram, "{op_name}: ram mismatch");
         assert_eq!(
-            vm_native.stack.index, vm_interp.stack.index,
+            vm_native.mem.ram, vm_interp.mem.ram,
+            "{op_name}: ram mismatch"
+        );
+        assert_eq!(
+            vm_native.stack_index, vm_interp.stack_index,
             "{op_name}: stack index mismatch"
         );
         assert_eq!(
-            vm_native.stack.data, vm_interp.stack.data,
+            vm_native.mem.stack, vm_interp.mem.stack,
             "{op_name}: stack data mismatch"
         );
         assert_eq!(
-            vm_native.ret.index, vm_interp.ret.index,
+            vm_native.rstack_index, vm_interp.rstack_index,
             "{op_name}: ret index mismatch"
         );
         assert_eq!(
-            vm_native.ret.data, vm_interp.ret.data,
+            vm_native.mem.rstack, vm_interp.mem.rstack,
             "{op_name}: ret index mismatch"
         );
     }

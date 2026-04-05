@@ -44,31 +44,6 @@ const fn ret(flags: u8) -> bool {
 /// Size of a device in port memory
 pub const DEV_SIZE: usize = 16;
 
-/// Simple circular stack, with room for 256 items
-#[derive(Debug, Eq, PartialEq)]
-pub struct Stack<'a> {
-    data: &'a mut [u8; 256],
-
-    /// The index points to the last occupied slot, and increases on `push`
-    ///
-    /// If the buffer is empty or full, it points to `u8::MAX`.
-    index: u8,
-}
-
-impl<'a> Stack<'a> {
-    fn new(data: &'a mut [u8; 256]) -> Self {
-        Self {
-            data,
-            index: u8::MAX,
-        }
-    }
-
-    fn reset(&mut self) {
-        self.data.fill(0u8);
-        self.index = u8::MAX;
-    }
-}
-
 /// Trait for a Uxn evaluator
 pub trait Backend: Sized {
     /// Run the VM with the selected backend
@@ -128,17 +103,37 @@ pub mod backend {
 /// This type expects the user to perform all of their `pop()` calls first,
 /// followed by any `push(..)` calls.  `pop()` will either adjust the true index
 /// or a virtual index, depending on whether `keep` is set.
-struct StackView<'a, 'b, const FLAGS: u8> {
-    stack: &'a mut Stack<'b>,
+pub struct Stack<'a, const FLAGS: u8> {
+    data: &'a mut [u8; 256],
+
+    /// Actual index
+    index: &'a mut u8,
 
     /// Virtual index, used in `keep` mode
     offset: u8,
 }
 
-impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
+impl<'a, const FLAGS: u8> Stack<'a, FLAGS> {
     #[inline(always)]
-    fn new(stack: &'a mut Stack<'b>) -> Self {
-        Self { stack, offset: 0 }
+    fn new(data: &'a mut [u8; 256], index: &'a mut u8) -> Self {
+        Self {
+            data,
+            index,
+            offset: 0,
+        }
+    }
+
+    /// Peeks at a byte from the stack
+    #[inline(always)]
+    pub fn peek_byte_at(&self, offset: u8) -> u8 {
+        self.data[usize::from(self.index.wrapping_sub(offset))]
+    }
+
+    #[inline(always)]
+    fn peek_short_at(&self, offset: u8) -> u16 {
+        let lo = self.peek_byte_at(offset);
+        let hi = self.peek_byte_at(offset.wrapping_add(1));
+        u16::from_le_bytes([lo, hi])
     }
 
     /// Pops a single value from the stack
@@ -146,7 +141,7 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
     /// Returns a [`Value::Short`] if `self.short` is set, and a [`Value::Byte`]
     /// otherwise.
     ///
-    /// If `self.keep` is set, then only the view offset ([`StackView::offset`])
+    /// If `self.keep` is set, then only the view offset ([`Stack::offset`])
     /// is changed; otherwise, the stack index ([`Stack::index`]) is changed.
     #[inline(always)]
     fn pop(&mut self) -> Value {
@@ -160,33 +155,40 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
     #[inline(always)]
     fn pop_byte(&mut self) -> u8 {
         if keep(FLAGS) {
-            let v = self.stack.peek_byte_at(self.offset);
+            let v = self.peek_byte_at(self.offset);
             self.offset = self.offset.wrapping_add(1);
             v
         } else {
-            self.stack.pop_byte()
+            let out = self.data[usize::from(*self.index)];
+            *self.index = self.index.wrapping_sub(1);
+            out
         }
     }
 
     #[inline(always)]
     fn pop_short(&mut self) -> u16 {
         if keep(FLAGS) {
-            let v = self.stack.peek_short_at(self.offset);
+            let v = self.peek_short_at(self.offset);
             self.offset = self.offset.wrapping_add(2);
             v
         } else {
-            self.stack.pop_short()
+            let lo = self.pop_byte();
+            let hi = self.pop_byte();
+            u16::from_le_bytes([lo, hi])
         }
     }
 
     #[inline(always)]
     fn push(&mut self, v: Value) {
-        self.stack.push(v);
+        match v {
+            Value::Short(v) => self.push_short(v),
+            Value::Byte(v) => self.push_byte(v),
+        }
     }
 
     #[inline(always)]
     fn reserve(&mut self, n: u8) {
-        self.stack.reserve(n);
+        *self.index = self.index.wrapping_add(n);
     }
 
     /// Replaces the top item on the stack with the given value
@@ -194,22 +196,55 @@ impl<'a, 'b, const FLAGS: u8> StackView<'a, 'b, FLAGS> {
     fn emplace(&mut self, v: Value) {
         match v {
             Value::Short(v) => {
-                self.stack.emplace_short(v);
+                self.emplace_short(v);
             }
             Value::Byte(v) => {
-                self.stack.emplace_byte(v);
+                self.emplace_byte(v);
             }
         }
     }
 
     #[inline(always)]
+    fn emplace_byte(&mut self, v: u8) {
+        self.data[usize::from(*self.index)] = v;
+    }
+
+    #[inline(always)]
+    fn emplace_short(&mut self, v: u16) {
+        let [lo, hi] = v.to_le_bytes();
+        self.data[usize::from(self.index.wrapping_sub(1))] = hi;
+        self.data[usize::from(*self.index)] = lo;
+    }
+
+    #[inline(always)]
     fn push_byte(&mut self, v: u8) {
-        self.stack.push_byte(v);
+        *self.index = self.index.wrapping_add(1);
+        self.data[usize::from(*self.index)] = v;
     }
 
     #[inline(always)]
     fn push_short(&mut self, v: u16) {
-        self.stack.push_short(v);
+        let [lo, hi] = v.to_le_bytes();
+        self.push_byte(hi);
+        self.push_byte(lo);
+    }
+
+    /// Sets the number of items in the stack
+    #[inline(always)]
+    pub fn set_len(&mut self, n: u8) {
+        *self.index = n.wrapping_sub(1);
+    }
+
+    /// Returns the number of items in the stack
+    #[inline(always)]
+    pub fn len(&self) -> u8 {
+        self.index.wrapping_add(1)
+    }
+
+    /// Checks whether the stack is empty
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -249,91 +284,6 @@ impl From<Value> for u16 {
             Value::Short(v) => v,
             Value::Byte(v) => u16::from(v),
         }
-    }
-}
-
-impl Stack<'_> {
-    #[inline(always)]
-    fn pop_byte(&mut self) -> u8 {
-        let out = self.data[usize::from(self.index)];
-        self.index = self.index.wrapping_sub(1);
-        out
-    }
-
-    #[inline(always)]
-    fn pop_short(&mut self) -> u16 {
-        let lo = self.pop_byte();
-        let hi = self.pop_byte();
-        u16::from_le_bytes([lo, hi])
-    }
-
-    #[inline(always)]
-    fn push_byte(&mut self, v: u8) {
-        self.index = self.index.wrapping_add(1);
-        self.data[usize::from(self.index)] = v;
-    }
-
-    #[inline(always)]
-    fn emplace_byte(&mut self, v: u8) {
-        self.data[usize::from(self.index)] = v;
-    }
-
-    #[inline(always)]
-    fn emplace_short(&mut self, v: u16) {
-        let [lo, hi] = v.to_le_bytes();
-        self.data[usize::from(self.index.wrapping_sub(1))] = hi;
-        self.data[usize::from(self.index)] = lo;
-    }
-
-    #[inline(always)]
-    fn reserve(&mut self, n: u8) {
-        self.index = self.index.wrapping_add(n);
-    }
-
-    #[inline(always)]
-    fn push_short(&mut self, v: u16) {
-        let [lo, hi] = v.to_le_bytes();
-        self.push_byte(hi);
-        self.push_byte(lo);
-    }
-
-    #[inline(always)]
-    fn push(&mut self, v: Value) {
-        match v {
-            Value::Short(v) => self.push_short(v),
-            Value::Byte(v) => self.push_byte(v),
-        }
-    }
-
-    /// Peeks at a byte from the data stack
-    #[inline(always)]
-    pub fn peek_byte_at(&self, offset: u8) -> u8 {
-        self.data[usize::from(self.index.wrapping_sub(offset))]
-    }
-
-    #[inline(always)]
-    fn peek_short_at(&self, offset: u8) -> u16 {
-        let lo = self.peek_byte_at(offset);
-        let hi = self.peek_byte_at(offset.wrapping_add(1));
-        u16::from_le_bytes([lo, hi])
-    }
-
-    /// Returns the number of items in the stack
-    #[inline(always)]
-    pub fn len(&self) -> u8 {
-        self.index.wrapping_add(1)
-    }
-
-    /// Checks whether the stack is empty
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Sets the number of items in the stack
-    #[inline(always)]
-    pub fn set_len(&mut self, n: u8) {
-        self.index = n.wrapping_sub(1);
     }
 }
 
@@ -378,19 +328,16 @@ impl<'a, B> core::ops::DerefMut for Uxn<'a, B> {
 /// `UxnCore` into its component pieces, which requires ownership; the [`Uxn`]
 /// contains an `Option<UxnCore>` which we can steal then replace.
 pub struct UxnCore<'a> {
-    /// Device memory
-    dev: &'a mut [u8; 256],
-    /// 64 KiB of VM memory
-    ram: &'a mut [u8; 65536],
-    /// 256-byte data stack
-    stack: Stack<'a>,
-    /// 256-byte return stack
-    ret: Stack<'a>,
+    mem: &'a mut UxnMem,
+    /// Data stack index
+    stack_index: u8,
+    /// Return stack index
+    rstack_index: u8,
 }
 
 macro_rules! op_cmp {
     ($self:ident, $flags:ident, $f:expr) => {{
-        let mut s = $self.stack_view::<{ $flags }>();
+        let mut s = $self.stack_mut::<{ $flags }>();
         #[allow(clippy::redundant_closure_call)]
         let v = if short($flags) {
             let b = s.pop_short();
@@ -407,7 +354,7 @@ macro_rules! op_cmp {
 
 macro_rules! op_bin {
     ($self:ident, $flags:ident, $f:expr) => {{
-        let mut s = $self.stack_view::<{ $flags }>();
+        let mut s = $self.stack_mut::<{ $flags }>();
         #[allow(clippy::redundant_closure_call)]
         if short($flags) {
             let b = s.pop_short();
@@ -448,6 +395,14 @@ impl UxnMem {
         }
     }
 
+    /// Fill all memory with zeros
+    pub fn reset(&mut self) {
+        self.dev.fill(0);
+        self.ram.fill(0);
+        self.stack.fill(0);
+        self.rstack.fill(0);
+    }
+
     /// Builds a new boxed [`UxnMem`] on the heap
     #[cfg(feature = "alloc")]
     pub fn boxed() -> alloc::boxed::Box<Self> {
@@ -458,25 +413,18 @@ impl UxnMem {
 impl<'a> UxnCore<'a> {
     /// Build a new `Uxn` with zeroed memory
     pub fn new(mem: &'a mut UxnMem) -> Self {
-        let UxnMem {
-            dev,
-            stack,
-            rstack,
-            ram,
-        } = mem;
-        ram.fill(0);
+        mem.reset();
         Self {
-            dev,
-            ram,
-            stack: Stack::new(stack),
-            ret: Stack::new(rstack),
+            stack_index: u8::MAX,
+            rstack_index: u8::MAX,
+            mem,
         }
     }
 
     /// Reads a byte from RAM at the program counter
     #[inline]
     fn next(&self, pc: &mut u16) -> u8 {
-        let out = self.ram[usize::from(*pc)];
+        let out = self.mem.ram[usize::from(*pc)];
         *pc = pc.wrapping_add(1);
         out
     }
@@ -494,11 +442,11 @@ impl<'a> UxnCore<'a> {
         match v {
             Value::Short(v) => {
                 let [lo, hi] = v.to_le_bytes();
-                self.ram[usize::from(addr)] = hi;
-                self.ram[usize::from(addr.wrapping_add(1))] = lo;
+                self.mem.ram[usize::from(addr)] = hi;
+                self.mem.ram[usize::from(addr.wrapping_add(1))] = lo;
             }
             Value::Byte(v) => {
-                self.ram[usize::from(addr)] = v;
+                self.mem.ram[usize::from(addr)] = v;
             }
         }
     }
@@ -506,33 +454,41 @@ impl<'a> UxnCore<'a> {
     #[inline(always)]
     fn ram_read<const FLAGS: u8>(&self, addr: u16) -> Value {
         if short(FLAGS) {
-            let hi = self.ram[usize::from(addr)];
-            let lo = self.ram[usize::from(addr.wrapping_add(1))];
+            let hi = self.mem.ram[usize::from(addr)];
+            let lo = self.mem.ram[usize::from(addr.wrapping_add(1))];
             Value::Short(u16::from_le_bytes([lo, hi]))
         } else {
-            let v = self.ram[usize::from(addr)];
+            let v = self.mem.ram[usize::from(addr)];
             Value::Byte(v)
         }
     }
 
+    /// Returns a mutable handle to the data stack
+    ///
+    /// You will likely want to call this with `stack_mut::<0>`, unless you know
+    /// what you're doing.
     #[inline(always)]
-    fn stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, 'a, FLAGS> {
-        let stack = if ret(FLAGS) {
-            &mut self.ret
+    pub fn stack_mut<const FLAGS: u8>(&mut self) -> Stack<'_, FLAGS> {
+        let (stack, index) = if ret(FLAGS) {
+            (&mut self.mem.rstack, &mut self.rstack_index)
         } else {
-            &mut self.stack
+            (&mut self.mem.stack, &mut self.stack_index)
         };
-        StackView::new(stack)
+        Stack::new(stack, index)
     }
 
+    /// Returns a mutable handle to the return stack
+    ///
+    /// You will likely want to call this with `stack_mut::<0>`, unless you know
+    /// what you're doing.
     #[inline(always)]
-    fn ret_stack_view<const FLAGS: u8>(&mut self) -> StackView<'_, 'a, FLAGS> {
-        let stack = if ret(FLAGS) {
-            &mut self.stack
+    pub fn rstack_mut<const FLAGS: u8>(&mut self) -> Stack<'_, FLAGS> {
+        let (stack, index) = if ret(FLAGS) {
+            (&mut self.mem.stack, &mut self.stack_index)
         } else {
-            &mut self.ret
+            (&mut self.mem.rstack, &mut self.rstack_index)
         };
-        StackView::new(stack)
+        Stack::new(stack, index)
     }
 
     /// Reads a word from RAM
@@ -540,15 +496,15 @@ impl<'a> UxnCore<'a> {
     /// If the address is at the top of RAM, the second byte will wrap to 0
     #[inline(always)]
     pub fn ram_read_word(&self, addr: u16) -> u16 {
-        let hi = self.ram[usize::from(addr)];
-        let lo = self.ram[usize::from(addr.wrapping_add(1))];
+        let hi = self.mem.ram[usize::from(addr)];
+        let lo = self.mem.ram[usize::from(addr.wrapping_add(1))];
         u16::from_le_bytes([lo, hi])
     }
 
     /// Writes to the given address in device memory
     #[inline(always)]
     pub fn write_dev_mem(&mut self, addr: u8, value: u8) {
-        self.dev[usize::from(addr)] = value;
+        self.mem.dev[usize::from(addr)] = value;
     }
 
     /// Converts raw ports memory into a [`Ports`] object
@@ -561,14 +517,15 @@ impl<'a> UxnCore<'a> {
     #[inline(always)]
     pub fn dev_at<D: Ports>(&self, pos: u8) -> &D {
         Self::check_dev_size::<D>();
-        D::ref_from_bytes(&self.dev[usize::from(pos)..][..DEV_SIZE]).unwrap()
+        D::ref_from_bytes(&self.mem.dev[usize::from(pos)..][..DEV_SIZE])
+            .unwrap()
     }
 
     /// Returns an exclusive reference to a device located at `pos`
     #[inline(always)]
     pub fn dev_mut_at<D: Ports>(&mut self, pos: u8) -> &mut D {
         Self::check_dev_size::<D>();
-        D::mut_from_bytes(&mut self.dev[usize::from(pos)..][..DEV_SIZE])
+        D::mut_from_bytes(&mut self.mem.dev[usize::from(pos)..][..DEV_SIZE])
             .unwrap()
     }
 
@@ -581,37 +538,13 @@ impl<'a> UxnCore<'a> {
     /// Reads a byte from RAM
     #[inline(always)]
     pub fn ram_read_byte(&self, addr: u16) -> u8 {
-        self.ram[usize::from(addr)]
+        self.mem.ram[usize::from(addr)]
     }
 
     /// Writes a byte to RAM
     #[inline(always)]
     pub fn ram_write_byte(&mut self, addr: u16, v: u8) {
-        self.ram[usize::from(addr)] = v;
-    }
-
-    /// Shared borrow of the working stack
-    #[inline(always)]
-    pub fn stack(&self) -> &Stack<'a> {
-        &self.stack
-    }
-
-    /// Mutable borrow of the working stack
-    #[inline(always)]
-    pub fn stack_mut(&mut self) -> &mut Stack<'a> {
-        &mut self.stack
-    }
-
-    /// Shared borrow of the return stack
-    #[inline(always)]
-    pub fn ret(&self) -> &Stack<'_> {
-        &self.ret
-    }
-
-    /// Mutable borrow of the return stack
-    #[inline(always)]
-    pub fn ret_mut(&mut self) -> &mut Stack<'a> {
-        &mut self.ret
+        self.mem.ram[usize::from(addr)] = v;
     }
 
     /// Resets system memory and loads the given ROM at address `0x100`
@@ -620,12 +553,11 @@ impl<'a> UxnCore<'a> {
     /// into extension memory.
     #[must_use]
     pub fn reset<'b>(&mut self, rom: &'b [u8]) -> &'b [u8] {
-        self.dev.fill(0);
-        self.ram.fill(0);
-        self.stack.reset();
-        self.ret.reset();
-        let n = (self.ram.len() - 0x100).min(rom.len());
-        self.ram[0x100..][..n].copy_from_slice(&rom[..n]);
+        self.mem.reset();
+        self.stack_index = u8::MAX;
+        self.rstack_index = u8::MAX;
+        let n = (self.mem.ram.len() - 0x100).min(rom.len());
+        self.mem.ram[0x100..][..n].copy_from_slice(&rom[..n]);
         &rom[n..]
     }
 
@@ -938,7 +870,7 @@ impl<'a> UxnCore<'a> {
     #[inline]
     pub fn jci(&mut self, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
-        if self.stack.pop_byte() != 0 {
+        if self.stack_mut::<0>().pop_byte() != 0 {
             pc = pc.wrapping_add(dt);
         }
         Some(pc)
@@ -966,7 +898,7 @@ impl<'a> UxnCore<'a> {
     #[inline]
     pub fn jsi(&mut self, mut pc: u16) -> Option<u16> {
         let dt = self.next2(&mut pc);
-        self.ret.push(Value::Short(pc));
+        self.rstack_mut::<0>().push(Value::Short(pc));
         Some(pc.wrapping_add(dt))
     }
 
@@ -991,7 +923,7 @@ impl<'a> UxnCore<'a> {
         } else {
             Value::Byte(self.next(&mut pc))
         };
-        self.stack_view::<FLAGS>().push(v);
+        self.stack_mut::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1010,7 +942,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn inc<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let v = s.pop();
         s.push(v.wrapping_add(1));
         Some(pc)
@@ -1031,7 +963,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn pop<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        self.stack_view::<FLAGS>().pop();
+        self.stack_mut::<FLAGS>().pop();
         Some(pc)
     }
 
@@ -1051,7 +983,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn nip<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let v = s.pop();
         let _ = s.pop();
         s.push(v);
@@ -1074,7 +1006,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn swp<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let b = s.pop();
         let a = s.pop();
         s.push(b);
@@ -1099,7 +1031,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn rot<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let c = s.pop();
         let b = s.pop();
         let a = s.pop();
@@ -1124,7 +1056,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn dup<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let v = s.pop();
         s.push(v);
         s.push(v);
@@ -1147,7 +1079,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn ovr<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let b = s.pop();
         let a = s.pop();
         s.push(a);
@@ -1254,7 +1186,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn jmp<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         Some(Self::jump_offset(pc, s.pop()))
     }
 
@@ -1274,7 +1206,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn jcn<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let dst = s.pop();
         let cond = s.pop_byte();
         Some(if cond != 0 {
@@ -1300,8 +1232,8 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn jsr<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        self.ret_stack_view::<FLAGS>().push(Value::Short(pc));
-        let mut s = self.stack_view::<FLAGS>();
+        self.rstack_mut::<FLAGS>().push(Value::Short(pc));
+        let mut s = self.stack_mut::<FLAGS>();
         Some(Self::jump_offset(pc, s.pop()))
     }
 
@@ -1321,8 +1253,8 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn sth<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let v = self.stack_view::<FLAGS>().pop();
-        self.ret_stack_view::<FLAGS>().push(v);
+        let v = self.stack_mut::<FLAGS>().pop();
+        self.rstack_mut::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1339,9 +1271,9 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn ldz<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let addr = self.stack_view::<FLAGS>().pop_byte();
+        let addr = self.stack_mut::<FLAGS>().pop_byte();
         let v = self.ram_read::<FLAGS>(u16::from(addr));
-        self.stack_view::<FLAGS>().push(v);
+        self.stack_mut::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1357,7 +1289,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn stz<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let addr = s.pop_byte();
         let v = s.pop();
         self.ram_write(u16::from(addr), v);
@@ -1378,10 +1310,10 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn ldr<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let offset = self.stack_view::<FLAGS>().pop_byte() as i8;
+        let offset = self.stack_mut::<FLAGS>().pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
         let v = self.ram_read::<FLAGS>(addr);
-        self.stack_view::<FLAGS>().push(v);
+        self.stack_mut::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1399,7 +1331,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn str<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let offset = s.pop_byte() as i8;
         let addr = pc.wrapping_add_signed(i16::from(offset));
         let v = s.pop();
@@ -1420,9 +1352,9 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn lda<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let addr = self.stack_view::<FLAGS>().pop_short();
+        let addr = self.stack_mut::<FLAGS>().pop_short();
         let v = self.ram_read::<FLAGS>(addr);
-        self.stack_view::<FLAGS>().push(v);
+        self.stack_mut::<FLAGS>().push(v);
         Some(pc)
     }
 
@@ -1439,7 +1371,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn sta<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let addr = s.pop_short();
         let v = s.pop();
         self.ram_write(addr, v);
@@ -1460,7 +1392,7 @@ impl<'a> UxnCore<'a> {
         pc: u16,
         dev: &mut dyn Device,
     ) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let i = s.pop_byte();
 
         // For compatibility with the C implementation, we'll
@@ -1471,17 +1403,17 @@ impl<'a> UxnCore<'a> {
         let v = if short(FLAGS) {
             s.reserve(2);
             dev.dei(self, i);
-            let hi = self.dev[usize::from(i)];
+            let hi = self.mem.dev[usize::from(i)];
             let j = i.wrapping_add(1);
             dev.dei(self, j);
-            let lo = self.dev[usize::from(j)];
+            let lo = self.mem.dev[usize::from(j)];
             Value::Short(u16::from_le_bytes([lo, hi]))
         } else {
             s.reserve(1);
             dev.dei(self, i);
-            Value::Byte(self.dev[usize::from(i)])
+            Value::Byte(self.mem.dev[usize::from(i)])
         };
-        self.stack_view::<FLAGS>().emplace(v);
+        self.stack_mut::<FLAGS>().emplace(v);
         Some(pc)
     }
 
@@ -1499,20 +1431,20 @@ impl<'a> UxnCore<'a> {
         pc: u16,
         dev: &mut dyn Device,
     ) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let i = s.pop_byte();
         let mut run = true;
         match s.pop() {
             Value::Short(v) => {
                 let [lo, hi] = v.to_le_bytes();
                 let j = i.wrapping_add(1);
-                self.dev[usize::from(i)] = hi;
+                self.mem.dev[usize::from(i)] = hi;
                 run &= dev.deo(self, i);
-                self.dev[usize::from(j)] = lo;
+                self.mem.dev[usize::from(j)] = lo;
                 run &= dev.deo(self, j);
             }
             Value::Byte(v) => {
-                self.dev[usize::from(i)] = v;
+                self.mem.dev[usize::from(i)] = v;
                 run &= dev.deo(self, i);
             }
         }
@@ -1645,7 +1577,7 @@ impl<'a> UxnCore<'a> {
     /// ```
     #[inline]
     pub fn sft<const FLAGS: u8>(&mut self, pc: u16) -> Option<u16> {
-        let mut s = self.stack_view::<FLAGS>();
+        let mut s = self.stack_mut::<FLAGS>();
         let shift = s.pop_byte();
         let shr = u32::from(shift & 0xF);
         let shl = u32::from(shift >> 4);
@@ -2127,11 +2059,11 @@ mod test {
                 match s.len() {
                     2 => {
                         let v = u8::from_str_radix(s, 16).unwrap();
-                        vm.stack.push_byte(v);
+                        vm.stack_mut::<0>().push_byte(v);
                     }
                     4 => {
                         let v = u16::from_str_radix(s, 16).unwrap();
-                        vm.stack.push_short(v);
+                        vm.stack_mut::<0>().push_short(v);
                     }
                     _ => panic!("invalid length for literal: {i:?}"),
                 }
@@ -2145,11 +2077,11 @@ mod test {
                         expected.push(u8::from_str_radix(s, 16).unwrap());
                     }
                 }
-                vm.ram[0] = op.unwrap();
+                vm.mem.ram[0] = op.unwrap();
                 vm.run(&mut dev, 0);
                 let mut actual = vec![];
-                while vm.stack.index != u8::MAX {
-                    actual.push(vm.stack.pop_byte());
+                while vm.stack_index != u8::MAX {
+                    actual.push(vm.stack_mut::<0>().pop_byte());
                 }
                 actual.reverse();
                 if actual != expected {
@@ -2258,7 +2190,7 @@ mod test {
             vm.ram_write_byte(0x101, i);
             let mut dev = EmptyDevice;
             vm.run(&mut dev, 0x100);
-            vm.stack_view::<0b001>().pop_short()
+            vm.stack_mut::<0b001>().pop_short()
         };
 
         let fib = |i| -> u32 {
@@ -2315,8 +2247,8 @@ mod test {
                 let mut $vm = Uxn::<backend::Interpreter>::new(&mut ram);
                 let _ = $vm.reset($data);
                 for d in $data {
-                    $vm.stack.push(Value::Byte(*d));
-                    $vm.ret.push(Value::Byte(*d));
+                    $vm.stack_mut::<0>().push(Value::Byte(*d));
+                    $vm.rstack_mut::<0>().push(Value::Byte(*d));
                 }
             };
         }

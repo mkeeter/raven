@@ -1,12 +1,9 @@
-use crate::{Device, Stack, UxnCore};
+use crate::{Device, UxnCore, UxnMem};
 
 type TailFn = for<'a> extern "rust-preserve-none" fn(
-    &'a mut [u8; 256],
     u8,
-    &'a mut [u8; 256],
     u8,
-    &'a mut [u8; 256],
-    &'a mut [u8; 65536],
+    &'a mut UxnMem,
     &'static FunctionTable,
     u16,
     &mut dyn Device,
@@ -20,12 +17,9 @@ pub fn entry<'a>(
 ) -> (UxnCore<'a>, u16) {
     let op = core.next(&mut pc);
     TABLE.0[op as usize](
-        core.stack.data,
-        core.stack.index,
-        core.ret.data,
-        core.ret.index,
-        core.dev,
-        core.ram,
+        core.stack_index,
+        core.rstack_index,
+        core.mem,
         &TABLE,
         pc,
         dev,
@@ -303,39 +297,24 @@ macro_rules! tail_fn {
     };
     ($name:ident $(::<$flags:ident>)?[$($arg0:ident: $ty0:ty),*][$($arg1:ident: $ty1:ty),*]) => {
         extern "rust-preserve-none" fn $name<'a, $(const $flags: u8)?>(
-            stack_data: &'a mut [u8; 256],
             stack_index: u8,
-            rstack_data: &'a mut [u8; 256],
             rstack_index: u8,
-            dev: &'a mut [u8; 256],
-            ram: &'a mut [u8; 65536],
+            mem: &'a mut UxnMem,
             table: &'static FunctionTable,
             pc: u16,
             $($arg0: $ty0),*
             $($arg1: $ty1),*
         ) -> (UxnCore<'a>, u16) {
             let mut core = UxnCore {
-                stack: Stack {
-                    data: stack_data,
-                    index: stack_index,
-                },
-                ret: Stack {
-                    data: rstack_data,
-                    index: rstack_index,
-                },
-                dev,
-                ram,
+                stack_index, rstack_index, mem,
             };
             match core.$name::<$($flags)?>(pc, $($arg0),*) {
                 Some(mut pc) => {
                     let op = core.next(&mut pc);
                     become table.0[op as usize](
-                        core.stack.data,
-                        core.stack.index,
-                        core.ret.data,
-                        core.ret.index,
-                        core.dev,
-                        core.ram,
+                        core.stack_index,
+                        core.rstack_index,
+                        core.mem,
                         table,
                         pc,
                         $($arg0),*
