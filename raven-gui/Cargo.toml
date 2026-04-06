@@ -1,6 +1,6 @@
 [package]
 name = "raven-gui"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 license = "MPL-2.0"
 repository = "https://github.com/mkeeter/raven"
@@ -21,8 +21,8 @@ uxn = { path = "../raven-uxn", package = "raven-uxn", version = "0.3.0" }
 varvara = { path = "../raven-varvara", package = "raven-varvara", version = "0.3.0" }
 
 [features]
-native = ["varvara/native"]
-tailcall = ["varvara/tailcall"]
+native = ["varvara/native", "cli/native"]
+tailcall = ["varvara/tailcall", "cli/tailcall"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clap.workspace = true
